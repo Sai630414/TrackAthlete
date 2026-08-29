@@ -30,6 +30,18 @@ export function AuthProvider({ children }) {
       setSession(next);
       return data.user;
     },
+    async forgotPassword(email) {
+      const { data } = await api.post('/auth/forgot-password', { email });
+      return data;
+    },
+    async verifyResetOTP(email, otp) {
+      const { data } = await api.post('/auth/verify-reset-otp', { email, otp });
+      return data;
+    },
+    async resetPassword(payload) {
+      const { data } = await api.post('/auth/reset-password', payload);
+      return data;
+    },
     logout() {
       localStorage.removeItem(storageKey);
       setSession(null);

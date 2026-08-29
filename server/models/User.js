@@ -52,6 +52,13 @@ const UserSchema = new mongoose.Schema({
     coordinates: { type: [Number] }
   },
 
+  // Password Reset & Authentication Fields
+  resetPasswordOTP: String,
+  resetPasswordOTPExpires: Date,
+  resetPasswordToken: String,
+  resetPasswordTokenExpires: Date,
+  isEmailVerified: { type: Boolean, default: false },
+
   createdAt: { type: Date, default: Date.now }
 });
 
