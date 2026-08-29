@@ -1,0 +1,72 @@
+trackathlete/
+|
+|-- README.md                          <- START HERE: setup instructions + design decisions
+|-- PROJECT_STRUCTURE.txt              <- this file
+|-- .gitignore
+|
+|-- client/                            FRONTEND — React + Vite + Tailwind
+|   |-- package.json
+|   |-- vite.config.js
+|   |-- tailwind.config.js
+|   |-- postcss.config.js
+|   |-- index.html
+|   `-- src/
+|       |-- main.jsx
+|       |-- App.jsx                    <- router + sidebar shell
+|       |-- index.css
+|       |-- services/
+|       |   `-- api.js                 <- axios instance (proxies /api -> backend)
+|       |-- components/
+|       |   |-- Sidebar.jsx
+|       |   |-- SportRankCard.jsx      <- ranked sport card w/ expandable breakdown
+|       |   `-- RuleBreakdownCard.jsx  <- single rule's score + evidence
+|       `-- pages/
+|           |-- ParentDashboard.jsx    <- FULLY BUILT: City/Sport/Radius search +
+|           |                             "Not satisfied? Explore better sports" ->
+|           |                             11-rule recommender results
+|           |-- AthleteDashboard.jsx   <- stub, ready to build out
+|           |-- CoachDashboard.jsx     <- stub, ready to build out
+|           |-- SponsorDashboard.jsx   <- stub, ready to build out
+|           `-- AcademyDashboard.jsx   <- stub, ready to build out
+|
+`-- server/                            BACKEND — Node.js + Express + MongoDB
+    |-- package.json
+    |-- .env.example
+    |-- server.js                      <- app entrypoint
+    |-- config/
+    |   `-- db.js                      <- mongoose connection
+    |-- models/
+    |   |-- User.js                    <- role: athlete|parent|coach|sponsor|academy|admin
+    |   |-- Academy.js
+    |   |-- SAICentre.js
+    |   |-- SportProfile.js            <- CORE: admin-seeded reference data for rules 3-9,11
+    |   |-- FederationStatus.js
+    |   |-- SportsQuota.js
+    |   |-- RoadmapStage.js
+    |   |-- Connection.js              <- coach-athlete requests + session notes
+    |   |-- Sponsorship.js
+    |   `-- Tournament.js
+    |-- routes/
+    |   |-- auth.routes.js
+    |   |-- parent.routes.js           <- CORE: /reference /search /recommend
+    |   |-- athlete.routes.js
+    |   |-- coach.routes.js
+    |   |-- academy.routes.js
+    |   |-- sponsor.routes.js
+    |   |-- tournament.routes.js
+    |   `-- reference.routes.js
+    |-- controllers/
+    |   `-- parent.controller.js       <- CORE: search + recommend endpoint logic
+    |-- utils/
+    |   |-- recommender.js             <- CORE: the full 11-rule scoring engine
+    |   |-- geo.js                     <- Haversine distance + shared distance curve
+    |   `-- indianCities.js            <- static city list w/ coordinates (dropdown data)
+    |-- socket/
+    |   `-- index.js                   <- Socket.IO stub, ready for real-time notifications
+    `-- seed/
+        |-- seed.js                    <- run with `npm run seed`
+        `-- data/
+            |-- saiCentres.json        <- 21 real SAI centres, nationwide, 3 pilot sports
+            |-- academies.json         <- 5 private academies, Vijayawada-scoped
+            `-- sportProfiles.json     <- national + AP-state profiles, 3 pilot sports
+                                           (ILLUSTRATIVE — replace with real research)

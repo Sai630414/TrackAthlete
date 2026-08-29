@@ -1,0 +1,62 @@
+[
+  {
+    "name": "Vijayawada Taekwondo Academy",
+    "sports": ["Taekwondo"],
+    "city": "Vijayawada",
+    "state": "Andhra Pradesh",
+    "feeRangeMin": 1500,
+    "feeRangeMax": 3000,
+    "contact": "+91-9000000001",
+    "acceptingStudents": true,
+    "verified": true,
+    "lat": 16.5100, "lng": 80.6350
+  },
+  {
+    "name": "Guntur Shuttle Sports Club",
+    "sports": ["Badminton"],
+    "city": "Vijayawada",
+    "state": "Andhra Pradesh",
+    "feeRangeMin": 2000,
+    "feeRangeMax": 4000,
+    "contact": "+91-9000000002",
+    "acceptingStudents": true,
+    "verified": true,
+    "lat": 16.4900, "lng": 80.6600
+  },
+  {
+    "name": "Krishna District Table Tennis Academy",
+    "sports": ["Table Tennis"],
+    "city": "Vijayawada",
+    "state": "Andhra Pradesh",
+    "feeRangeMin": 1000,
+    "feeRangeMax": 2500,
+    "contact": "+91-9000000003",
+    "acceptingStudents": true,
+    "verified": true,
+    "lat": 16.5200, "lng": 80.6200
+  },
+  {
+    "name": "Bandar Road Combat Sports Centre",
+    "sports": ["Taekwondo", "Karate"],
+    "city": "Vijayawada",
+    "state": "Andhra Pradesh",
+    "feeRangeMin": 1200,
+    "feeRangeMax": 2800,
+    "contact": "+91-9000000004",
+    "acceptingStudents": true,
+    "verified": false,
+    "lat": 16.4980, "lng": 80.6450
+  },
+  {
+    "name": "Amaravati Racquet Sports Academy",
+    "sports": ["Badminton", "Table Tennis"],
+    "city": "Vijayawada",
+    "state": "Andhra Pradesh",
+    "feeRangeMin": 1800,
+    "feeRangeMax": 3500,
+    "contact": "+91-9000000005",
+    "acceptingStudents": true,
+    "verified": true,
+    "lat": 16.5300, "lng": 80.6100
+  }
+]

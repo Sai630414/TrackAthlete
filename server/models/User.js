@@ -1,0 +1,60 @@
+const mongoose = require('mongoose');
+
+const UserSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  passwordHash: { type: String, required: true },
+  role: { type: String, enum: ['athlete', 'parent', 'coach', 'sponsor', 'academy', 'admin'], required: true },
+
+  // Athlete-specific
+  sport: String,
+  beltRank: String,
+  age: Number,
+  achievements: [String],
+  videoLink: String,
+  seekingSponsorship: Boolean,
+  sponsorshipReason: String,
+  federationState: String, // state used to look up FederationStatus
+  relocationFlexible: { type: Boolean, default: true },
+  tournaments: [{
+    tournamentName: String,
+    year: String,
+    category: String,
+    position: String
+  }],
+
+  // Parent-specific
+  childName: String,
+  childAge: Number,
+  childSport: String,
+
+  // Coach-specific
+  certifications: [String],
+  yearsExperience: Number,
+  acceptingAthletes: { type: Boolean, default: true },
+
+  // Sponsor-specific
+  organizationName: String,
+  budgetRange: String,
+  targetSports: [String],
+
+  // Academy-specific
+  academyName: String,
+  sportsOffered: [String],
+  contactPhone: String,
+  address: String,
+
+  // Location (used for distance calculations across roles)
+  city: String,
+  state: String,
+  location: {
+    type: { type: String, enum: ['Point'] },
+    coordinates: { type: [Number] }
+  },
+
+  createdAt: { type: Date, default: Date.now }
+});
+
+UserSchema.index({ location: '2dsphere' }, { sparse: true });
+
+module.exports = mongoose.model('User', UserSchema);
