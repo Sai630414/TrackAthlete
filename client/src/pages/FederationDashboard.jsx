@@ -710,24 +710,28 @@ export default function FederationDashboard() {
               <button onClick={() => setShowCreateEventModal(false)} className="text-[#b9d9bf] hover:text-white cursor-pointer"><XCircle size={18} /></button>
             </div>
 
-            <form onSubmit={handleCreateEvent} className="p-5 space-y-3">
+            <form onSubmit={handleCreateEvent} className="p-5 space-y-4">
+              {/* 1. Championship / Event Name * */}
               <div>
-                <Label required>Championship / Event Name</Label>
+                <Label required className="font-bold text-xs">Championship / Event Name *</Label>
                 <Input
                   value={eventForm.eventName}
                   onChange={e => setEventForm({ ...eventForm, eventName: e.target.value })}
                   placeholder="e.g. 42nd Senior National Championship"
-                  className="mt-1 text-xs"
+                  className="mt-1 text-xs font-bold"
+                  required
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* 2 & 3. Sport Discipline * & Category * */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <Label required>Sport Discipline</Label>
+                  <Label required className="font-bold text-xs">Sport Discipline *</Label>
                   <select
                     value={eventForm.sport}
                     onChange={e => setEventForm({ ...eventForm, sport: e.target.value })}
                     className="w-full h-10 px-3 rounded-lg border border-[#d2dad2] bg-white text-xs font-bold mt-1"
+                    required
                   >
                     <option value={federation?.sport || 'Taekwondo'}>{federation?.sport || 'Taekwondo'}</option>
                     {uniqueSports.filter(s => s !== (federation?.sport || 'Taekwondo')).map(s => (
@@ -736,46 +740,76 @@ export default function FederationDashboard() {
                   </select>
                 </div>
                 <div>
-                  <Label required>Category</Label>
-                  <Input value={eventForm.category} onChange={e => setEventForm({ ...eventForm, category: e.target.value })} className="mt-1 text-xs" />
+                  <Label required className="font-bold text-xs">Category *</Label>
+                  <Input
+                    value={eventForm.category}
+                    onChange={e => setEventForm({ ...eventForm, category: e.target.value })}
+                    placeholder="e.g. Senior Championship"
+                    className="mt-1 text-xs font-bold"
+                    required
+                  />
                 </div>
               </div>
 
+              {/* 4. TOURNAMENT DATE * (Prominently styled date picker) */}
+              <div className="p-3.5 rounded-xl border border-[#2f6d5a] bg-[#f0f7f4] shadow-2xs">
+                <Label required className="text-[#194e42] font-extrabold text-xs flex items-center gap-1.5 mb-1">
+                  <Calendar className="w-4 h-4 text-[#194e42]" /> TOURNAMENT DATE *
+                </Label>
+                <Input
+                  type="date"
+                  value={eventForm.tournamentDate}
+                  onChange={e => setEventForm({ ...eventForm, tournamentDate: e.target.value })}
+                  className="mt-1 text-xs font-bold text-[#194e42] border-[#2f6d5a] bg-white h-10 cursor-pointer"
+                  required
+                />
+                <p className="text-[11px] text-[#194e42] mt-1 font-semibold">
+                  Official date on which the championship / tournament takes place.
+                </p>
+              </div>
+
+              {/* 5. Event Location */}
               <div>
-                <Label>Event Location</Label>
-                <Input value={eventForm.location} onChange={e => setEventForm({ ...eventForm, location: e.target.value })} placeholder="e.g. IG Indoor Stadium, New Delhi" className="mt-1 text-xs" />
+                <Label className="font-bold text-xs">Event Location</Label>
+                <Input
+                  value={eventForm.location}
+                  onChange={e => setEventForm({ ...eventForm, location: e.target.value })}
+                  placeholder="e.g. IG Indoor Stadium, New Delhi"
+                  className="mt-1 text-xs font-bold"
+                />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label required>Tournament Date *</Label>
-                  <Input
-                    type="date"
-                    value={eventForm.tournamentDate}
-                    onChange={e => setEventForm({ ...eventForm, tournamentDate: e.target.value })}
-                    className="mt-1 text-xs font-bold text-[#194e42]"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label required>Result Submission Deadline (Freeze Lock Date) *</Label>
-                  <Input
-                    type="date"
-                    value={eventForm.submissionDeadline}
-                    onChange={e => setEventForm({ ...eventForm, submissionDeadline: e.target.value })}
-                    className="mt-1 text-xs font-bold text-[#c85c40]"
-                    required
-                  />
-                </div>
+              {/* 6. Result Submission Deadline (Freeze Lock Date) * */}
+              <div className="p-3.5 rounded-xl border border-[#efcbc3] bg-[#fff8f6] shadow-2xs">
+                <Label required className="text-[#c85c40] font-extrabold text-xs flex items-center gap-1.5 mb-1">
+                  <Lock className="w-4 h-4 text-[#c85c40]" /> Result Submission Deadline (Freeze Lock Date) *
+                </Label>
+                <Input
+                  type="date"
+                  value={eventForm.submissionDeadline}
+                  onChange={e => setEventForm({ ...eventForm, submissionDeadline: e.target.value })}
+                  className="mt-1 text-xs font-bold text-[#c85c40] border-[#efcbc3] bg-white h-10 cursor-pointer"
+                  required
+                />
+                <p className="text-[11px] text-[#697c7c] mt-1 font-medium">
+                  Note: After this deadline, the event becomes FROZEN 🔒 and official results cannot be edited or submitted.
+                </p>
               </div>
 
-              <p className="text-[11px] text-[#697c7c] mt-1">
-                Note: After submission deadline, the event becomes FROZEN 🔒 and official results cannot be edited or submitted.
-              </p>
-
+              {/* 7. Action Submit Button */}
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setShowCreateEventModal(false)} className="h-9 px-4 rounded-lg border border-[#d8ded5] bg-white font-bold text-xs cursor-pointer">Cancel</button>
-                <button type="submit" disabled={creatingEvent} className="h-9 px-5 rounded-lg bg-[#e07050] text-white font-extrabold text-xs uppercase cursor-pointer">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateEventModal(false)}
+                  className="h-10 px-4 rounded-lg border border-[#d8ded5] bg-white font-bold text-xs cursor-pointer hover:bg-[#f4f8f5]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingEvent}
+                  className="h-10 px-6 rounded-lg bg-[#e07050] hover:bg-[#c85c40] text-white font-extrabold text-xs uppercase tracking-wider cursor-pointer transition-all shadow-md"
+                >
                   {creatingEvent ? 'Publishing…' : 'Publish Official Event'}
                 </button>
               </div>
