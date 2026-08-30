@@ -117,7 +117,7 @@ export default function FederationVerifiedSection({ athleteUserId, isCoachView =
                   </div>
 
                   <div style={{ fontSize: 11, color: '#526668', marginTop: 4 }}>
-                    Category: {item.category} · Year {item.year}
+                    {item.sport} · {item.category} · Tournament Date {item.event?.tournamentDate ? new Date(item.event.tournamentDate).toLocaleDateString('en-IN') : new Date(item.eventDate).toLocaleDateString('en-IN')}
                   </div>
 
                   {item.description && (

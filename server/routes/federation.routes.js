@@ -516,29 +516,23 @@ router.post('/achievements', verifyToken, requireRoles('federation'), async (req
     // Aadhaar is normalized and HMACed only in memory; plaintext is never persisted.
     const aadhaarHash = hashAadhaar(aadhaarNumber);
 
-    // Automatic Athlete Matching Engine (Current & Historical)
-    let matchedUser = null;
-    if (aadhaarHash) {
-      matchedUser = await User.findOne({ role: 'athlete', aadhaarHash });
-    }
-    if (!matchedUser && (athleteUserId || athleteId)) {
-      matchedUser = await User.findOne({
-        role: 'athlete',
-        $or: [
-          { _id: athleteUserId },
-          { athleteId: athleteId }
-        ]
-      });
-    }
-    if (!matchedUser && finalWinnerName) {
-      matchedUser = await User.findOne({
-        role: 'athlete',
-        name: new RegExp('^' + finalWinnerName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i')
-      });
-    }
+    // Link only by the private Aadhaar HMAC. Names and IDs are never used as
+    // identity fallbacks for official federation results.
+    const matchedUser = await User.findOne({ role: 'athlete', aadhaarHash });
 
-    const matchedUserId = matchedUser ? matchedUser._id : (athleteUserId || null);
-    const matchedAthleteId = matchedUser ? (matchedUser.athleteId || `ATH-${matchedUser._id.toString().slice(-8).toUpperCase()}`) : (athleteId || null);
+    const matchedUserId = matchedUser ? matchedUser._id : null;
+    const matchedAthleteId = matchedUser ? (matchedUser.athleteId || `ATH-${matchedUser._id.toString().slice(-8).toUpperCase()}`) : null;
+
+    const duplicate = await OfficialAchievement.exists({
+      federation: fed._id,
+      event: event._id,
+      aadhaarHash,
+      achievementType,
+      medal: achievementType === 'medal' ? (medal || 'Gold') : null,
+      rank: achievementType === 'ranking' ? Number(rank || 1) : null,
+      verificationStatus: { $ne: 'REVOKED' }
+    });
+    if (duplicate) return res.status(409).json({ error: 'An official result for this athlete and event already exists.' });
 
     const officialRecordId = generateUniqueId('TA-ACH');
 

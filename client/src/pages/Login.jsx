@@ -43,7 +43,7 @@ export default function Login() {
 
   // Role-Specific Payload State
   const [parentFields, setParentFields] = useState({ childName: '', childAge: '', childSport: 'Taekwondo' });
-  const [athleteFields, setAthleteFields] = useState({ sport: 'Taekwondo', beltRank: '', age: '', federationState: 'Andhra Pradesh', seekingSponsorship: false, sponsorshipReason: '' });
+  const [athleteFields, setAthleteFields] = useState({ sport: 'Taekwondo', beltRank: '', age: '', federationState: 'Andhra Pradesh', aadhaarNumber: '', seekingSponsorship: false, sponsorshipReason: '' });
   const [coachFields, setCoachFields] = useState({ sport: 'Taekwondo', yearsExperience: '', certifications: '', acceptingAthletes: true });
   const [sponsorFields, setSponsorFields] = useState({ organizationName: '', budgetRange: '₹50,000 - ₹2,000,000', targetSports: 'Taekwondo' });
   const [academyFields, setAcademyFields] = useState({ academyName: '', sportsOffered: 'Taekwondo', contactPhone: '', address: '' });
@@ -77,7 +77,7 @@ export default function Login() {
         // Build role specific payload
         let rolePayload = {};
         if (role === 'parent') rolePayload = { childName: parentFields.childName, childAge: Number(parentFields.childAge) || 0, childSport: parentFields.childSport };
-        else if (role === 'athlete') rolePayload = { sport: athleteFields.sport, age: Number(athleteFields.age) || 0, beltRank: athleteFields.beltRank, federationState: athleteFields.federationState, seekingSponsorship: athleteFields.seekingSponsorship, sponsorshipReason: athleteFields.sponsorshipReason };
+        else if (role === 'athlete') rolePayload = { sport: athleteFields.sport, age: Number(athleteFields.age) || 0, beltRank: athleteFields.beltRank, federationState: athleteFields.federationState, aadhaarNumber: athleteFields.aadhaarNumber, seekingSponsorship: athleteFields.seekingSponsorship, sponsorshipReason: athleteFields.sponsorshipReason };
         else if (role === 'coach') rolePayload = { sport: coachFields.sport, yearsExperience: Number(coachFields.yearsExperience) || 0, certifications: coachFields.certifications.split(',').map(s => s.trim()).filter(Boolean), acceptingAthletes: coachFields.acceptingAthletes };
         else if (role === 'sponsor') rolePayload = { organizationName: sponsorFields.organizationName, budgetRange: sponsorFields.budgetRange, targetSports: sponsorFields.targetSports.split(',').map(s => s.trim()).filter(Boolean) };
         else if (role === 'academy') rolePayload = { academyName: academyFields.academyName, sportsOffered: academyFields.sportsOffered.split(',').map(s => s.trim()).filter(Boolean), contactPhone: academyFields.contactPhone, address: academyFields.address };
@@ -331,6 +331,10 @@ export default function Login() {
                     <input value={athleteFields.federationState} onChange={e => setAthleteFields({ ...athleteFields, federationState: e.target.value })} type="text" placeholder="e.g. Andhra Pradesh" required />
                   </label>
                 </div>
+                <label>Athlete Aadhaar Number
+                  <input value={athleteFields.aadhaarNumber} onChange={e => setAthleteFields({ ...athleteFields, aadhaarNumber: e.target.value.replace(/\D/g, '').slice(0, 12) })} type="password" inputMode="numeric" autoComplete="off" pattern="[0-9]{12}" minLength="12" maxLength="12" placeholder="12-digit Aadhaar number" required />
+                  <small>Used only for secure federation-result matching. It is never displayed.</small>
+                </label>
                 <label className="checkbox-label">
                   <input type="checkbox" checked={athleteFields.seekingSponsorship} onChange={e => setAthleteFields({ ...athleteFields, seekingSponsorship: e.target.checked })} />
                   Actively seeking sponsorship for upcoming national/international events

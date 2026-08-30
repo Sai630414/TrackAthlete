@@ -49,6 +49,9 @@ router.post('/signup', async (req, res) => {
     const OfficialAchievement = require('../models/OfficialAchievement');
 
     const aadhaarHash = aadhaarNumber || aadhaar ? hashAadhaar(aadhaarNumber || aadhaar) : null;
+    if (role === 'athlete' && !aadhaarHash) {
+      return res.status(400).json({ error: 'Athlete Aadhaar Number must contain exactly 12 digits.' });
+    }
     if ((aadhaarNumber || aadhaar) && !aadhaarHash) {
       return res.status(400).json({ error: 'Aadhaar number must contain exactly 12 digits.' });
     }
@@ -77,7 +80,7 @@ router.post('/signup', async (req, res) => {
       if (user.aadhaarHash) matchCriteria.push({ aadhaarHash: user.aadhaarHash });
       if (matchCriteria.length > 0) {
         await OfficialAchievement.updateMany(
-          { athleteUserId: null, $or: matchCriteria },
+          { $or: matchCriteria },
           { $set: { athleteUserId: user._id, athleteId: athleteIdStr } }
         ).catch(e => console.error('Historical achievement auto-link error:', e));
       }
