@@ -133,15 +133,18 @@ export default function FederationDashboard() {
   // Create Event Submit
   const handleCreateEvent = async (e) => {
     e?.preventDefault();
-    if (!eventForm.eventName || !eventForm.tournamentDate || !eventForm.submissionDeadline) {
-      toast({ title: 'Required Fields', description: 'Please enter event name, tournament date, and submission deadline.', variant: 'destructive' });
+    if (!eventForm.eventName || !eventForm.submissionDeadline) {
+      toast({ title: 'Required Fields', description: 'Please enter event name and submission deadline.', variant: 'destructive' });
       return;
     }
+
+    const effectiveTournamentDate = eventForm.tournamentDate || eventForm.submissionDeadline;
 
     try {
       setCreatingEvent(true);
       const { data } = await api.post('/federation/events', {
         ...eventForm,
+        tournamentDate: effectiveTournamentDate,
         sport: eventForm.sport || federation?.sport || 'Taekwondo'
       });
       setEvents(prev => [data, ...prev]);

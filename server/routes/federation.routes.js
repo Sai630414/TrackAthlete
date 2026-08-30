@@ -380,8 +380,8 @@ router.get('/profile', verifyToken, requireRoles('federation'), async (req, res)
 router.post('/events', verifyToken, requireRoles('federation'), async (req, res) => {
   try {
     const { eventName, sport, category, location, tournamentDate, startDate, endDate, submissionDeadline } = req.body;
-    if (!eventName || !sport || !category || !tournamentDate || !submissionDeadline) {
-      return res.status(400).json({ error: 'Event name, sport, category, tournament date, and submission deadline are required.' });
+    if (!eventName || !sport || !category || !submissionDeadline) {
+      return res.status(400).json({ error: 'Event name, sport, category, and submission deadline are required.' });
     }
 
     const fed = await Federation.findById(req.user.id);
@@ -389,7 +389,7 @@ router.post('/events', verifyToken, requireRoles('federation'), async (req, res)
 
     const eventId = generateUniqueId('EVT');
     const deadlineDate = new Date(submissionDeadline);
-    const tourneyDate = new Date(tournamentDate);
+    const tourneyDate = tournamentDate ? new Date(tournamentDate) : (startDate ? new Date(startDate) : deadlineDate);
 
     const event = await OfficialEvent.create({
       eventId,
