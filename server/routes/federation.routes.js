@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const Federation = require('../models/Federation');
 const OfficialEvent = require('../models/OfficialEvent');
 const OfficialAchievement = require('../models/OfficialAchievement');
+const OfficialAssociation = require('../models/OfficialAssociation');
 const User = require('../models/User');
 const { verifyToken, requireRoles } = require('../middleware/auth.middleware');
 const { sendBrevoEmail } = require('../utils/mailer');
@@ -40,10 +41,10 @@ router.post('/login', async (req, res) => {
     if (!fed && (federationId === 'FED-[#173235]' || email?.includes('taekwondo') || federationId?.startsWith('FED-'))) {
       const defaultPasswordHash = await bcrypt.hash(password || 'FederationPass123!', 10);
       fed = await Federation.create({
-        federationId: federationId || 'FED-TKD92841',
-        name: 'India Taekwondo Federation',
+        federationId: federationId || 'FED-TKD001',
+        name: 'Andhra Pradesh Taekwondo Federation',
         sport: 'Taekwondo',
-        state: 'National',
+        state: 'Andhra Pradesh',
         officialEmail: email || 'official@taekwondo.org.in',
         officialPhone: '+91 98765 00100',
         passwordHash: defaultPasswordHash,
@@ -233,7 +234,7 @@ router.get('/search-athlete/:athleteId', verifyToken, requireRoles('federation')
       role: 'athlete',
       $or: [
         { athleteId: searchId },
-        { _id: searchId.match(/^[0-[#173235]a-fA-F]{24}$/) ? searchId : null }
+        { _id: searchId.match(/^[0-9a-fA-F]{24}$/) ? searchId : null }
       ]
     }).select('name athleteId sport city state age beltRank');
 
@@ -354,6 +355,47 @@ router.get('/achievements', verifyToken, requireRoles('federation'), async (req,
       .populate('event', 'eventName eventId isFrozen submissionDeadline')
       .sort({ createdAt: -1 });
     res.json(achievements);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/federation/all — Public endpoint returning all MongoDB National Federations
+router.get('/all', async (req, res) => {
+  try {
+    const { sport, search } = req.query;
+    const filter = {};
+    if (sport) filter.sport = new RegExp('^' + String(sport).replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i');
+    if (search) {
+      filter.$or = [
+        { name: new RegExp(String(search), 'i') },
+        { sport: new RegExp(String(search), 'i') },
+        { abbreviation: new RegExp(String(search), 'i') }
+      ];
+    }
+    const federations = await Federation.find(filter).select('-passwordHash -loginOTPHash').sort({ name: 1 });
+    res.json(federations);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/federation/associations — Public endpoint returning all MongoDB State/Regional Associations
+router.get('/associations', async (req, res) => {
+  try {
+    const { sport, state, search } = req.query;
+    const filter = {};
+    if (sport) filter.sport = new RegExp('^' + String(sport).replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i');
+    if (state) filter.state = new RegExp('^' + String(state).replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i');
+    if (search) {
+      filter.$or = [
+        { associationName: new RegExp(String(search), 'i') },
+        { sport: new RegExp(String(search), 'i') },
+        { state: new RegExp(String(search), 'i') }
+      ];
+    }
+    const associations = await OfficialAssociation.find(filter).sort({ associationName: 1 });
+    res.json(associations);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

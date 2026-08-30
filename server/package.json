@@ -7,7 +7,8 @@
     "dev": "nodemon server.js",
     "start": "node server.js",
     "seed": "node seed/seed.js",
-    "seed:federation": "node seedFederation.js"
+    "seed:federation": "node seedFederation.js",
+    "seed:organizations": "node seedOrganizations.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

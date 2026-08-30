@@ -19,6 +19,9 @@ const chatRoutes = require('./routes/chat.routes');
 const federationRoutes = require('./routes/federation.routes');
 const verificationRoutes = require('./routes/verification.routes');
 
+const Federation = require('./models/Federation');
+const OfficialAssociation = require('./models/OfficialAssociation');
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: process.env.CLIENT_ORIGIN || '*' } });
@@ -33,6 +36,46 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'TrackAthlete API' }));
+
+// Public MongoDB Organization endpoints
+app.get('/api/federations', async (req, res) => {
+  try {
+    const { sport, search } = req.query;
+    const filter = {};
+    if (sport) filter.sport = new RegExp('^' + String(sport).replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i');
+    if (search) {
+      filter.$or = [
+        { name: new RegExp(String(search), 'i') },
+        { sport: new RegExp(String(search), 'i') },
+        { abbreviation: new RegExp(String(search), 'i') }
+      ];
+    }
+    const federations = await Federation.find(filter).select('-passwordHash -loginOTPHash').sort({ name: 1 });
+    res.json(federations);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/associations', async (req, res) => {
+  try {
+    const { sport, state, search } = req.query;
+    const filter = {};
+    if (sport) filter.sport = new RegExp('^' + String(sport).replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i');
+    if (state) filter.state = new RegExp('^' + String(state).replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i');
+    if (search) {
+      filter.$or = [
+        { associationName: new RegExp(String(search), 'i') },
+        { sport: new RegExp(String(search), 'i') },
+        { state: new RegExp(String(search), 'i') }
+      ];
+    }
+    const associations = await OfficialAssociation.find(filter).sort({ associationName: 1 });
+    res.json(associations);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/athlete', athleteRoutes);

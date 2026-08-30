@@ -15,7 +15,7 @@ import {
   TabsTrigger,
   TabsContent,
 } from '../components/ui';
-import { Shield, Award, Calendar, MapPin, Search, Plus, FileText, CheckCircle2, Lock, Eye, LogOut, Upload, UserCheck, AlertTriangle, XCircle, RefreshCw } from 'lucide-react';
+import { Shield, Award, Calendar, MapPin, Search, Plus, FileText, CheckCircle2, Lock, Eye, LogOut, Upload, UserCheck, AlertTriangle, XCircle, RefreshCw, Building, Globe } from 'lucide-react';
 import api from '../services/api';
 
 export default function FederationDashboard() {
@@ -27,13 +27,20 @@ export default function FederationDashboard() {
   const [events, setEvents] = useState([]);
   const [achievements, setAchievements] = useState([]);
 
+  // Dynamic MongoDB Organization Directory
+  const [allFederations, setAllFederations] = useState([]);
+  const [allAssociations, setAllAssociations] = useState([]);
+  const [selectedSportFilter, setSelectedSportFilter] = useState('');
+  const [selectedStateFilter, setSelectedStateFilter] = useState('');
+  const [searchOrgQuery, setSearchOrgQuery] = useState('');
+
   // Create Event Modal State
   const [showCreateEventModal, setShowCreateEventModal] = useState(false);
   const [eventForm, setEventForm] = useState({
     eventName: '',
-    sport: 'Taekwondo',
-    category: 'Senior National Championship',
-    location: 'New Delhi',
+    sport: '',
+    category: 'Senior Championship',
+    location: '',
     startDate: '',
     endDate: '',
     submissionDeadline: ''
@@ -41,7 +48,7 @@ export default function FederationDashboard() {
   const [creatingEvent, setCreatingEvent] = useState(false);
 
   // Search & Candidate Match State
-  const [athleteSearchInput, setAthleteSearchInput] = useState('ATH-7K4M92XQ');
+  const [athleteSearchInput, setAthleteSearchInput] = useState('ATH-1B2CD580');
   const [candidateAthlete, setCandidateAthlete] = useState(null);
   const [searchingCandidate, setSearchingCandidate] = useState(false);
   const [candidateError, setCandidateError] = useState('');
@@ -68,10 +75,12 @@ export default function FederationDashboard() {
   const fetchFederationData = useCallback(async () => {
     try {
       setLoading(true);
-      const [profileRes, eventsRes, achRes] = await Promise.all([
+      const [profileRes, eventsRes, achRes, fedsRes, assocRes] = await Promise.all([
         api.get('/federation/profile').catch(() => ({ data: null })),
         api.get('/federation/events').catch(() => ({ data: [] })),
-        api.get('/federation/achievements').catch(() => ({ data: [] }))
+        api.get('/federation/achievements').catch(() => ({ data: [] })),
+        api.get('/federations').catch(() => ({ data: [] })),
+        api.get('/associations').catch(() => ({ data: [] }))
       ]);
 
       if (profileRes.data) {
@@ -80,6 +89,8 @@ export default function FederationDashboard() {
       }
       setEvents(eventsRes.data || []);
       setAchievements(achRes.data || []);
+      setAllFederations(fedsRes.data || []);
+      setAllAssociations(assocRes.data || []);
     } catch (err) {
       console.error('Fetch Federation Data Error:', err);
     } finally {
@@ -90,6 +101,24 @@ export default function FederationDashboard() {
   useEffect(() => {
     fetchFederationData();
   }, [fetchFederationData]);
+
+  // Derived Dynamic Filters from MongoDB Records
+  const uniqueSports = Array.from(new Set(allFederations.map(f => f.sport).filter(Boolean))).sort();
+  const uniqueStates = Array.from(new Set(allAssociations.map(a => a.state).filter(Boolean))).sort();
+
+  // Filtered MongoDB Organizations
+  const filteredFederations = allFederations.filter(f => {
+    const matchSport = !selectedSportFilter || f.sport.toLowerCase() === selectedSportFilter.toLowerCase();
+    const matchQuery = !searchOrgQuery || f.name.toLowerCase().includes(searchOrgQuery.toLowerCase()) || f.sport.toLowerCase().includes(searchOrgQuery.toLowerCase());
+    return matchSport && matchQuery;
+  });
+
+  const filteredAssociations = allAssociations.filter(a => {
+    const matchSport = !selectedSportFilter || a.sport.toLowerCase() === selectedSportFilter.toLowerCase();
+    const matchState = !selectedStateFilter || a.state.toLowerCase() === selectedStateFilter.toLowerCase();
+    const matchQuery = !searchOrgQuery || a.associationName.toLowerCase().includes(searchOrgQuery.toLowerCase()) || a.sport.toLowerCase().includes(searchOrgQuery.toLowerCase());
+    return matchSport && matchState && matchQuery;
+  });
 
   // Handle Logout
   const handleLogout = () => {
@@ -108,15 +137,18 @@ export default function FederationDashboard() {
 
     try {
       setCreatingEvent(true);
-      const { data } = await api.post('/federation/events', eventForm);
+      const { data } = await api.post('/federation/events', {
+        ...eventForm,
+        sport: eventForm.sport || federation?.sport || 'Taekwondo'
+      });
       setEvents(prev => [data, ...prev]);
       toast({ title: '🏆 Official Event Created', description: `Event ${data.eventName} (${data.eventId}) published.`, variant: 'success' });
       setShowCreateEventModal(false);
       setEventForm({
         eventName: '',
         sport: federation?.sport || 'Taekwondo',
-        category: 'Senior National Championship',
-        location: 'New Delhi',
+        category: 'Senior Championship',
+        location: '',
         startDate: '',
         endDate: '',
         submissionDeadline: ''
@@ -220,8 +252,8 @@ export default function FederationDashboard() {
     }
   };
 
-  const fedName = federation?.name || 'India Taekwondo Federation';
-  const fedId = federation?.federationId || 'FED-TKD92841';
+  const fedName = federation?.name || 'Andhra Pradesh Taekwondo Federation';
+  const fedId = federation?.federationId || 'FED-TKD001';
 
   return (
     <div className="p-6 md:p-10 max-w-6xl mx-auto space-y-6">
@@ -245,7 +277,7 @@ export default function FederationDashboard() {
             {fedName} <em style={{ color: '#b9d9bf', fontStyle: 'italic' }}>Verification Desk</em>
           </h1>
           <p className="text-xs text-[#c5d3ce] mt-1">
-            {federation?.sport || 'Sports'} Governing Federation · {federation?.state || 'National'} Jurisdiction · Official Ledger Active
+            {federation?.sport || 'Sports'} Governing Federation · {federation?.state || 'National'} Jurisdiction · Dynamic MongoDB Directory Active
           </p>
         </div>
 
@@ -273,6 +305,7 @@ export default function FederationDashboard() {
           <TabsTrigger value="events">Official Events ({events.length})</TabsTrigger>
           <TabsTrigger value="record">Record Athlete Result</TabsTrigger>
           <TabsTrigger value="ledger">Issued Achievements Ledger ({achievements.length})</TabsTrigger>
+          <TabsTrigger value="directory">Organizations Directory ({allFederations.length + allAssociations.length})</TabsTrigger>
           <TabsTrigger value="profile">Federation Profile</TabsTrigger>
         </TabsList>
 
@@ -359,10 +392,10 @@ export default function FederationDashboard() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Search className="w-5 h-5 text-[#194e42]" /> Search Candidate Athlete by TrackAthlete Permanent ID
+                <Search className="w-5 h-5 text-[#194e42]" /> Search Candidate Athlete by Permanent Athlete ID
               </CardTitle>
               <CardDescription>
-                Search and confirm candidate athlete details using their permanent ID (e.g. ATH-7K4M92XQ) before issuing an official achievement.
+                Search and confirm candidate athlete details using their permanent ID (e.g. ATH-1B2CD580) before issuing an official achievement.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -372,7 +405,7 @@ export default function FederationDashboard() {
                   <Input
                     value={athleteSearchInput}
                     onChange={e => setAthleteSearchInput(e.target.value)}
-                    placeholder="Enter Permanent Athlete ID (e.g. ATH-7K4M92XQ)…"
+                    placeholder="Enter Permanent Athlete ID (e.g. ATH-1B2CD580)…"
                     className="pl-9 font-mono font-bold uppercase text-xs"
                   />
                 </div>
@@ -486,7 +519,142 @@ export default function FederationDashboard() {
           </Card>
         </TabsContent>
 
-        {/* TAB 4: FEDERATION PROFILE */}
+        {/* TAB 4: DYNAMIC MONGODB ORGANIZATIONS DIRECTORY */}
+        <TabsContent value="directory" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building className="w-5 h-5 text-[#194e42]" /> Official Organizations Directory (MongoDB Live Ledger)
+              </CardTitle>
+              <CardDescription>
+                Live database records imported from MYAS National Sports Federations and Official State Associations.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+
+              {/* Dynamic Filter Controls */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-[#f4f8f5] p-4 rounded-xl border border-[#e2eee4]">
+                <div>
+                  <Label>Filter by Sport (Dynamic)</Label>
+                  <select
+                    value={selectedSportFilter}
+                    onChange={e => setSelectedSportFilter(e.target.value)}
+                    className="w-full h-9 px-3 rounded-lg border border-[#d2dad2] bg-white text-xs font-bold mt-1"
+                  >
+                    <option value="">-- All Sports ({uniqueSports.length}) --</option>
+                    {uniqueSports.map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <Label>Filter by State (Dynamic)</Label>
+                  <select
+                    value={selectedStateFilter}
+                    onChange={e => setSelectedStateFilter(e.target.value)}
+                    className="w-full h-9 px-3 rounded-lg border border-[#d2dad2] bg-white text-xs font-bold mt-1"
+                  >
+                    <option value="">-- All States ({uniqueStates.length}) --</option>
+                    {uniqueStates.map(st => (
+                      <option key={st} value={st}>{st}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <Label>Search Organizations</Label>
+                  <div className="relative mt-1">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-[#697c7c]" />
+                    <Input
+                      value={searchOrgQuery}
+                      onChange={e => setSearchOrgQuery(e.target.value)}
+                      placeholder="Type name or code…"
+                      className="pl-8 h-9 text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* National Federations Grid */}
+              <div>
+                <h4 className="font-extrabold text-[#173235] text-sm mb-3 flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-[#cc694e]" /> Recognized National Sports Federations ({filteredFederations.length})
+                </h4>
+
+                {filteredFederations.length === 0 ? (
+                  <div className="p-4 rounded-lg bg-[#f8faf7] text-xs text-[#697c7c] border border-dashed text-center">
+                    No National Federations match the selected filter.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {filteredFederations.map((fed) => (
+                      <div key={fed._id} className="p-3.5 rounded-xl border border-[#d8ded5] bg-white shadow-2xs flex flex-col justify-between">
+                        <div>
+                          <div className="flex justify-between items-start gap-2">
+                            <span className="text-[10px] font-mono font-bold bg-[#e2eee4] text-[#194e42] px-2 py-0.5 rounded border border-[#2f6d5a]/30">
+                              {fed.federationId}
+                            </span>
+                            <Badge className="bg-[#e2eee4] text-[#194e42] text-[10px] border-[#2f6d5a]">
+                              {fed.recognitionStatus || 'Recognized'}
+                            </Badge>
+                          </div>
+                          <h5 className="font-bold text-[#173235] text-xs mt-2">{fed.name}</h5>
+                          <p className="text-[11px] text-[#526668] mt-0.5">Sport: <strong>{fed.sport}</strong></p>
+                        </div>
+                        {fed.website && (
+                          <a href={fed.website} target="_blank" rel="noreferrer" className="text-[11px] font-bold text-[#e07050] mt-2 block hover:underline">
+                            Official Site →
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Official State Associations Grid */}
+              <div className="pt-4 border-t border-[#e2eee4]">
+                <h4 className="font-extrabold text-[#173235] text-sm mb-3 flex items-center gap-2">
+                  <Building className="w-4 h-4 text-[#194e42]" /> Official State & Regional Associations ({filteredAssociations.length})
+                </h4>
+
+                {filteredAssociations.length === 0 ? (
+                  <div className="p-4 rounded-lg bg-[#f8faf7] text-xs text-[#697c7c] border border-dashed text-center">
+                    No State Associations match the selected filter.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {filteredAssociations.map((assoc) => (
+                      <div key={assoc._id} className="p-3.5 rounded-xl border border-[#d8ded5] bg-white shadow-2xs flex flex-col justify-between">
+                        <div>
+                          <div className="flex justify-between items-start gap-2">
+                            <span className="text-[10px] font-mono font-bold bg-[#f4f8f5] text-[#173235] px-2 py-0.5 rounded border border-[#d2dad2]">
+                              {assoc.state}
+                            </span>
+                            <span className="text-[10px] font-bold text-[#194e42] bg-[#e2eee4] px-2 py-0.5 rounded">
+                              {assoc.sport}
+                            </span>
+                          </div>
+                          <h5 className="font-bold text-[#173235] text-xs mt-2">{assoc.associationName}</h5>
+                          {assoc.secretary?.name && (
+                            <p className="text-[11px] text-[#526668] mt-1">Secretary: {assoc.secretary.name}</p>
+                          )}
+                          {assoc.email && (
+                            <p className="text-[11px] text-[#697c7c] mt-0.5">{assoc.email}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* TAB 5: FEDERATION PROFILE */}
         <TabsContent value="profile" className="space-y-4">
           <Card>
             <CardHeader>
@@ -535,15 +703,24 @@ export default function FederationDashboard() {
                 <Input
                   value={eventForm.eventName}
                   onChange={e => setEventForm({ ...eventForm, eventName: e.target.value })}
-                  placeholder="e.g. 42nd Senior National Taekwondo Championship"
+                  placeholder="e.g. 42nd Senior National Championship"
                   className="mt-1 text-xs"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label required>Sport</Label>
-                  <Input value={eventForm.sport} onChange={e => setEventForm({ ...eventForm, sport: e.target.value })} className="mt-1 text-xs" />
+                  <Label required>Sport Discipline</Label>
+                  <select
+                    value={eventForm.sport}
+                    onChange={e => setEventForm({ ...eventForm, sport: e.target.value })}
+                    className="w-full h-10 px-3 rounded-lg border border-[#d2dad2] bg-white text-xs font-bold mt-1"
+                  >
+                    <option value={federation?.sport || 'Taekwondo'}>{federation?.sport || 'Taekwondo'}</option>
+                    {uniqueSports.filter(s => s !== (federation?.sport || 'Taekwondo')).map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <Label required>Category</Label>
@@ -672,7 +849,7 @@ export default function FederationDashboard() {
                 <Input
                   value={achievementForm.description}
                   onChange={e => setAchievementForm({ ...achievementForm, description: e.target.value })}
-                  placeholder="e.g. Under-68kg Senior Category Final Score 12-4"
+                  placeholder="e.g. Under-68kg Division Final Match Winner"
                   className="mt-1 text-xs"
                 />
               </div>

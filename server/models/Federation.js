@@ -1,13 +1,19 @@
 const mongoose = require('mongoose');
 
 const FederationSchema = new mongoose.Schema({
-  federationId: { type: String, required: true, unique: true }, // e.g. FED-7K4M92XQ
+  federationId: { type: String, required: true, unique: true }, // e.g. FED-TKD001 or FED-AFI
   name: { type: String, required: true },
   sport: { type: String, required: true },
-  state: { type: String, required: true },
-  officialEmail: { type: String, required: true, unique: true },
-  officialPhone: { type: String, required: true },
-  passwordHash: { type: String, required: true },
+  state: { type: String, default: 'National' },
+  abbreviation: { type: String, default: '' },
+  website: { type: String, default: '' },
+  recognitionStatus: { type: String, default: 'Recognized' },
+  recognitionYear: { type: Number, default: 2024 },
+  sourceDocument: { type: String, default: '' },
+
+  officialEmail: { type: String, sparse: true, default: undefined },
+  officialPhone: { type: String, default: '' },
+  passwordHash: { type: String, default: '' },
   status: { type: String, enum: ['Active', 'Suspended', 'PendingVerification'], default: 'Active' },
 
   // OTP authentication fields
