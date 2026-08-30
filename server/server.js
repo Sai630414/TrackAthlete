@@ -93,13 +93,18 @@ initSocket(io);
 
 const PORT = process.env.PORT || 5000;
 
-connectDB()
-  .then(() => {
-    server.listen(PORT, () => {
-      console.log(`TrackAthlete API running on port ${PORT}`);
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  connectDB()
+    .then(() => {
+      server.listen(PORT, () => {
+        console.log(`TrackAthlete API running on port ${PORT}`);
+      });
+    })
+    .catch((err) => {
+      console.error("Failed to connect to MongoDB:", err.message);
     });
-  })
-  .catch((err) => {
-    console.error("Failed to connect to MongoDB:", err.message);
-    process.exit(1);
-  });
+} else {
+  connectDB();
+}
+
+module.exports = app;
