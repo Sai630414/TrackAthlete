@@ -4,6 +4,7 @@ const OfficialAchievementSchema = new mongoose.Schema({
   officialRecordId: { type: String, required: true, unique: true }, // e.g. TA-ACH-8M3K91PL
   athleteUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   athleteId: { type: String, default: null }, // ATH-XXXXXXXX
+  aadhaarHash: { type: String, default: null }, // HMAC-SHA256 hash of normalized Aadhaar number
   athleteIdentityReference: { type: String, default: null }, // Salted SHA-256 hash of identity
   athleteName: { type: String, required: true },
   

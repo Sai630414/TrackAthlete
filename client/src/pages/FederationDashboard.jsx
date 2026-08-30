@@ -41,6 +41,7 @@ export default function FederationDashboard() {
     sport: '',
     category: 'Senior Championship',
     location: '',
+    tournamentDate: '',
     startDate: '',
     endDate: '',
     submissionDeadline: ''
@@ -57,6 +58,8 @@ export default function FederationDashboard() {
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState('');
   const [achievementForm, setAchievementForm] = useState({
+    winnerName: '',
+    aadhaarNumber: '',
     achievementType: 'medal',
     medal: 'Gold',
     rank: 1,
@@ -130,8 +133,8 @@ export default function FederationDashboard() {
   // Create Event Submit
   const handleCreateEvent = async (e) => {
     e?.preventDefault();
-    if (!eventForm.eventName || !eventForm.submissionDeadline) {
-      toast({ title: 'Required Fields', description: 'Please enter event name and submission deadline.', variant: 'destructive' });
+    if (!eventForm.eventName || !eventForm.tournamentDate || !eventForm.submissionDeadline) {
+      toast({ title: 'Required Fields', description: 'Please enter event name, tournament date, and submission deadline.', variant: 'destructive' });
       return;
     }
 
@@ -149,6 +152,7 @@ export default function FederationDashboard() {
         sport: federation?.sport || 'Taekwondo',
         category: 'Senior Championship',
         location: '',
+        tournamentDate: '',
         startDate: '',
         endDate: '',
         submissionDeadline: ''
@@ -171,6 +175,7 @@ export default function FederationDashboard() {
       setCandidateAthlete(null);
       const { data } = await api.get(`/federation/search-athlete/${athleteSearchInput.trim()}`);
       setCandidateAthlete(data);
+      setAchievementForm(prev => ({ ...prev, winnerName: data.name }));
       toast({ title: 'Athlete Identified', description: `Matched candidate ${data.name} (${data.athleteId}).`, variant: 'success' });
     } catch (err) {
       setCandidateError(err.response?.data?.error || 'No matching registered athlete found.');
@@ -207,8 +212,13 @@ export default function FederationDashboard() {
   // Record Achievement Submit
   const handleRecordAchievement = async (e) => {
     e?.preventDefault();
-    if (!selectedEventId || !candidateAthlete) {
-      toast({ title: 'Selection Required', description: 'Please select an event and confirm an athlete candidate.', variant: 'destructive' });
+    const finalWinnerName = achievementForm.winnerName || candidateAthlete?.name;
+    if (!selectedEventId || !finalWinnerName) {
+      toast({ title: 'Selection Required', description: 'Please select an event and provide winner name.', variant: 'destructive' });
+      return;
+    }
+    if (!achievementForm.certificateData) {
+      toast({ title: 'Certificate Required', description: 'Please upload the official certificate PDF to freeze the result.', variant: 'destructive' });
       return;
     }
 
@@ -216,9 +226,10 @@ export default function FederationDashboard() {
       setRecordingAchievement(true);
       const { data } = await api.post('/federation/achievements', {
         eventId: selectedEventId,
-        athleteUserId: candidateAthlete.athleteUserId,
-        athleteId: candidateAthlete.athleteId,
-        athleteName: candidateAthlete.name,
+        winnerName: finalWinnerName,
+        aadhaarNumber: achievementForm.aadhaarNumber,
+        athleteUserId: candidateAthlete?.athleteUserId,
+        athleteId: candidateAthlete?.athleteId,
         achievementType: achievementForm.achievementType,
         medal: achievementForm.achievementType === 'medal' ? achievementForm.medal : undefined,
         rank: achievementForm.achievementType === 'ranking' ? Number(achievementForm.rank) : undefined,
@@ -231,10 +242,12 @@ export default function FederationDashboard() {
       });
 
       setAchievements(prev => [data, ...prev]);
-      toast({ title: '🎉 Official Result Issued', description: `Permanent Record ${data.officialRecordId} linked to ${candidateAthlete.name}.`, variant: 'success' });
+      toast({ title: '🔒 Official Result Frozen', description: `Permanent Record ${data.officialRecordId} generated for ${finalWinnerName}. Result is now frozen & public.`, variant: 'success' });
       setShowRecordModal(false);
       setCandidateAthlete(null);
       setAchievementForm({
+        winnerName: '',
+        aadhaarNumber: '',
         achievementType: 'medal',
         medal: 'Gold',
         rank: 1,
@@ -733,18 +746,32 @@ export default function FederationDashboard() {
                 <Input value={eventForm.location} onChange={e => setEventForm({ ...eventForm, location: e.target.value })} placeholder="e.g. IG Indoor Stadium, New Delhi" className="mt-1 text-xs" />
               </div>
 
-              <div>
-                <Label required>Result Submission Deadline (Freeze Lock Date)</Label>
-                <Input
-                  type="date"
-                  value={eventForm.submissionDeadline}
-                  onChange={e => setEventForm({ ...eventForm, submissionDeadline: e.target.value })}
-                  className="mt-1 text-xs font-bold text-[#c85c40]"
-                />
-                <p className="text-[11px] text-[#697c7c] mt-1">
-                  Note: After this deadline, the event becomes FROZEN 🔒 and official results cannot be edited or submitted.
-                </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label required>Tournament Date *</Label>
+                  <Input
+                    type="date"
+                    value={eventForm.tournamentDate}
+                    onChange={e => setEventForm({ ...eventForm, tournamentDate: e.target.value })}
+                    className="mt-1 text-xs font-bold text-[#194e42]"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label required>Result Submission Deadline (Freeze Lock Date) *</Label>
+                  <Input
+                    type="date"
+                    value={eventForm.submissionDeadline}
+                    onChange={e => setEventForm({ ...eventForm, submissionDeadline: e.target.value })}
+                    className="mt-1 text-xs font-bold text-[#c85c40]"
+                    required
+                  />
+                </div>
               </div>
+
+              <p className="text-[11px] text-[#697c7c] mt-1">
+                Note: After submission deadline, the event becomes FROZEN 🔒 and official results cannot be edited or submitted.
+              </p>
 
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setShowCreateEventModal(false)} className="h-9 px-4 rounded-lg border border-[#d8ded5] bg-white font-bold text-xs cursor-pointer">Cancel</button>
@@ -784,15 +811,34 @@ export default function FederationDashboard() {
                 </select>
               </div>
 
-              {!candidateAthlete ? (
-                <div className="p-3 rounded-lg bg-[#fff3f0] border border-[#efcbc3] text-xs text-[#e07050] font-bold">
-                  Please search and confirm candidate athlete using Tab 2 first.
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label required>Winner Name *</Label>
+                  <Input
+                    value={achievementForm.winnerName}
+                    onChange={e => setAchievementForm({ ...achievementForm, winnerName: e.target.value })}
+                    placeholder="Official Winner Full Name"
+                    className="mt-1 text-xs font-bold"
+                    required
+                  />
                 </div>
-              ) : (
-                <div className="p-3 rounded-lg bg-[#e2eee4] border border-[#2f6d5a] text-xs font-bold text-[#194e42]">
-                  Athlete Candidate: <strong>{candidateAthlete.name}</strong> ({candidateAthlete.athleteId})
+                <div>
+                  <Label required>Aadhaar Number *</Label>
+                  <Input
+                    type="password"
+                    value={achievementForm.aadhaarNumber}
+                    onChange={e => setAchievementForm({ ...achievementForm, aadhaarNumber: e.target.value })}
+                    placeholder="12-Digit Private Aadhaar"
+                    className="mt-1 text-xs font-mono font-bold"
+                    required
+                  />
                 </div>
-              )}
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-[#f0f7f4] border border-[#b8dbc9] text-[11px] text-[#194e42] font-semibold flex items-center gap-2">
+                <Shield className="w-4 h-4 text-[#cc694e] shrink-0" />
+                <span>Aadhaar is private and used only for official verification.</span>
+              </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -855,19 +901,28 @@ export default function FederationDashboard() {
               </div>
 
               <div>
-                <Label>Attach Signed Official Certificate PDF (Optional, max 1MB)</Label>
+                <Label required>Certificate Upload * (PDF, max 1MB)</Label>
                 <input
                   type="file"
                   accept="application/pdf"
                   onChange={handleCertificateFileSelect}
                   className="mt-1 text-xs w-full"
+                  required
                 />
+                {achievementForm.certificateFileName && (
+                  <p className="text-[11px] font-bold text-[#194e42] mt-1">Selected: {achievementForm.certificateFileName}</p>
+                )}
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-[#fff8eb] border border-[#f3d9a2] text-[11px] text-[#8a5300] font-semibold flex items-center gap-2">
+                <Lock className="w-4 h-4 text-[#cc694e] shrink-0" />
+                <span>Submitting the certificate will freeze this official result and make the permitted result information publicly visible.</span>
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setShowRecordModal(false)} className="h-9 px-4 rounded-lg border border-[#d8ded5] bg-white font-bold text-xs cursor-pointer">Cancel</button>
-                <button type="submit" disabled={recordingAchievement || !candidateAthlete || !selectedEventId} className="h-9 px-5 rounded-lg bg-[#e07050] text-white font-extrabold text-xs uppercase cursor-pointer">
-                  {recordingAchievement ? 'Issuing…' : 'Issue Permanent Official Result'}
+                <button type="submit" disabled={recordingAchievement || !selectedEventId || !achievementForm.certificateData} className="h-9 px-5 rounded-lg bg-[#e07050] text-white font-extrabold text-xs uppercase cursor-pointer">
+                  {recordingAchievement ? 'Freezing & Issuing…' : 'Freeze & Issue Official Result'}
                 </button>
               </div>
             </form>

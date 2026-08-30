@@ -15,6 +15,24 @@ async function verifyToken(req, res, next) {
     const jwtSecret = process.env.JWT_SECRET || 'trackathlete_sih_secret_2026';
     const decoded = jwt.verify(token, jwtSecret);
 
+    if (decoded.role === 'federation') {
+      const Federation = require('../models/Federation');
+      const fed = await Federation.findById(decoded.id).select('-passwordHash -loginOTPHash -activationOTPHash');
+      if (!fed) {
+        return res.status(401).json({ error: 'Invalid authentication session. Federation record no longer exists.' });
+      }
+      req.user = {
+        _id: fed._id,
+        id: fed._id,
+        role: 'federation',
+        federationId: fed.federationId,
+        name: fed.name,
+        sport: fed.sport,
+        officialEmail: fed.officialEmail
+      };
+      return next();
+    }
+
     const user = await User.findById(decoded.id).select('-passwordHash -resetPasswordOTP');
     if (!user) {
       return res.status(401).json({ error: 'Invalid authentication session. User no longer exists.' });

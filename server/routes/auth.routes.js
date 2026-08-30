@@ -45,6 +45,18 @@ router.post('/signup', async (req, res) => {
       }
     }
 
+    const OfficialAchievement = require('../models/OfficialAchievement');
+
+    let aadhaarHash = null;
+    if (req.body.aadhaarNumber || req.body.aadhaar) {
+      const rawAadhaar = req.body.aadhaarNumber || req.body.aadhaar;
+      const cleanAadhaar = String(rawAadhaar).replace(/\D/g, '');
+      if (cleanAadhaar.length >= 10) {
+        const secret = process.env.JWT_SECRET || 'trackathlete_sih_secret_2026';
+        aadhaarHash = crypto.createHmac('sha256', secret).update(cleanAadhaar).digest('hex');
+      }
+    }
+
     const passwordHash = await bcrypt.hash(password, 10);
     const userPayload = {
       name: String(name).trim(),
@@ -53,11 +65,29 @@ router.post('/signup', async (req, res) => {
       role,
       city,
       state,
+      aadhaarHash,
       ...rest
     };
     if (location) userPayload.location = location;
 
     const user = await User.create(userPayload);
+    const athleteIdStr = `ATH-${user._id.toString().slice(-8).toUpperCase()}`;
+    user.athleteId = athleteIdStr;
+    await user.save();
+
+    // Auto-link historical achievements by Aadhaar hash or Name match
+    if (role === 'athlete') {
+      const matchCriteria = [];
+      if (user.aadhaarHash) matchCriteria.push({ aadhaarHash: user.aadhaarHash });
+      if (user.name) matchCriteria.push({ athleteName: new RegExp('^' + user.name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i') });
+
+      if (matchCriteria.length > 0) {
+        await OfficialAchievement.updateMany(
+          { athleteUserId: null, $or: matchCriteria },
+          { $set: { athleteUserId: user._id, athleteId: athleteIdStr } }
+        ).catch(e => console.error('Historical achievement auto-link error:', e));
+      }
+    }
     
     const expiresIn = rememberMe ? '30d' : '7d';
     const jwtSecret = process.env.JWT_SECRET || 'trackathlete_sih_secret_2026';

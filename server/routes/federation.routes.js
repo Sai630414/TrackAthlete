@@ -379,9 +379,9 @@ router.get('/profile', verifyToken, requireRoles('federation'), async (req, res)
 // POST /api/federation/events — Create Official Federation Event
 router.post('/events', verifyToken, requireRoles('federation'), async (req, res) => {
   try {
-    const { eventName, sport, category, location, startDate, endDate, submissionDeadline } = req.body;
-    if (!eventName || !sport || !category || !submissionDeadline) {
-      return res.status(400).json({ error: 'Event name, sport, category, and submission deadline are required.' });
+    const { eventName, sport, category, location, tournamentDate, startDate, endDate, submissionDeadline } = req.body;
+    if (!eventName || !sport || !category || !tournamentDate || !submissionDeadline) {
+      return res.status(400).json({ error: 'Event name, sport, category, tournament date, and submission deadline are required.' });
     }
 
     const fed = await Federation.findById(req.user.id);
@@ -389,6 +389,7 @@ router.post('/events', verifyToken, requireRoles('federation'), async (req, res)
 
     const eventId = generateUniqueId('EVT');
     const deadlineDate = new Date(submissionDeadline);
+    const tourneyDate = new Date(tournamentDate);
 
     const event = await OfficialEvent.create({
       eventId,
@@ -397,11 +398,12 @@ router.post('/events', verifyToken, requireRoles('federation'), async (req, res)
       sport: String(sport).trim(),
       category: String(category).trim(),
       location: location ? String(location).trim() : '',
-      startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined,
+      tournamentDate: tourneyDate,
+      startDate: startDate ? new Date(startDate) : tourneyDate,
+      endDate: endDate ? new Date(endDate) : tourneyDate,
       submissionDeadline: deadlineDate,
       isFrozen: new Date() > deadlineDate,
-      status: new Date() > deadlineDate ? 'FROZEN' : 'OPEN'
+      status: new Date() > deadlineDate ? 'FROZEN' : (tourneyDate >= new Date() ? 'UPCOMING' : 'OPEN')
     });
 
     res.status(201).json(event);
@@ -461,7 +463,7 @@ router.get('/search-athlete/:athleteId', verifyToken, requireRoles('federation')
   }
 });
 
-// POST /api/federation/achievements — Record Official Federation Result
+// POST /api/federation/achievements — Record Official Federation Result & Freeze
 router.post('/achievements', verifyToken, requireRoles('federation'), async (req, res) => {
   try {
     const {
@@ -469,6 +471,8 @@ router.post('/achievements', verifyToken, requireRoles('federation'), async (req
       athleteId,
       athleteUserId,
       athleteName,
+      winnerName,
+      aadhaarNumber,
       achievementType,
       medal,
       rank,
@@ -480,8 +484,9 @@ router.post('/achievements', verifyToken, requireRoles('federation'), async (req
       certificateFileSize
     } = req.body;
 
-    if (!eventId || !athleteName || !achievementType || !year) {
-      return res.status(400).json({ error: 'Event ID, athlete name, achievement type, and year are required.' });
+    const finalWinnerName = String(winnerName || athleteName || '').trim();
+    if (!eventId || !finalWinnerName || !achievementType) {
+      return res.status(400).json({ error: 'Event ID, winner name, and achievement type are required.' });
     }
 
     const fed = await Federation.findById(req.user.id);
@@ -490,36 +495,39 @@ router.post('/achievements', verifyToken, requireRoles('federation'), async (req
     const event = await OfficialEvent.findOne({ _id: eventId, federation: fed._id });
     if (!event) return res.status(404).json({ error: 'Event not found or does not belong to this federation.' });
 
-    if (event.isFrozen || (event.submissionDeadline && new Date() > event.submissionDeadline)) {
-      event.isFrozen = true;
-      event.status = 'FROZEN';
-      await event.save();
-      return res.status(403).json({ error: 'This official event is FROZEN because the submission deadline has passed.' });
-    }
-
-    let matchedUserId = athleteUserId || null;
-    let matchedAthleteId = athleteId || null;
-
-    if (athleteId && !matchedUserId) {
-      const foundAth = await User.findOne({ role: 'athlete', athleteId: String(athleteId).trim().toUpperCase() });
-      if (foundAth) {
-        matchedUserId = foundAth._id;
-        matchedAthleteId = foundAth.athleteId;
+    // Compute normalized Aadhaar hash securely (Aadhaar is NEVER stored or logged)
+    let aadhaarHash = null;
+    if (aadhaarNumber) {
+      const cleanAadhaar = String(aadhaarNumber).replace(/\D/g, '');
+      if (cleanAadhaar.length >= 10) {
+        const secret = process.env.JWT_SECRET || 'trackathlete_sih_secret_2026';
+        aadhaarHash = crypto.createHmac('sha256', secret).update(cleanAadhaar).digest('hex');
       }
     }
 
-    const existing = await OfficialAchievement.findOne({
-      federation: fed._id,
-      event: event._id,
-      athleteName: String(athleteName).trim(),
-      achievementType,
-      medal: achievementType === 'medal' ? medal : undefined,
-      rank: achievementType === 'ranking' ? Number(rank) : undefined
-    });
-
-    if (existing) {
-      return res.status(409).json({ error: 'An official result record already exists for this athlete in this event category.' });
+    // Automatic Athlete Matching Engine (Current & Historical)
+    let matchedUser = null;
+    if (aadhaarHash) {
+      matchedUser = await User.findOne({ role: 'athlete', aadhaarHash });
     }
+    if (!matchedUser && (athleteUserId || athleteId)) {
+      matchedUser = await User.findOne({
+        role: 'athlete',
+        $or: [
+          { _id: athleteUserId },
+          { athleteId: athleteId }
+        ]
+      });
+    }
+    if (!matchedUser && finalWinnerName) {
+      matchedUser = await User.findOne({
+        role: 'athlete',
+        name: new RegExp('^' + finalWinnerName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i')
+      });
+    }
+
+    const matchedUserId = matchedUser ? matchedUser._id : (athleteUserId || null);
+    const matchedAthleteId = matchedUser ? (matchedUser.athleteId || `ATH-${matchedUser._id.toString().slice(-8).toUpperCase()}`) : (athleteId || null);
 
     const officialRecordId = generateUniqueId('TA-ACH');
 
@@ -527,25 +535,36 @@ router.post('/achievements', verifyToken, requireRoles('federation'), async (req
       officialRecordId,
       athleteUserId: matchedUserId,
       athleteId: matchedAthleteId,
-      athleteName: String(athleteName).trim(),
+      aadhaarHash,
+      athleteName: finalWinnerName,
       federation: fed._id,
       event: event._id,
       tournamentName: event.eventName,
       sport: event.sport,
       category: event.category,
       achievementType,
-      medal: achievementType === 'medal' ? medal : undefined,
-      rank: achievementType === 'ranking' ? Number(rank) : undefined,
-      year: Number(year),
-      eventDate: eventDate ? new Date(eventDate) : event.startDate,
+      medal: achievementType === 'medal' ? (medal || 'Gold') : undefined,
+      rank: achievementType === 'ranking' ? Number(rank || 1) : undefined,
+      year: Number(year || new Date().getFullYear()),
+      eventDate: eventDate ? new Date(eventDate) : (event.tournamentDate || event.startDate || new Date()),
       description: description ? String(description).trim() : '',
       certificateData: certificateData || null,
       certificateFileName: certificateFileName || 'official_certificate.pdf',
       certificateFileSize: certificateFileSize || 0,
-      verificationStatus: 'VERIFIED'
+      verificationStatus: 'FROZEN',
+      frozenAt: new Date()
     });
 
-    res.status(201).json(achievement);
+    // Submitting certificate freezes the official result
+    event.isFrozen = true;
+    event.status = 'COMPLETED';
+    await event.save();
+
+    const achObj = achievement.toObject();
+    delete achObj.aadhaarHash;
+    delete achObj.athleteIdentityReference;
+
+    res.status(201).json(achObj);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

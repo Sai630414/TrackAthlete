@@ -7,10 +7,11 @@ const OfficialEventSchema = new mongoose.Schema({
   sport: { type: String, required: true },
   category: { type: String, required: true },
   location: { type: String, default: '' },
+  tournamentDate: { type: Date, required: true },
   startDate: { type: Date },
   endDate: { type: Date },
   submissionDeadline: { type: Date, required: true },
-  status: { type: String, enum: ['OPEN', 'FROZEN', 'CLOSED'], default: 'OPEN' },
+  status: { type: String, enum: ['OPEN', 'FROZEN', 'CLOSED', 'UPCOMING', 'COMPLETED'], default: 'OPEN' },
   isFrozen: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }

@@ -7,6 +7,8 @@ const UserSchema = new mongoose.Schema({
   role: { type: String, enum: ['athlete', 'parent', 'coach', 'sponsor', 'academy', 'admin', 'federation'], required: true },
 
   // Athlete-specific
+  athleteId: { type: String, default: null },
+  aadhaarHash: { type: String, default: null },
   sport: String,
   beltRank: String,
   age: Number,

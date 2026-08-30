@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../services/api';
 import SportRankCard from '../components/SportRankCard';
+import OfficialTournamentsSection from '../components/OfficialTournamentsSection';
 import { useAuth } from '../context/AuthContext';
 
 export default function ParentDashboard() {
@@ -238,6 +239,9 @@ export default function ParentDashboard() {
           ))}
         </div>
       )}
+
+      {/* OFFICIAL FEDERATION TOURNAMENTS & RESULTS LEDGER */}
+      <OfficialTournamentsSection />
     </div>
   );
 }
