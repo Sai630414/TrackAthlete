@@ -5,9 +5,10 @@ const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
  * Fallback to console log if BREVO_API_KEY is not configured (dev mode friendly).
  */
 async function sendBrevoEmail({ toEmail, toName, subject, htmlContent, textContent }) {
-  const apiKey = process.env.BREVO_API_KEY;
-  const senderEmail = process.env.BREVO_SENDER_EMAIL || 'noreply@trackathlete.in';
-  const senderName = process.env.BREVO_SENDER_NAME || 'TrackAthlete Team';
+  const rawKey = process.env.BREVO_API_KEY || '';
+  const apiKey = rawKey.trim().replace(/^['"]|['"]$/g, '');
+  const senderEmail = (process.env.BREVO_SENDER_EMAIL || 'saikondareddypala@gmail.com').trim().replace(/^['"]|['"]$/g, '');
+  const senderName = (process.env.BREVO_SENDER_NAME || 'TrackAthlete').trim().replace(/^['"]|['"]$/g, '');
 
   if (!apiKey) {
     console.log('\n==================================================');
@@ -19,16 +20,17 @@ async function sendBrevoEmail({ toEmail, toName, subject, htmlContent, textConte
     return { success: true, simulated: true };
   }
 
+  let response;
   try {
     const payload = {
       sender: { name: senderName, email: senderEmail },
-      to: [{ email: toEmail, name: toName || toEmail.split('@')[0] }],
+      to: [{ email: toEmail.trim(), name: (toName || toEmail.split('@')[0]).trim() }],
       subject: subject,
       htmlContent: htmlContent,
       textContent: textContent || htmlContent.replace(/<[^>]+>/g, '')
     };
 
-    const response = await fetch(BREVO_API_URL, {
+    response = await fetch(BREVO_API_URL, {
       method: 'POST',
       headers: {
         'api-key': apiKey,
@@ -37,19 +39,30 @@ async function sendBrevoEmail({ toEmail, toName, subject, htmlContent, textConte
       },
       body: JSON.stringify(payload)
     });
-
-    const responseData = await response.json();
-
-    if (!response.ok) {
-      console.error('[Brevo Mailer Error]', responseData);
-      throw new Error(responseData.message || `Brevo HTTP error ${response.status}`);
-    }
-
-    return { success: true, data: responseData };
-  } catch (error) {
-    console.error('[Brevo Mailer Exception]', error.message);
-    throw error;
+  } catch (netErr) {
+    console.error('[Brevo Mailer Exception - Pre-Response Network/Fetch Error]', {
+      name: netErr.name,
+      message: netErr.message,
+      code: netErr.code,
+      causeCode: netErr.cause?.code,
+      causeMessage: netErr.cause?.message
+    });
+    throw new Error(`Brevo fetch failed before response: ${netErr.message} (code: ${netErr.code || netErr.cause?.code || 'UNKNOWN'})`);
   }
+
+  const responseData = await response.json().catch(() => ({ message: 'Unparseable response body' }));
+
+  if (!response.ok) {
+    console.error(`[Brevo HTTP Error ${response.status}]`, {
+      status: response.status,
+      statusText: response.statusText,
+      brevoCode: responseData.code,
+      brevoMessage: responseData.message
+    });
+    throw new Error(`Brevo HTTP ${response.status}: ${responseData.message || response.statusText}`);
+  }
+
+  return { success: true, data: responseData };
 }
 
 /**
