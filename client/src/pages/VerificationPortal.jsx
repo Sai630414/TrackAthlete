@@ -180,9 +180,7 @@ export default function VerificationPortal() {
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', color: '#697c7c' }}>Athlete Candidate</div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: '#173235', marginTop: 2 }}>{record.athleteName}</div>
-                  <div style={{ fontSize: 12, fontFamily: 'monospace', fontWeight: 700, color: '#194e42', marginTop: 2 }}>
-                    Permanent ID: {record.athleteId}
-                  </div>
+                  <div style={{ fontSize: 12, color: '#526668', marginTop: 2 }}>Official result recipient</div>
                 </div>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', color: '#697c7c' }}>Issuing Federation</div>
@@ -201,7 +199,7 @@ export default function VerificationPortal() {
                       {record.achievementType === 'medal' ? `${record.medal} Medal` : `Rank #${record.rank}`} — {record.tournamentName}
                     </div>
                     <div style={{ fontSize: 12, color: '#526668', marginTop: 2 }}>
-                      Category: {record.category} · Year {record.year}
+                      Category: {record.category} · Tournament Date {record.tournamentDate ? new Date(record.tournamentDate).toLocaleDateString('en-IN') : new Date(record.eventDate).toLocaleDateString('en-IN')}
                     </div>
                   </div>
                 </div>
