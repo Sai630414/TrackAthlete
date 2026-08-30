@@ -1,68 +1,91 @@
+const https = require('https');
+
 const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
 
 /**
- * Send email via Brevo Transactional Email REST API.
- * Fallback to console log if BREVO_API_KEY is not configured (dev mode friendly).
+ * Send email via Brevo Transactional Email REST API using Node native https module.
+ * Explicitly manages TLS sockets and prevents undici UND_ERR_SOCKET issues in Vercel serverless.
  */
-async function sendBrevoEmail({ toEmail, toName, subject, htmlContent, textContent }) {
-  const rawKey = process.env.BREVO_API_KEY || '';
-  const apiKey = rawKey.trim().replace(/^['"]|['"]$/g, '');
-  const senderEmail = (process.env.BREVO_SENDER_EMAIL || 'saikondareddypala@gmail.com').trim().replace(/^['"]|['"]$/g, '');
-  const senderName = (process.env.BREVO_SENDER_NAME || 'TrackAthlete').trim().replace(/^['"]|['"]$/g, '');
+function sendBrevoEmail({ toEmail, toName, subject, htmlContent, textContent }) {
+  return new Promise((resolve, reject) => {
+    const rawKey = process.env.BREVO_API_KEY || '';
+    const apiKey = rawKey.trim().replace(/^['"]|['"]$/g, '');
+    const senderEmail = (process.env.BREVO_SENDER_EMAIL || 'saikondareddypala@gmail.com').trim().replace(/^['"]|['"]$/g, '');
+    const senderName = (process.env.BREVO_SENDER_NAME || 'TrackAthlete').trim().replace(/^['"]|['"]$/g, '');
 
-  if (!apiKey) {
-    console.log('\n==================================================');
-    console.log(`[BREVO MAILER SIMULATOR - NO BREVO_API_KEY SET]`);
-    console.log(`To: ${toName ? `${toName} <${toEmail}>` : toEmail}`);
-    console.log(`Subject: ${subject}`);
-    console.log(`Content:\n${textContent || htmlContent}`);
-    console.log('==================================================\n');
-    return { success: true, simulated: true };
-  }
+    if (!apiKey) {
+      console.log('\n==================================================');
+      console.log(`[BREVO MAILER SIMULATOR - NO BREVO_API_KEY SET]`);
+      console.log(`To: ${toName ? `${toName} <${toEmail}>` : toEmail}`);
+      console.log(`Subject: ${subject}`);
+      console.log(`Content:\n${textContent || htmlContent}`);
+      console.log('==================================================\n');
+      return resolve({ success: true, simulated: true });
+    }
 
-  let response;
-  try {
-    const payload = {
+    const payload = JSON.stringify({
       sender: { name: senderName, email: senderEmail },
       to: [{ email: toEmail.trim(), name: (toName || toEmail.split('@')[0]).trim() }],
       subject: subject,
       htmlContent: htmlContent,
       textContent: textContent || htmlContent.replace(/<[^>]+>/g, '')
-    };
+    });
 
-    response = await fetch(BREVO_API_URL, {
+    const options = {
+      hostname: 'api.brevo.com',
+      port: 443,
+      path: '/v3/smtp/email',
       method: 'POST',
       headers: {
         'api-key': apiKey,
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'Content-Length': Buffer.byteLength(payload),
+        'User-Agent': 'TrackAthlete-Mailer/1.0',
+        'Connection': 'close'
       },
-      body: JSON.stringify(payload)
-    });
-  } catch (netErr) {
-    console.error('[Brevo Mailer Exception - Pre-Response Network/Fetch Error]', {
-      name: netErr.name,
-      message: netErr.message,
-      code: netErr.code,
-      causeCode: netErr.cause?.code,
-      causeMessage: netErr.cause?.message
-    });
-    throw new Error(`Brevo fetch failed before response: ${netErr.message} (code: ${netErr.code || netErr.cause?.code || 'UNKNOWN'})`);
-  }
+      timeout: 10000
+    };
 
-  const responseData = await response.json().catch(() => ({ message: 'Unparseable response body' }));
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        let responseData = {};
+        try { responseData = JSON.parse(data); } catch (e) { responseData = { message: data || 'Non-JSON response' }; }
 
-  if (!response.ok) {
-    console.error(`[Brevo HTTP Error ${response.status}]`, {
-      status: response.status,
-      statusText: response.statusText,
-      brevoCode: responseData.code,
-      brevoMessage: responseData.message
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          return resolve({ success: true, data: responseData, statusCode: res.statusCode });
+        } else {
+          console.error(`[Brevo API Error ${res.statusCode}]`, {
+            status: res.statusCode,
+            brevoCode: responseData.code,
+            brevoMessage: responseData.message
+          });
+          const err = new Error(`Brevo API HTTP ${res.statusCode}: ${responseData.message || res.statusMessage || 'Request failed'}`);
+          err.statusCode = res.statusCode;
+          err.responseData = responseData;
+          return reject(err);
+        }
+      });
     });
-    throw new Error(`Brevo HTTP ${response.status}: ${responseData.message || response.statusText}`);
-  }
 
-  return { success: true, data: responseData };
+    req.on('timeout', () => {
+      req.destroy(new Error('Brevo API request timed out after 10000ms'));
+    });
+
+    req.on('error', (netErr) => {
+      console.error('[Brevo Network Error]', {
+        name: netErr.name,
+        message: netErr.message,
+        code: netErr.code
+      });
+      reject(new Error(`Brevo network failure: ${netErr.message} (code: ${netErr.code || 'UNKNOWN'})`));
+    });
+
+    req.write(payload);
+    req.end();
+  });
 }
 
 /**
