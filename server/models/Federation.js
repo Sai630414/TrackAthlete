@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const FederationSchema = new mongoose.Schema({
-  federationId: { type: String, required: true, unique: true }, // e.g. FED-TKD001 or FED-AFI
+  federationId: { type: String, required: true, unique: true }, // e.g. FED-TKD001 or FED-ATHLETICS
   name: { type: String, required: true },
   sport: { type: String, required: true },
   state: { type: String, default: 'National' },
@@ -14,9 +14,15 @@ const FederationSchema = new mongoose.Schema({
   officialEmail: { type: String, sparse: true, default: undefined },
   officialPhone: { type: String, default: '' },
   passwordHash: { type: String, default: '' },
+  accountActivated: { type: Boolean, default: false },
   status: { type: String, enum: ['Active', 'Suspended', 'PendingVerification'], default: 'Active' },
 
-  // OTP authentication fields
+  // Activation 2FA OTP fields
+  activationOTPHash: String,
+  activationOTPExpires: Date,
+  activationVerified: { type: Boolean, default: false },
+
+  // Login 2FA OTP fields
   loginOTPHash: String,
   loginOTPExpires: Date,
   loginOTPAttempts: { type: Number, default: 0 },
