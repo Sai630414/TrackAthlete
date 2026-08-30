@@ -25,6 +25,7 @@ import api from '../services/api';
 import ChatPanel from '../components/ChatPanel';
 import FederationVerifiedSection from '../components/FederationVerifiedSection';
 import OfficialTournamentsSection from '../components/OfficialTournamentsSection';
+import FederationListsSection from '../components/FederationListsSection';
 import {
   Shield,
   User,
@@ -328,6 +329,9 @@ export default function AthleteDashboard() {
               </span>
             ) : null}
           </TabsTrigger>
+          <TabsTrigger value="federation-lists">
+            <Shield className="w-4 h-4 mr-1.5" /> Federation Lists
+          </TabsTrigger>
         </TabsList>
 
         {/* ── PROFILE & PREFERENCES TAB ──────────────────────────────── */}
@@ -552,6 +556,10 @@ export default function AthleteDashboard() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="federation-lists" className="space-y-6">
+          <FederationListsSection />
         </TabsContent>
 
         {/* ── COACHES & MENTORSHIP TAB ──────────────────────────────── */}

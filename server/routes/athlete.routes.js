@@ -8,7 +8,7 @@ const { hashAadhaar, withoutAadhaar } = require('../utils/aadhaar');
 async function linkHistoricalAchievements(user) {
   if (user.role !== 'athlete' || !user.aadhaarHash) return;
   await OfficialAchievement.updateMany(
-    { aadhaarHash: user.aadhaarHash, athleteUserId: null },
+    { aadhaarHash: user.aadhaarHash },
     { $set: { athleteUserId: user._id, athleteId: user.athleteId } }
   );
 }
@@ -87,16 +87,23 @@ router.get('/:id/official-achievements', async (req, res) => {
     const athleteUser = await User.findById(req.params.id);
     if (!athleteUser) return res.status(404).json({ error: 'Athlete not found.' });
 
+    // Repair/link legacy records at read time as well as on signup and profile
+    // updates, so a matching official result is visible immediately.
+    await linkHistoricalAchievements(athleteUser);
+
     const queryConditions = [{ athleteUserId: athleteUser._id }];
 
     if (athleteUser.athleteId) {
       queryConditions.push({ athleteId: athleteUser.athleteId });
     }
 
-    const officialAchievements = await OfficialAchievement.find({ $or: queryConditions })
+    const officialAchievements = await OfficialAchievement.find({
+      $or: queryConditions,
+      verificationStatus: { $in: ['FROZEN', 'VERIFIED'] }
+    })
       .select('-aadhaarHash -athleteIdentityReference')
       .populate('federation', 'name federationId sport state officialEmail')
-      .populate('event', 'eventName eventId submissionDeadline isFrozen')
+      .populate('event', 'eventName eventId tournamentDate location submissionDeadline isFrozen')
       .sort({ createdAt: -1 });
 
     res.json(officialAchievements);

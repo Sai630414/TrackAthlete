@@ -603,7 +603,9 @@ router.get('/all', async (req, res) => {
         { abbreviation: new RegExp(String(search), 'i') }
       ];
     }
-    const federations = await Federation.find(filter).select('-passwordHash -loginOTPHash -activationOTPHash').sort({ name: 1 });
+    const federations = await Federation.find(filter)
+      .select('federationId name sport state abbreviation website recognitionStatus recognitionYear sourceDocument officialEmail officialPhone accountActivated status createdAt updatedAt')
+      .sort({ name: 1 });
     res.json(federations);
   } catch (err) {
     res.status(500).json({ error: err.message });

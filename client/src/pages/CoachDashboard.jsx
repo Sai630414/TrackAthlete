@@ -10,6 +10,7 @@ import {
 import ChatPanel from '../components/ChatPanel';
 import AthleteProfileModal from '../components/AthleteProfileModal';
 import OfficialTournamentsSection from '../components/OfficialTournamentsSection';
+import FederationListsSection from '../components/FederationListsSection';
 import {
   UserCheck, Check, X, Plus, Award, Users, BookOpen,
   Clock, ExternalLink, Trophy, MapPin, MessageCircle, FileText,
@@ -170,6 +171,9 @@ export default function CoachDashboard() {
           </TabsTrigger>
           <TabsTrigger value="notes">
             <BookOpen className="w-4 h-4 mr-1.5" /> Session Notes
+          </TabsTrigger>
+          <TabsTrigger value="federation-lists">
+            <FileText className="w-4 h-4 mr-1.5" /> Federation Lists
           </TabsTrigger>
         </TabsList>
 
@@ -453,6 +457,10 @@ export default function CoachDashboard() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="federation-lists" className="space-y-4">
+          <FederationListsSection />
         </TabsContent>
       </Tabs>
 

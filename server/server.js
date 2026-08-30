@@ -62,7 +62,9 @@ app.get('/api/federations', async (req, res) => {
         { abbreviation: new RegExp(String(search), 'i') }
       ];
     }
-    const federations = await Federation.find(filter).select('-passwordHash -loginOTPHash').sort({ name: 1 });
+    const federations = await Federation.find(filter)
+      .select('federationId name sport state abbreviation website recognitionStatus recognitionYear sourceDocument officialEmail officialPhone accountActivated status createdAt updatedAt')
+      .sort({ name: 1 });
     res.json(federations);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -82,7 +84,7 @@ app.get('/api/associations', async (req, res) => {
         { state: new RegExp(String(search), 'i') }
       ];
     }
-    const associations = await OfficialAssociation.find(filter).sort({ associationName: 1 });
+    const associations = await OfficialAssociation.find(filter).select('-__v').sort({ associationName: 1 });
     res.json(associations);
   } catch (err) {
     res.status(500).json({ error: err.message });

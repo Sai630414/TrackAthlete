@@ -135,7 +135,7 @@ router.post('/login', async (req, res) => {
     const jwtSecret = process.env.JWT_SECRET || 'trackathlete_sih_secret_2026';
     const token = jwt.sign({ id: user._id, role: user.role }, jwtSecret, { expiresIn });
     
-    const userObj = user.toObject();
+    const userObj = withoutAadhaar(user);
     delete userObj.passwordHash;
     delete userObj.resetPasswordOTP;
 
