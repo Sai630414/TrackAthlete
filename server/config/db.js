@@ -1,6 +1,12 @@
 const dns = require('dns');
 
-dns.setServers(['8.8.8.8', '1.1.1.1']);
+if (!process.env.VERCEL) {
+  try {
+    dns.setServers(['8.8.8.8', '1.1.1.1']);
+  } catch (e) {
+    // Ignore DNS override errors in restricted environments
+  }
+}
 
 const mongoose = require('mongoose');
 
