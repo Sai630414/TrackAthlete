@@ -1,4 +1,5 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react';
+import React from 'react';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { TooltipProvider } from './components/ui/tooltip';
 import { ToastProvider } from './components/ui/use-toast';
 import { useAuth } from './context/AuthContext';
