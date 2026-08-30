@@ -11,11 +11,7 @@ async function connectDB() {
     return;
   }
 
-  const uri = process.env.MONGO_URI || process.env.MONGODB_URI;
-
-  if (!uri) {
-    throw new Error('MONGO_URI environment variable is not configured');
-  }
+  const uri = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/trackathlete';
 
   try {
     console.log('Connecting to MongoDB Atlas cluster...');

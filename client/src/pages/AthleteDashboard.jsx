@@ -23,6 +23,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import api from '../services/api';
 import ChatPanel from '../components/ChatPanel';
+import FederationVerifiedSection from '../components/FederationVerifiedSection';
 import {
   Shield,
   User,
@@ -414,6 +415,8 @@ export default function AthleteDashboard() {
 
         {/* ── TOURNAMENTS & VIDEO TAB ──────────────────────────────── */}
         <TabsContent value="tournaments" className="space-y-6">
+          <FederationVerifiedSection athleteUserId={user?._id} />
+
           <Card>
             <CardHeader>
               <CardTitle>Add Tournament Achievement Record</CardTitle>

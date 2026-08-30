@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Clock
 } from 'lucide-react';
+import FederationVerifiedSection from './FederationVerifiedSection';
 
 function getYouTubeEmbedUrl(url) {
   if (!url) return null;
@@ -313,7 +314,9 @@ export default function AthleteProfileModal({
 
           {/* TAB 2: TOURNAMENTS */}
           {activeTab === 'tournaments' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <FederationVerifiedSection athleteUserId={data?._id} isCoachView={true} />
+
               {(!data.tournaments || data.tournaments.length === 0) ? (
                 <div style={{ textAlign: 'center', padding: '36px 16px', background: '#f8faf7', borderRadius: 14, border: '1px dashed #d8ded5' }}>
                   <Trophy size={32} color="#8a9d9a" style={{ margin: '0 auto 8px' }} />

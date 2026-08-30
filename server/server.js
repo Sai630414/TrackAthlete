@@ -16,23 +16,21 @@ const sponsorRoutes = require('./routes/sponsor.routes');
 const tournamentRoutes = require('./routes/tournament.routes');
 const referenceRoutes = require('./routes/reference.routes');
 const chatRoutes = require('./routes/chat.routes');
+const federationRoutes = require('./routes/federation.routes');
+const verificationRoutes = require('./routes/verification.routes');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: process.env.CLIENT_ORIGIN || '*' } });
 app.set('io', io);
-// app.use((req, res, next) => {
-//   console.log('REQUEST:', req.method, req.originalUrl);
-//   console.log('ORIGIN:', req.headers.origin);
-//   next();
-// });
 
 app.use(cors({
   origin: true,
   credentials: true
 }));
-// app.use(cors({ origin: process.env.CLIENT_ORIGIN || '*' }));
-app.use(express.json());
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'TrackAthlete API' }));
 
@@ -45,6 +43,8 @@ app.use('/api/sponsor', sponsorRoutes);
 app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/reference', referenceRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/federation', federationRoutes);
+app.use('/api/verify', verificationRoutes);
 
 initSocket(io);
 

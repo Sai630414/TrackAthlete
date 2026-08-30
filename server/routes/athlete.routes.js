@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const Connection = require('../models/Connection');
+const OfficialAchievement = require('../models/OfficialAchievement');
 
 // GET /api/athlete/coaches or /api/athlete/coaches/list — list all coaches
 router.get('/coaches', async (req, res) => {
@@ -54,6 +55,32 @@ router.get('/:id/connections', async (req, res) => {
       .populate('coach', '-passwordHash')
       .sort({ createdAt: -1 });
     res.json(connections);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/athlete/:id/official-achievements — list federation-verified achievements for an athlete
+router.get('/:id/official-achievements', async (req, res) => {
+  try {
+    const athleteUser = await User.findById(req.params.id);
+    if (!athleteUser) return res.status(404).json({ error: 'Athlete not found.' });
+
+    const queryConditions = [
+      { athleteUserId: athleteUser._id },
+      { athleteName: new RegExp('^' + athleteUser.name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i') }
+    ];
+
+    if (athleteUser.athleteId) {
+      queryConditions.push({ athleteId: athleteUser.athleteId });
+    }
+
+    const officialAchievements = await OfficialAchievement.find({ $or: queryConditions })
+      .populate('federation', 'name federationId sport state officialEmail')
+      .populate('event', 'eventName eventId submissionDeadline isFrozen')
+      .sort({ createdAt: -1 });
+
+    res.json(officialAchievements);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

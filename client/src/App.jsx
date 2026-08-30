@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react';
 import { TooltipProvider } from './components/ui/tooltip';
 import { ToastProvider } from './components/ui/use-toast';
 import { useAuth } from './context/AuthContext';
@@ -9,26 +9,60 @@ import CoachDashboard from './pages/CoachDashboard';
 import SponsorDashboard from './pages/SponsorDashboard';
 import AcademyDashboard from './pages/AcademyDashboard';
 import Login from './pages/Login';
+import FederationLogin from './pages/FederationLogin';
+import FederationDashboard from './pages/FederationDashboard';
+import VerificationPortal from './pages/VerificationPortal';
 
-const routeForRole = { parent: '/parent', athlete: '/athlete', coach: '/coach', sponsor: '/sponsor', academy: '/academy', admin: '/academy' };
+const routeForRole = {
+  parent: '/parent',
+  athlete: '/athlete',
+  coach: '/coach',
+  sponsor: '/sponsor',
+  academy: '/academy',
+  admin: '/academy',
+  federation: '/federation/dashboard'
+};
 
 function ProtectedApp() {
   const { user } = useAuth();
   const destination = routeForRole[user?.role] || '/parent';
   if (!user) return <Navigate to="/login" replace />;
-  return <div className="app-shell"><Sidebar /><main className="app-main"><Routes>
-    <Route path="/" element={<Navigate to={destination} replace />} />
-    <Route path="/parent" element={user.role === 'parent' ? <ParentDashboard /> : <Navigate to={destination} replace />} />
-    <Route path="/athlete" element={user.role === 'athlete' ? <AthleteDashboard /> : <Navigate to={destination} replace />} />
-    <Route path="/coach" element={user.role === 'coach' ? <CoachDashboard /> : <Navigate to={destination} replace />} />
-    <Route path="/sponsor" element={user.role === 'sponsor' ? <SponsorDashboard /> : <Navigate to={destination} replace />} />
-    <Route path="/academy" element={['academy', 'admin'].includes(user.role) ? <AcademyDashboard /> : <Navigate to={destination} replace />} />
-  </Routes></main></div>;
+
+  if (user.role === 'federation') {
+    return <FederationDashboard />;
+  }
+
+  return (
+    <div className="app-shell">
+      <Sidebar />
+      <main className="app-main">
+        <Routes>
+          <Route path="/" element={<Navigate to={destination} replace />} />
+          <Route path="/parent" element={user.role === 'parent' ? <ParentDashboard /> : <Navigate to={destination} replace />} />
+          <Route path="/athlete" element={user.role === 'athlete' ? <AthleteDashboard /> : <Navigate to={destination} replace />} />
+          <Route path="/coach" element={user.role === 'coach' ? <CoachDashboard /> : <Navigate to={destination} replace />} />
+          <Route path="/sponsor" element={user.role === 'sponsor' ? <SponsorDashboard /> : <Navigate to={destination} replace />} />
+          <Route path="/academy" element={['academy', 'admin'].includes(user.role) ? <AcademyDashboard /> : <Navigate to={destination} replace />} />
+        </Routes>
+      </main>
+    </div>
+  );
 }
 
 export default function App() {
-  return <ToastProvider><TooltipProvider delayDuration={120}><BrowserRouter><Routes>
-    <Route path="/login" element={<Login />} />
-    <Route path="/*" element={<ProtectedApp />} />
-  </Routes></BrowserRouter></TooltipProvider></ToastProvider>;
+  return (
+    <ToastProvider>
+      <TooltipProvider delayDuration={120}>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/federation/login" element={<FederationLogin />} />
+            <Route path="/federation/dashboard" element={<FederationDashboard />} />
+            <Route path="/verify/:recordId" element={<VerificationPortal />} />
+            <Route path="/*" element={<ProtectedApp />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </ToastProvider>
+  );
 }
