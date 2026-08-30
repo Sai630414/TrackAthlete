@@ -97,12 +97,28 @@ router.post('/send-activation-otp', async (req, res) => {
       </div>
     `;
 
-    sendBrevoEmail({
-      toEmail: fed.officialEmail || 'official@sports.gov.in',
-      toName: fed.name,
-      subject,
-      htmlContent
-    }).catch(err => console.error('[Activation Mailer Error]', err.message));
+    try {
+      const mailResult = await sendBrevoEmail({
+        toEmail: fed.officialEmail || 'official@sports.gov.in',
+        toName: fed.name,
+        subject,
+        htmlContent
+      });
+      console.log('[Activation Mailer Accepted]', {
+        federationId: fed.federationId,
+        recipient: fed.officialEmail,
+        statusCode: mailResult.statusCode,
+        messageId: mailResult.data?.messageId
+      });
+    } catch (mailErr) {
+      console.error('[Activation Mailer Error]', {
+        federationId: fed.federationId,
+        message: mailErr.message,
+        statusCode: mailErr.statusCode,
+        responseData: mailErr.responseData
+      });
+      return res.status(500).json({ error: `Failed to send activation email via Brevo: ${mailErr.message}` });
+    }
 
     res.json({
       message: 'Activation OTP code sent to official registered email.',
@@ -266,12 +282,28 @@ router.post('/login', async (req, res) => {
       </div>
     `;
 
-    sendBrevoEmail({
-      toEmail: fed.officialEmail || 'official@sports.gov.in',
-      toName: fed.name,
-      subject,
-      htmlContent
-    }).catch(err => console.error('[Federation Mailer Error]', err.message));
+    try {
+      const mailResult = await sendBrevoEmail({
+        toEmail: fed.officialEmail || 'official@sports.gov.in',
+        toName: fed.name,
+        subject,
+        htmlContent
+      });
+      console.log('[Login 2FA Mailer Accepted]', {
+        federationId: fed.federationId,
+        recipient: fed.officialEmail,
+        statusCode: mailResult.statusCode,
+        messageId: mailResult.data?.messageId
+      });
+    } catch (mailErr) {
+      console.error('[Login 2FA Mailer Error]', {
+        federationId: fed.federationId,
+        message: mailErr.message,
+        statusCode: mailErr.statusCode,
+        responseData: mailErr.responseData
+      });
+      return res.status(500).json({ error: `Failed to send 2FA login email via Brevo: ${mailErr.message}` });
+    }
 
     res.json({
       requireOTP: true,
