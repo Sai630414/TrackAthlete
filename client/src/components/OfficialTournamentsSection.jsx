@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar, Award, Shield, MapPin, CheckCircle2, Lock, Eye, FileText } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Calendar, Award, Shield, MapPin, Lock, Eye, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
 import api from '../services/api';
 
 export default function OfficialTournamentsSection() {
@@ -8,6 +8,12 @@ export default function OfficialTournamentsSection() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('upcoming');
   const [viewPdfModal, setViewPdfModal] = useState(null);
+  const upcomingRail = useRef(null);
+  const completedRail = useRef(null);
+
+  const scrollRail = (rail, direction) => {
+    rail.current?.scrollBy({ left: direction * 320, behavior: 'smooth' });
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -79,9 +85,11 @@ export default function OfficialTournamentsSection() {
             No upcoming official tournaments published yet.
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="relative">
+            <RailControls onPrevious={() => scrollRail(upcomingRail, -1)} onNext={() => scrollRail(upcomingRail, 1)} />
+            <div ref={upcomingRail} className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-3 pr-1" aria-label="Upcoming official tournaments">
             {upcomingEvents.map((evt) => (
-              <div key={evt._id} className="p-4 rounded-xl border border-[#2f6d5a] bg-white shadow-2xs flex flex-col justify-between space-y-3">
+              <div key={evt._id} className="min-w-[280px] sm:min-w-[310px] max-w-[310px] snap-start p-4 rounded-xl border border-[#2f6d5a] bg-white shadow-2xs flex flex-col justify-between space-y-3">
                 <div>
                   <div className="flex justify-between items-start gap-2">
                     <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
@@ -118,6 +126,7 @@ export default function OfficialTournamentsSection() {
                 </div>
               </div>
             ))}
+            </div>
           </div>
         )
       ) : (
@@ -126,9 +135,11 @@ export default function OfficialTournamentsSection() {
             No completed official results published yet.
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="relative">
+            <RailControls onPrevious={() => scrollRail(completedRail, -1)} onNext={() => scrollRail(completedRail, 1)} />
+            <div ref={completedRail} className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-3 pr-1" aria-label="Completed official tournament results">
             {completedResults.map((resItem) => (
-              <div key={resItem._id} className="p-4 rounded-xl border border-[#2f6d5a] bg-white shadow-2xs flex flex-col justify-between space-y-3">
+              <div key={resItem._id} className="min-w-[280px] sm:min-w-[310px] max-w-[310px] snap-start p-4 rounded-xl border border-[#2f6d5a] bg-white shadow-2xs flex flex-col justify-between space-y-3">
                 <div>
                   <div className="flex justify-between items-start gap-2">
                     <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-[#fef9e7] text-[#9a6c00] border border-[#f0d060] flex items-center gap-1">
@@ -147,7 +158,7 @@ export default function OfficialTournamentsSection() {
 
                   <div className="space-y-1 mt-2 text-xs text-[#526668]">
                     <div>Discipline: <strong>{resItem.sport}</strong> ({resItem.category})</div>
-                    <div>Year: {resItem.year}</div>
+                    <div>Tournament Date: {resItem.event?.tournamentDate ? new Date(resItem.event.tournamentDate).toLocaleDateString('en-IN') : new Date(resItem.eventDate).toLocaleDateString('en-IN')}</div>
                   </div>
                 </div>
 
@@ -173,6 +184,7 @@ export default function OfficialTournamentsSection() {
                 </div>
               </div>
             ))}
+            </div>
           </div>
         )
       )}
@@ -200,6 +212,19 @@ export default function OfficialTournamentsSection() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function RailControls({ onPrevious, onNext }) {
+  return (
+    <div className="flex justify-end gap-2 mb-2" aria-label="Tournament carousel controls">
+      <button type="button" onClick={onPrevious} className="h-8 w-8 rounded-lg border border-[#d2dad2] bg-white text-[#194e42] hover:bg-[#e2eee4] flex items-center justify-center cursor-pointer" aria-label="Previous tournaments">
+        <ChevronLeft size={16} />
+      </button>
+      <button type="button" onClick={onNext} className="h-8 w-8 rounded-lg border border-[#d2dad2] bg-white text-[#194e42] hover:bg-[#e2eee4] flex items-center justify-center cursor-pointer" aria-label="Next tournaments">
+        <ChevronRight size={16} />
+      </button>
     </div>
   );
 }

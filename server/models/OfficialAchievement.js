@@ -28,6 +28,7 @@ const OfficialAchievementSchema = new mongoose.Schema({
   certificateFileSize: { type: Number, default: 0 },
   
   verificationStatus: { type: String, enum: ['VERIFIED', 'FROZEN', 'REVOKED'], default: 'VERIFIED' },
+  isFrozen: { type: Boolean, default: false },
   frozenAt: { type: Date, default: null },
   
   createdAt: { type: Date, default: Date.now },
@@ -37,6 +38,14 @@ const OfficialAchievementSchema = new mongoose.Schema({
 OfficialAchievementSchema.pre('save', function (next) {
   this.updatedAt = new Date();
   next();
+});
+
+OfficialAchievementSchema.set('toJSON', {
+  transform: (_doc, value) => {
+    delete value.aadhaarHash;
+    delete value.athleteIdentityReference;
+    return value;
+  }
 });
 
 module.exports = mongoose.model('OfficialAchievement', OfficialAchievementSchema);

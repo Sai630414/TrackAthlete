@@ -3,6 +3,15 @@ const router = express.Router();
 const User = require('../models/User');
 const Connection = require('../models/Connection');
 const OfficialAchievement = require('../models/OfficialAchievement');
+const { hashAadhaar, withoutAadhaar } = require('../utils/aadhaar');
+
+async function linkHistoricalAchievements(user) {
+  if (user.role !== 'athlete' || !user.aadhaarHash) return;
+  await OfficialAchievement.updateMany(
+    { aadhaarHash: user.aadhaarHash, athleteUserId: null },
+    { $set: { athleteUserId: user._id, athleteId: user.athleteId } }
+  );
+}
 
 // GET /api/athlete/coaches or /api/athlete/coaches/list — list all coaches
 router.get('/coaches', async (req, res) => {
@@ -30,7 +39,7 @@ router.get('/coaches/list', async (req, res) => {
 // GET /api/athlete/:id/profile
 router.get('/:id/profile', async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select('-passwordHash');
+    const user = await User.findById(req.params.id).select('-passwordHash -aadhaarHash');
     if (!user) return res.status(404).json({ error: 'Not found' });
     res.json(user);
   } catch (err) {
@@ -41,8 +50,20 @@ router.get('/:id/profile', async (req, res) => {
 // PUT /api/athlete/:id/profile
 router.put('/:id/profile', async (req, res) => {
   try {
-    const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true }).select('-passwordHash');
-    res.json(user);
+    const updates = { ...req.body };
+    const rawAadhaar = updates.aadhaarNumber || updates.aadhaar;
+    delete updates.aadhaarNumber;
+    delete updates.aadhaar;
+    delete updates.aadhaarHash;
+    if (rawAadhaar) {
+      const aadhaarHash = hashAadhaar(rawAadhaar);
+      if (!aadhaarHash) return res.status(400).json({ error: 'Aadhaar number must contain exactly 12 digits.' });
+      updates.aadhaarHash = aadhaarHash;
+    }
+    const user = await User.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true });
+    if (!user) return res.status(404).json({ error: 'Not found' });
+    await linkHistoricalAchievements(user);
+    res.json(withoutAadhaar(user));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -66,16 +87,14 @@ router.get('/:id/official-achievements', async (req, res) => {
     const athleteUser = await User.findById(req.params.id);
     if (!athleteUser) return res.status(404).json({ error: 'Athlete not found.' });
 
-    const queryConditions = [
-      { athleteUserId: athleteUser._id },
-      { athleteName: new RegExp('^' + athleteUser.name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i') }
-    ];
+    const queryConditions = [{ athleteUserId: athleteUser._id }];
 
     if (athleteUser.athleteId) {
       queryConditions.push({ athleteId: athleteUser.athleteId });
     }
 
     const officialAchievements = await OfficialAchievement.find({ $or: queryConditions })
+      .select('-aadhaarHash -athleteIdentityReference')
       .populate('federation', 'name federationId sport state officialEmail')
       .populate('event', 'eventName eventId submissionDeadline isFrozen')
       .sort({ createdAt: -1 });

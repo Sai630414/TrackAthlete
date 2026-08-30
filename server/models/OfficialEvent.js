@@ -3,6 +3,9 @@ const mongoose = require('mongoose');
 const OfficialEventSchema = new mongoose.Schema({
   eventId: { type: String, required: true, unique: true }, // e.g. EVT-9K2M41XP
   federation: { type: mongoose.Schema.Types.ObjectId, ref: 'Federation', required: true },
+  // Snapshots keep public event cards readable if a federation profile later changes.
+  federationName: { type: String, default: '' },
+  federationId: { type: String, default: '' },
   eventName: { type: String, required: true },
   sport: { type: String, required: true },
   category: { type: String, required: true },

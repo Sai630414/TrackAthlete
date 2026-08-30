@@ -133,18 +133,15 @@ export default function FederationDashboard() {
   // Create Event Submit
   const handleCreateEvent = async (e) => {
     e?.preventDefault();
-    if (!eventForm.eventName || !eventForm.submissionDeadline) {
-      toast({ title: 'Required Fields', description: 'Please enter event name and submission deadline.', variant: 'destructive' });
+    if (!eventForm.eventName || !eventForm.tournamentDate || !eventForm.submissionDeadline) {
+      toast({ title: 'Required Fields', description: 'Please enter the event name, tournament date, and submission deadline.', variant: 'destructive' });
       return;
     }
-
-    const effectiveTournamentDate = eventForm.tournamentDate || eventForm.submissionDeadline;
 
     try {
       setCreatingEvent(true);
       const { data } = await api.post('/federation/events', {
         ...eventForm,
-        tournamentDate: effectiveTournamentDate,
         sport: eventForm.sport || federation?.sport || 'Taekwondo'
       });
       setEvents(prev => [data, ...prev]);
@@ -376,6 +373,9 @@ export default function FederationDashboard() {
                         <div className="space-y-1 my-2 text-xs text-[#526668]">
                           <div>Category: <strong>{evt.category}</strong> · Sport: <strong>{evt.sport}</strong></div>
                           {evt.location && <div>Location: {evt.location}</div>}
+                          <div className="text-[#194e42] font-bold mt-1">
+                            Tournament Date: {evt.tournamentDate ? new Date(evt.tournamentDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Not set'}
+                          </div>
                           <div className="text-[#c85c40] font-bold mt-1">
                             Deadline: {new Date(evt.submissionDeadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </div>
@@ -938,7 +938,7 @@ export default function FederationDashboard() {
               </div>
 
               <div>
-                <Label required>Certificate Upload * (PDF, max 1MB)</Label>
+                <Label required>Signed Official Certificate PDF * (max 1MB)</Label>
                 <input
                   type="file"
                   accept="application/pdf"

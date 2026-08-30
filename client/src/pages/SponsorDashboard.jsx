@@ -21,6 +21,7 @@ import {
   ProgressChart,
 } from '../components/ui';
 import { HeartHandshake, ShieldCheck, DollarSign, Award, Send, CheckCircle2 } from 'lucide-react';
+import OfficialTournamentsSection from '../components/OfficialTournamentsSection';
 
 export default function SponsorDashboard() {
   const { user } = useAuth();
@@ -140,6 +141,8 @@ export default function SponsorDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <OfficialTournamentsSection />
 
       {/* PLEDGE DIALOG */}
       <Dialog isOpen={!!selectedAthlete} onClose={() => setSelectedAthlete(null)}>

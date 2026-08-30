@@ -31,13 +31,7 @@ router.get('/', async (req, res) => {
 router.get('/upcoming', async (req, res) => {
   try {
     const now = new Date();
-    const upcomingEvents = await OfficialEvent.find({
-      $or: [
-        { tournamentDate: { $gte: now } },
-        { status: 'UPCOMING' },
-        { isFrozen: false }
-      ]
-    })
+    const upcomingEvents = await OfficialEvent.find({ tournamentDate: { $gt: now } })
     .populate('federation', 'name federationId sport state website')
     .sort({ tournamentDate: 1, createdAt: -1 });
 
@@ -51,7 +45,8 @@ router.get('/upcoming', async (req, res) => {
 router.get('/completed', async (req, res) => {
   try {
     const completedAchievements = await OfficialAchievement.find({
-      verificationStatus: { $in: ['FROZEN', 'VERIFIED'] }
+      verificationStatus: 'FROZEN',
+      isFrozen: true
     })
     .select('-aadhaarHash -athleteIdentityReference')
     .populate('federation', 'name federationId sport state')

@@ -24,6 +24,7 @@ import { useSocket } from '../context/SocketContext';
 import api from '../services/api';
 import ChatPanel from '../components/ChatPanel';
 import FederationVerifiedSection from '../components/FederationVerifiedSection';
+import OfficialTournamentsSection from '../components/OfficialTournamentsSection';
 import {
   Shield,
   User,
@@ -415,6 +416,7 @@ export default function AthleteDashboard() {
 
         {/* ── TOURNAMENTS & VIDEO TAB ──────────────────────────────── */}
         <TabsContent value="tournaments" className="space-y-6">
+          <OfficialTournamentsSection />
           <FederationVerifiedSection athleteUserId={user?._id} />
 
           <Card>

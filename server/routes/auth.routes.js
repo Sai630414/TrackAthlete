@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const User = require('../models/User');
 const indianCities = require('../utils/indianCities');
 const { verifyToken } = require('../middleware/auth.middleware');
+const { hashAadhaar, withoutAadhaar } = require('../utils/aadhaar');
 const {
   sendForgotPasswordOTP,
   sendWelcomeEmail,
@@ -15,7 +16,7 @@ const {
 // POST /api/auth/signup
 router.post('/signup', async (req, res) => {
   try {
-    const { name, email, password, role, rememberMe, city, state, ...rest } = req.body;
+    const { name, email, password, role, rememberMe, city, state, aadhaarNumber, aadhaar, aadhaarHash: ignoredAadhaarHash, ...rest } = req.body;
     if (!name || !email || !password || !role) {
       return res.status(400).json({ error: 'Name, email, password, and role are required.' });
     }
@@ -47,14 +48,9 @@ router.post('/signup', async (req, res) => {
 
     const OfficialAchievement = require('../models/OfficialAchievement');
 
-    let aadhaarHash = null;
-    if (req.body.aadhaarNumber || req.body.aadhaar) {
-      const rawAadhaar = req.body.aadhaarNumber || req.body.aadhaar;
-      const cleanAadhaar = String(rawAadhaar).replace(/\D/g, '');
-      if (cleanAadhaar.length >= 10) {
-        const secret = process.env.JWT_SECRET || 'trackathlete_sih_secret_2026';
-        aadhaarHash = crypto.createHmac('sha256', secret).update(cleanAadhaar).digest('hex');
-      }
+    const aadhaarHash = aadhaarNumber || aadhaar ? hashAadhaar(aadhaarNumber || aadhaar) : null;
+    if ((aadhaarNumber || aadhaar) && !aadhaarHash) {
+      return res.status(400).json({ error: 'Aadhaar number must contain exactly 12 digits.' });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -75,12 +71,10 @@ router.post('/signup', async (req, res) => {
     user.athleteId = athleteIdStr;
     await user.save();
 
-    // Auto-link historical achievements by Aadhaar hash or Name match
+    // Auto-link historical official results by Aadhaar hash only.
     if (role === 'athlete') {
       const matchCriteria = [];
       if (user.aadhaarHash) matchCriteria.push({ aadhaarHash: user.aadhaarHash });
-      if (user.name) matchCriteria.push({ athleteName: new RegExp('^' + user.name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i') });
-
       if (matchCriteria.length > 0) {
         await OfficialAchievement.updateMany(
           { athleteUserId: null, $or: matchCriteria },
@@ -93,7 +87,7 @@ router.post('/signup', async (req, res) => {
     const jwtSecret = process.env.JWT_SECRET || 'trackathlete_sih_secret_2026';
     const token = jwt.sign({ id: user._id, role: user.role }, jwtSecret, { expiresIn });
     
-    const userObj = user.toObject();
+    const userObj = withoutAadhaar(user);
     delete userObj.passwordHash;
     delete userObj.resetPasswordOTP;
 

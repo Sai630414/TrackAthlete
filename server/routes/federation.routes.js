@@ -2,11 +2,11 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
 const Federation = require('../models/Federation');
 const OfficialEvent = require('../models/OfficialEvent');
 const OfficialAchievement = require('../models/OfficialAchievement');
 const OfficialAssociation = require('../models/OfficialAssociation');
+const { hashAadhaar, normalizeAadhaar, withoutAadhaar } = require('../utils/aadhaar');
 const User = require('../models/User');
 const { verifyToken, requireRoles } = require('../middleware/auth.middleware');
 const { sendBrevoEmail } = require('../utils/mailer');
@@ -380,8 +380,8 @@ router.get('/profile', verifyToken, requireRoles('federation'), async (req, res)
 router.post('/events', verifyToken, requireRoles('federation'), async (req, res) => {
   try {
     const { eventName, sport, category, location, tournamentDate, startDate, endDate, submissionDeadline } = req.body;
-    if (!eventName || !sport || !category || !submissionDeadline) {
-      return res.status(400).json({ error: 'Event name, sport, category, and submission deadline are required.' });
+    if (!eventName || !sport || !category || !tournamentDate || !submissionDeadline) {
+      return res.status(400).json({ error: 'Event name, sport, category, tournament date, and submission deadline are required.' });
     }
 
     const fed = await Federation.findById(req.user.id);
@@ -389,11 +389,16 @@ router.post('/events', verifyToken, requireRoles('federation'), async (req, res)
 
     const eventId = generateUniqueId('EVT');
     const deadlineDate = new Date(submissionDeadline);
-    const tourneyDate = tournamentDate ? new Date(tournamentDate) : (startDate ? new Date(startDate) : deadlineDate);
+    const tourneyDate = new Date(tournamentDate);
+    if (Number.isNaN(deadlineDate.getTime()) || Number.isNaN(tourneyDate.getTime())) {
+      return res.status(400).json({ error: 'Tournament date and submission deadline must be valid dates.' });
+    }
 
     const event = await OfficialEvent.create({
       eventId,
       federation: fed._id,
+      federationName: fed.name,
+      federationId: fed.federationId,
       eventName: String(eventName).trim(),
       sport: String(sport).trim(),
       category: String(category).trim(),
@@ -494,16 +499,22 @@ router.post('/achievements', verifyToken, requireRoles('federation'), async (req
 
     const event = await OfficialEvent.findOne({ _id: eventId, federation: fed._id });
     if (!event) return res.status(404).json({ error: 'Event not found or does not belong to this federation.' });
-
-    // Compute normalized Aadhaar hash securely (Aadhaar is NEVER stored or logged)
-    let aadhaarHash = null;
-    if (aadhaarNumber) {
-      const cleanAadhaar = String(aadhaarNumber).replace(/\D/g, '');
-      if (cleanAadhaar.length >= 10) {
-        const secret = process.env.JWT_SECRET || 'trackathlete_sih_secret_2026';
-        aadhaarHash = crypto.createHmac('sha256', secret).update(cleanAadhaar).digest('hex');
-      }
+    if (event.isFrozen || (event.submissionDeadline && new Date() > event.submissionDeadline)) {
+      return res.status(409).json({ error: 'Result submission is locked for this event.' });
     }
+
+    if (!aadhaarNumber || normalizeAadhaar(aadhaarNumber).length !== 12) {
+      return res.status(400).json({ error: 'A valid 12-digit Aadhaar number is required for private athlete matching.' });
+    }
+    if (!certificateData || !certificateFileName || !String(certificateData).startsWith('data:application/pdf;base64,')) {
+      return res.status(400).json({ error: 'A signed official certificate PDF is required.' });
+    }
+    if (Number(certificateFileSize) <= 0 || Number(certificateFileSize) > 1024 * 1024) {
+      return res.status(400).json({ error: 'Certificate PDF must be no larger than 1 MB.' });
+    }
+
+    // Aadhaar is normalized and HMACed only in memory; plaintext is never persisted.
+    const aadhaarHash = hashAadhaar(aadhaarNumber);
 
     // Automatic Athlete Matching Engine (Current & Historical)
     let matchedUser = null;
@@ -552,19 +563,15 @@ router.post('/achievements', verifyToken, requireRoles('federation'), async (req
       certificateFileName: certificateFileName || 'official_certificate.pdf',
       certificateFileSize: certificateFileSize || 0,
       verificationStatus: 'FROZEN',
+      isFrozen: true,
       frozenAt: new Date()
     });
 
-    // Submitting certificate freezes the official result
-    event.isFrozen = true;
+    // A submitted result is immutable; the event remains open for other valid winners until its deadline.
     event.status = 'COMPLETED';
     await event.save();
 
-    const achObj = achievement.toObject();
-    delete achObj.aadhaarHash;
-    delete achObj.athleteIdentityReference;
-
-    res.status(201).json(achObj);
+    res.status(201).json(withoutAadhaar(achievement));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -574,6 +581,7 @@ router.post('/achievements', verifyToken, requireRoles('federation'), async (req
 router.get('/achievements', verifyToken, requireRoles('federation'), async (req, res) => {
   try {
     const achievements = await OfficialAchievement.find({ federation: req.user.id })
+      .select('-aadhaarHash -athleteIdentityReference')
       .populate('event', 'eventName eventId isFrozen submissionDeadline')
       .sort({ createdAt: -1 });
     res.json(achievements);

@@ -66,4 +66,18 @@ const UserSchema = new mongoose.Schema({
 
 UserSchema.index({ location: '2dsphere' }, { sparse: true });
 
+// Identity matching data is backend-only, including when a User document is
+// serialized by an endpoint that did not explicitly project its fields.
+UserSchema.set('toJSON', {
+  transform: (_doc, value) => {
+    delete value.passwordHash;
+    delete value.resetPasswordOTP;
+    delete value.resetPasswordToken;
+    delete value.aadhaarHash;
+    delete value.aadhaar;
+    delete value.aadhaarNumber;
+    return value;
+  }
+});
+
 module.exports = mongoose.model('User', UserSchema);

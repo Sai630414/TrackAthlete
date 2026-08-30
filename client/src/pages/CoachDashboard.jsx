@@ -9,6 +9,7 @@ import {
 } from '../components/ui';
 import ChatPanel from '../components/ChatPanel';
 import AthleteProfileModal from '../components/AthleteProfileModal';
+import OfficialTournamentsSection from '../components/OfficialTournamentsSection';
 import {
   UserCheck, Check, X, Plus, Award, Users, BookOpen,
   Clock, ExternalLink, Trophy, MapPin, MessageCircle, FileText,
@@ -145,6 +146,8 @@ export default function CoachDashboard() {
           </span>
         </div>
       </div>
+
+      <OfficialTournamentsSection />
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
