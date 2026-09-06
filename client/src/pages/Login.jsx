@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Building2, CheckCircle2, HeartHandshake, KeyRound, LoaderCircle, LockKeyhole, Mail, UserRound, UsersRound } from 'lucide-react';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { ArrowLeft, ArrowRight, Building2, CalendarPlus, CheckCircle2, HeartHandshake, KeyRound, LoaderCircle, LockKeyhole, Mail, UserRound, UsersRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const routeForRole = {
@@ -18,10 +18,12 @@ const roles = [
   { id: 'coach', label: 'Coach', copy: 'Guide your athletes', icon: UsersRound },
   { id: 'sponsor', label: 'Sponsor', copy: 'Support with clarity', icon: HeartHandshake },
   { id: 'academy', label: 'Academy', copy: 'Manage your listing', icon: Building2 }
+  ,{ id: 'organizer', label: 'Organize Event', copy: 'Create and manage sports events', icon: CalendarPlus }
 ];
 
 export default function Login() {
   const { user, login, signup, forgotPassword, resetPassword } = useAuth();
+  const navigate = useNavigate();
 
   if (user) {
     return <Navigate to={routeForRole[user.role] || '/parent'} replace />;
@@ -170,7 +172,8 @@ export default function Login() {
       <div className="story-foot"><i /> Built for the Indian sports ecosystem</div>
     </section>
     <section className="login-panel">
-      <div className="login-card">
+        <div className="login-card">
+          <p className="login-help" style={{ marginBottom: 12 }}>Organizing a competition? <Link to="/organizer/login">Open the Organizer workspace</Link></p>
 
         {/* Auth Mode Tabs */}
         {mode !== 'forgot' && (
@@ -198,7 +201,7 @@ export default function Login() {
         {mode !== 'forgot' && (
           <div className="role-picker" role="radiogroup" aria-label="Select account role">
             {roles.map(({ id, label, copy, icon: Icon }) => (
-              <button type="button" role="radio" aria-checked={role === id} key={id} onClick={() => setRole(id)} className={role === id ? 'role-option selected' : 'role-option'}>
+              <button type="button" role="radio" aria-checked={role === id} key={id} onClick={() => id === 'organizer' ? navigate('/organizer/login') : setRole(id)} className={role === id ? 'role-option selected' : 'role-option'}>
                 <Icon size={17} />
                 <span><b>{label}</b><small>{copy}</small></span>
               </button>

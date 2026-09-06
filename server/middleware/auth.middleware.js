@@ -32,6 +32,13 @@ async function verifyToken(req, res, next) {
       };
       return next();
     }
+    if (decoded.role === 'organizer') {
+      const Organizer = require('../models/Organizer');
+      const organizer = await Organizer.findById(decoded.id);
+      if (!organizer || organizer.accountStatus !== 'active') return res.status(401).json({ error: 'Invalid organizer session.' });
+      req.user = { _id: organizer._id, id: organizer._id, role: 'organizer', organizerId: organizer.organizerId, name: organizer.name, email: organizer.email };
+      return next();
+    }
 
     const user = await User.findById(decoded.id).select('-passwordHash -resetPasswordOTP');
     if (!user) {

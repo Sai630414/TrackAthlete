@@ -23,7 +23,19 @@ export default function OfficialTournamentsSection() {
           api.get('/tournaments/upcoming').catch(() => ({ data: [] })),
           api.get('/tournaments/completed').catch(() => ({ data: [] }))
         ]);
-        setUpcomingEvents(upRes.data || []);
+        const payload = upRes.data || [];
+        setUpcomingEvents(Array.isArray(payload) ? payload : [
+          ...(payload.federationEvents || []),
+          ...(payload.organizerEvents || []).map(event => ({
+            ...event,
+            isOrganizerEvent: true,
+            tournamentDate: event.eventDate,
+            location: event.venue,
+            submissionDeadline: event.registrationDeadline,
+            sport: event.sports?.map(s => s.sportName).join(', '),
+            category: 'Organizer Event'
+          }))
+        ]);
         setCompletedResults(compRes.data || []);
       } catch (err) {
         console.error('Error fetching tournaments:', err);
@@ -93,20 +105,20 @@ export default function OfficialTournamentsSection() {
                 <div>
                   <div className="flex justify-between items-start gap-2">
                     <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
-                      UPCOMING TOURNAMENT
+                      {evt.isOrganizerEvent ? 'ORGANIZER EVENT' : 'UPCOMING TOURNAMENT'}
                     </span>
                     <span className="text-[10px] font-mono font-bold text-[#173235] bg-[#f4f8f5] px-2 py-0.5 rounded border border-[#d2dad2]">
-                      {evt.eventId}
+                      {evt.isOrganizerEvent ? 'Organizer Verified' : evt.eventId}
                     </span>
                   </div>
 
                   <h4 className="font-extrabold text-[#173235] text-sm mt-2">{evt.eventName}</h4>
-                  <p className="text-xs font-bold text-[#194e42] mt-0.5">{evt.federation?.name || 'Recognized Federation'}</p>
+                  <p className="text-xs font-bold text-[#194e42] mt-0.5">{evt.isOrganizerEvent ? (evt.organizer?.organizationName || evt.organizer?.name || 'Event organizer') : (evt.federation?.name || 'Recognized Federation')}</p>
 
                   <div className="space-y-1 mt-2 text-xs text-[#526668]">
                     <div className="flex items-center gap-1.5">
                       <Award className="w-3.5 h-3.5 text-[#cc694e]" />
-                      <span>Sport: <strong>{evt.sport}</strong> ({evt.category})</span>
+                      <span>Sport: <strong>{evt.sport}</strong> ({evt.isOrganizerEvent ? 'Organizer Event' : evt.category})</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5 text-[#194e42]" />
@@ -122,7 +134,7 @@ export default function OfficialTournamentsSection() {
                 </div>
 
                 <div className="pt-2 border-t border-[#e2eee4] text-[11px] text-[#697c7c]">
-                  Official Submission Deadline: {evt.submissionDeadline ? new Date(evt.submissionDeadline).toLocaleDateString('en-IN') : 'Open'}
+                  {evt.isOrganizerEvent ? 'Registration deadline' : 'Official Submission Deadline'}: {evt.submissionDeadline ? new Date(evt.submissionDeadline).toLocaleDateString('en-IN') : 'Open'}
                 </div>
               </div>
             ))}

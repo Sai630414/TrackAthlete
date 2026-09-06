@@ -13,6 +13,8 @@ import Login from './pages/Login';
 import FederationLogin from './pages/FederationLogin';
 import FederationDashboard from './pages/FederationDashboard';
 import VerificationPortal from './pages/VerificationPortal';
+import OrganizerLogin from './pages/OrganizerLogin';
+import OrganizerDashboard from './pages/OrganizerDashboard';
 
 const routeForRole = {
   parent: '/parent',
@@ -21,7 +23,8 @@ const routeForRole = {
   sponsor: '/sponsor',
   academy: '/academy',
   admin: '/academy',
-  federation: '/federation/dashboard'
+  federation: '/federation/dashboard',
+  organizer: '/organizer'
 };
 
 function ProtectedApp() {
@@ -32,6 +35,7 @@ function ProtectedApp() {
   if (user.role === 'federation') {
     return <FederationDashboard />;
   }
+  if (user.role === 'organizer') return <OrganizerDashboard />;
 
   return (
     <div className="app-shell">
@@ -59,6 +63,8 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/federation/login" element={<FederationLogin />} />
             <Route path="/federation/dashboard" element={<FederationDashboard />} />
+            <Route path="/organizer/login" element={<OrganizerLogin />} />
+            <Route path="/organizer" element={<OrganizerDashboard />} />
             <Route path="/verify/:recordId" element={<VerificationPortal />} />
             <Route path="/*" element={<ProtectedApp />} />
           </Routes>

@@ -58,6 +58,16 @@ function getYouTubeEmbedUrl(url) {
     : null;
 }
 
+function MyEventRegistrations() {
+  const [registrations, setRegistrations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { api.get('/organizer-events/my/registrations').then(({ data }) => setRegistrations(data.registrations || [])).catch(() => setRegistrations([])).finally(() => setLoading(false)); }, []);
+  return <Card>
+    <CardHeader><CardTitle>My Event Registrations</CardTitle><CardDescription>Organizer event registrations, team memberships and join-request outcomes.</CardDescription></CardHeader>
+    <CardContent>{loading ? <p>Loading registrations…</p> : registrations.length === 0 ? <p className="text-sm text-[#526668]">You have no organizer event registrations yet.</p> : <div className="space-y-3">{registrations.map(r => <div key={r._id} className="border rounded-lg p-3"><div className="font-bold">{r.event?.eventName || 'Organizer event'}</div><div className="text-sm text-[#526668]">{r.type === 'team' ? `Team: ${r.team?.name || 'Team registration'}` : 'Individual'} · Status: <b>{r.status}</b></div><div className="text-sm text-[#526668]">Event date: {r.event?.eventDate ? new Date(r.event.eventDate).toLocaleDateString() : '—'}</div></div>)}</div>}</CardContent>
+  </Card>;
+}
+
 export default function AthleteDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -332,6 +342,9 @@ export default function AthleteDashboard() {
           <TabsTrigger value="federation-lists">
             <Shield className="w-4 h-4 mr-1.5" /> Federation Lists
           </TabsTrigger>
+          <TabsTrigger value="event-registrations">
+            <Trophy className="w-4 h-4 mr-1.5" /> My Event Registrations
+          </TabsTrigger>
         </TabsList>
 
         {/* ── PROFILE & PREFERENCES TAB ──────────────────────────────── */}
@@ -560,6 +573,9 @@ export default function AthleteDashboard() {
 
         <TabsContent value="federation-lists" className="space-y-6">
           <FederationListsSection />
+        </TabsContent>
+        <TabsContent value="event-registrations" className="space-y-6">
+          <MyEventRegistrations />
         </TabsContent>
 
         {/* ── COACHES & MENTORSHIP TAB ──────────────────────────────── */}

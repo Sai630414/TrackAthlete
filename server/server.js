@@ -18,6 +18,8 @@ const referenceRoutes = require('./routes/reference.routes');
 const chatRoutes = require('./routes/chat.routes');
 const federationRoutes = require('./routes/federation.routes');
 const verificationRoutes = require('./routes/verification.routes');
+const organizerRoutes = require('./routes/organizer.routes');
+const organizerEventRoutes = require('./routes/organizer-events.routes');
 
 const Federation = require('./models/Federation');
 const OfficialAssociation = require('./models/OfficialAssociation');
@@ -45,6 +47,29 @@ app.use(async (req, res, next) => {
     console.error('Database connection middleware error:', err);
     res.status(500).json({ error: 'Database connection error: ' + err.message });
   }
+});
+
+// Reconcile deadline-driven state on requests without relying on a fragile
+// serverless background job. It never changes frozen sport results.
+app.use(async (_req, _res, next) => {
+  try {
+    const OrganizerEvent = require('./models/OrganizerEvent');
+    const EventTeam = require('./models/EventTeam');
+    const now = new Date();
+    const events = await OrganizerEvent.find({ $or: [{ resultSubmissionDeadline: { $lt: now } }, { teamFormationDeadline: { $lt: now } }] });
+    for (const event of events) {
+      let dirty = false;
+      if (event.resultSubmissionDeadline < now) event.sports.forEach(s => { if (s.resultStatus === 'pending') { s.resultStatus = 'deadline_passed'; dirty = true; } });
+      if (event.teamFormationDeadline && event.teamFormationDeadline < now) {
+        for (const sport of event.sports.filter(s => s.competitionType === 'team')) {
+          const teams = await EventTeam.find({ event: event._id, sportConfigId: sport._id, status: 'forming' });
+          for (const team of teams) if (team.members.filter(m => m.status === 'confirmed').length < sport.minimumTeamSize) { team.status = 'terminated'; team.terminationReason = 'Minimum team size not reached by team formation deadline.'; await team.save(); }
+        }
+      }
+      if (dirty) await event.save();
+    }
+  } catch (err) { console.error('Organizer deadline reconciliation error:', err.message); }
+  next();
 });
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'TrackAthlete API' }));
@@ -102,6 +127,8 @@ app.use('/api/reference', referenceRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/federation', federationRoutes);
 app.use('/api/verify', verificationRoutes);
+app.use('/api/organizer', organizerRoutes);
+app.use('/api/organizer-events', organizerEventRoutes);
 
 initSocket(io);
 

@@ -1,0 +1,4 @@
+const mongoose = require('mongoose');
+const OrganizerResultSchema = new mongoose.Schema({ organizer: { type: mongoose.Schema.Types.ObjectId, ref: 'Organizer', required: true }, event: { type: mongoose.Schema.Types.ObjectId, ref: 'OrganizerEvent', required: true }, sportConfigId: { type: mongoose.Schema.Types.ObjectId, required: true }, resultType: { type: String, enum: ['positions', 'medals'], required: true }, entries: [{ name: String, aadhaarHash: { type: String, select: false }, mobile: String, outcome: String, athlete: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, team: { type: mongoose.Schema.Types.ObjectId, ref: 'EventTeam' }, certificateUrl: String }], isFrozen: { type: Boolean, default: false }, frozenAt: Date }, { timestamps: true });
+OrganizerResultSchema.index({ event: 1, sportConfigId: 1 }, { unique: true });
+module.exports = mongoose.model('OrganizerResult', OrganizerResultSchema);

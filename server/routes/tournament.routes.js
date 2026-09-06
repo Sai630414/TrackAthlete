@@ -35,7 +35,9 @@ router.get('/upcoming', async (req, res) => {
     .populate('federation', 'name federationId sport state website')
     .sort({ tournamentDate: 1, createdAt: -1 });
 
-    res.json(upcomingEvents);
+    const OrganizerEvent = require('../models/OrganizerEvent');
+    const organizerEvents = await OrganizerEvent.find({ status: 'published', eventDate: { $gt: now } }).populate('organizer', 'name organizationName organizerId').sort({ eventDate: 1 });
+    res.json({ federationEvents: upcomingEvents, organizerEvents: organizerEvents.map(event => ({ ...event.toJSON(), sourceType: 'organizer' })) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
