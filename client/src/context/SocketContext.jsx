@@ -7,6 +7,9 @@ import api from '../services/api';
 const SocketContext = createContext(null);
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+// The current Vercel server is serverless and does not host persistent
+// Socket.IO connections. HTTP features remain fully available in production.
+const socketAvailable = !import.meta.env.PROD;
 
 export function SocketProvider({ children }) {
   const { user } = useAuth();
@@ -32,7 +35,9 @@ export function SocketProvider({ children }) {
         setUnreadByConnection(res.data.byConnection);
       }
     } catch (err) {
-      console.error('Error fetching unread counts:', err);
+      // Unread badges are an enhancement; a failed API call must not affect
+      // dashboard rendering or routing.
+      setUnreadByConnection({});
     }
   }, [user?._id]);
 
@@ -47,6 +52,12 @@ export function SocketProvider({ children }) {
         if (prev) prev.disconnect();
         return null;
       });
+      setIsConnected(false);
+      return;
+    }
+
+    if (!socketAvailable) {
+      setSocket(null);
       setIsConnected(false);
       return;
     }

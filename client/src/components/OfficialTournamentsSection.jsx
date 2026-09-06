@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Calendar, Award, Shield, MapPin, Lock, Eye, FileText, ChevronLeft, ChevronRight, Users, CheckCircle, AlertCircle, X, Search, UserPlus, AlertTriangle } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
