@@ -3,10 +3,14 @@ import api from '../services/api';
 
 const AuthContext = createContext(null);
 const storageKey = 'trackathlete-session';
+const organizerStorageKey = 'trackathlete-organizer-session';
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(storageKey)) || null; } catch { return null; }
+    try {
+      const key = window.location.pathname.startsWith('/organizer') ? organizerStorageKey : storageKey;
+      return JSON.parse(localStorage.getItem(key)) || null;
+    } catch { return null; }
   });
 
   useEffect(() => {
@@ -33,13 +37,13 @@ export function AuthProvider({ children }) {
     async organizerLogin(credentials) {
       const { data } = await api.post('/organizer/auth/login', credentials);
       const next = { token: data.token, user: { ...data.organizer, role: 'organizer' } };
-      localStorage.setItem(storageKey, JSON.stringify(next)); setSession(next); return next.user;
+      localStorage.setItem(organizerStorageKey, JSON.stringify(next)); setSession(next); return next.user;
     },
     async organizerSignup(formData) { return (await api.post('/organizer/auth/signup', formData)).data; },
     async verifyOrganizerEmail(email, otp) {
       const { data } = await api.post('/organizer/auth/verify-email', { email, otp });
       const next = { token: data.token, user: { ...data.organizer, role: 'organizer' } };
-      localStorage.setItem(storageKey, JSON.stringify(next)); setSession(next); return next.user;
+      localStorage.setItem(organizerStorageKey, JSON.stringify(next)); setSession(next); return next.user;
     },
     async forgotPassword(email) {
       const { data } = await api.post('/auth/forgot-password', { email });
@@ -54,7 +58,8 @@ export function AuthProvider({ children }) {
       return data;
     },
     logout() {
-      localStorage.removeItem(storageKey);
+      if (session?.user?.role === 'organizer') localStorage.removeItem(organizerStorageKey);
+      else localStorage.removeItem(storageKey);
       setSession(null);
     }
   }), [session]);
