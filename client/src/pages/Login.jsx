@@ -25,10 +25,6 @@ export default function Login() {
   const { user, login, signup, forgotPassword, resetPassword } = useAuth();
   const navigate = useNavigate();
 
-  if (user) {
-    return <Navigate to={routeForRole[user.role] || '/parent'} replace />;
-  }
-
   const [mode, setMode] = useState('signin'); // 'signin' | 'signup' | 'forgot'
   const [role, setRole] = useState('parent');
 
@@ -59,6 +55,10 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  if (user) {
+    return <Navigate to={routeForRole[user.role] || '/parent'} replace />;
+  }
 
   async function submit(event) {
     event.preventDefault();

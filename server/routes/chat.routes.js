@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Message = require('../models/Message');
 const Connection = require('../models/Connection');
 
@@ -8,11 +9,21 @@ router.get('/unread/:userId', async (req, res) => {
   try {
     const userId = req.params.userId;
 
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.json({ totalUnread: 0, byConnection: {} });
+    }
+
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+
     // Find all active connections for this user (as athlete or coach)
     const connections = await Connection.find({
-      $or: [{ athlete: userId }, { coach: userId }],
+      $or: [{ athlete: userObjectId }, { coach: userObjectId }],
       status: 'Active'
     }).select('_id');
+
+    if (!connections || connections.length === 0) {
+      return res.json({ totalUnread: 0, byConnection: {} });
+    }
 
     const connectionIds = connections.map(c => c._id);
 
@@ -21,7 +32,7 @@ router.get('/unread/:userId', async (req, res) => {
       {
         $match: {
           connectionId: { $in: connectionIds },
-          sender: { $ne: new require('mongoose').Types.ObjectId(userId) },
+          sender: { $ne: userObjectId },
           read: { $ne: true }
         }
       },
@@ -43,7 +54,8 @@ router.get('/unread/:userId', async (req, res) => {
 
     res.json({ totalUnread, byConnection });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error fetching unread counts:', err);
+    res.json({ totalUnread: 0, byConnection: {} });
   }
 });
 
