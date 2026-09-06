@@ -56,17 +56,14 @@ app.use(async (_req, _res, next) => {
     const OrganizerEvent = require('./models/OrganizerEvent');
     const EventTeam = require('./models/EventTeam');
     const now = new Date();
-    const events = await OrganizerEvent.find({ $or: [{ resultSubmissionDeadline: { $lt: now } }, { teamFormationDeadline: { $lt: now } }] });
+    const events = await OrganizerEvent.find({ teamFormationDeadline: { $lt: now } });
     for (const event of events) {
-      let dirty = false;
-      if (event.resultSubmissionDeadline < now) event.sports.forEach(s => { if (s.resultStatus === 'pending') { s.resultStatus = 'deadline_passed'; dirty = true; } });
       if (event.teamFormationDeadline && event.teamFormationDeadline < now) {
         for (const sport of event.sports.filter(s => s.competitionType === 'team')) {
           const teams = await EventTeam.find({ event: event._id, sportConfigId: sport._id, status: 'forming' });
           for (const team of teams) if (team.members.filter(m => m.status === 'confirmed').length < sport.minimumTeamSize) { team.status = 'terminated'; team.terminationReason = 'Minimum team size not reached by team formation deadline.'; await team.save(); }
         }
       }
-      if (dirty) await event.save();
     }
   } catch (err) { console.error('Organizer deadline reconciliation error:', err.message); }
   next();

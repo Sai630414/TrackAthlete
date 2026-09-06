@@ -25,6 +25,7 @@ import api from '../services/api';
 import ChatPanel from '../components/ChatPanel';
 import FederationVerifiedSection from '../components/FederationVerifiedSection';
 import OfficialTournamentsSection from '../components/OfficialTournamentsSection';
+import OrganizerEventsSection from '../components/OrganizerEventsSection';
 import FederationListsSection from '../components/FederationListsSection';
 import {
   Shield,
@@ -64,7 +65,7 @@ function MyEventRegistrations() {
   useEffect(() => { api.get('/organizer-events/my/registrations').then(({ data }) => setRegistrations(data.registrations || [])).catch(() => setRegistrations([])).finally(() => setLoading(false)); }, []);
   return <Card>
     <CardHeader><CardTitle>My Event Registrations</CardTitle><CardDescription>Organizer event registrations, team memberships and join-request outcomes.</CardDescription></CardHeader>
-    <CardContent>{loading ? <p>Loading registrations…</p> : registrations.length === 0 ? <p className="text-sm text-[#526668]">You have no organizer event registrations yet.</p> : <div className="space-y-3">{registrations.map(r => <div key={r._id} className="border rounded-lg p-3"><div className="font-bold">{r.event?.eventName || 'Organizer event'}</div><div className="text-sm text-[#526668]">{r.type === 'team' ? `Team: ${r.team?.name || 'Team registration'}` : 'Individual'} · Status: <b>{r.status}</b></div><div className="text-sm text-[#526668]">Event date: {r.event?.eventDate ? new Date(r.event.eventDate).toLocaleDateString() : '—'}</div></div>)}</div>}</CardContent>
+    <CardContent>{loading ? <p>Loading registrations…</p> : registrations.length === 0 ? <p className="text-sm text-[#526668]">You have no organizer event registrations yet.</p> : <div className="space-y-3">{registrations.map(r => { const sport = r.event?.sports?.find(s => String(s._id) === String(r.sportConfigId)); return <div key={r._id} className="border rounded-lg p-3"><div className="font-bold">{r.event?.eventName || 'Organizer event'}</div><div className="text-sm text-[#526668]">Sport: <b>{sport?.sportName || '—'}</b> · {r.type === 'team' ? `Team: ${r.team?.name || 'Team registration'}` : 'Individual'} · Status: <b>{String(r.status).replaceAll('_', ' ')}</b></div><div className="text-sm text-[#526668]">Organizer: {r.event?.organizer?.organizationName || r.event?.organizer?.name || '—'} · Venue: {r.event?.venue || '—'}</div><div className="text-sm text-[#526668]">Event date: {r.event?.eventDate ? new Date(r.event.eventDate).toLocaleDateString() : '—'}</div></div> })}</div>}</CardContent>
   </Card>;
 }
 
@@ -433,6 +434,7 @@ export default function AthleteDashboard() {
 
         {/* ── TOURNAMENTS & VIDEO TAB ──────────────────────────────── */}
         <TabsContent value="tournaments" className="space-y-6">
+          <OrganizerEventsSection athleteSport={profile.sport} />
           <OfficialTournamentsSection />
           <FederationVerifiedSection athleteUserId={user?._id} />
 

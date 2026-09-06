@@ -32,7 +32,7 @@ export default function OfficialTournamentsSection() {
             tournamentDate: event.eventDate,
             location: event.venue,
             submissionDeadline: event.registrationDeadline,
-            sport: event.sports?.map(s => s.sportName).join(', '),
+            sports: event.sports || [],
             category: 'Organizer Event'
           }))
         ]);
@@ -116,10 +116,10 @@ export default function OfficialTournamentsSection() {
                   <p className="text-xs font-bold text-[#194e42] mt-0.5">{evt.isOrganizerEvent ? (evt.organizer?.organizationName || evt.organizer?.name || 'Event organizer') : (evt.federation?.name || 'Recognized Federation')}</p>
 
                   <div className="space-y-1 mt-2 text-xs text-[#526668]">
-                    <div className="flex items-center gap-1.5">
+                    {evt.isOrganizerEvent ? <div className="flex flex-wrap gap-1.5"><Award className="w-3.5 h-3.5 text-[#cc694e] mt-1" />{evt.sports?.map(s => <span key={s._id || s.sportName} className="px-2 py-0.5 rounded border border-[#2f6d5a] bg-[#e2eee4] text-[10px] font-extrabold text-[#194e42]">{String(s.sportName).toUpperCase()}</span>)}</div> : <div className="flex items-center gap-1.5">
                       <Award className="w-3.5 h-3.5 text-[#cc694e]" />
-                      <span>Sport: <strong>{evt.sport}</strong> ({evt.isOrganizerEvent ? 'Organizer Event' : evt.category})</span>
-                    </div>
+                      <span>Sport: <strong>{evt.sport}</strong> ({evt.category})</span>
+                    </div>}
                     <div className="flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5 text-[#194e42]" />
                       <span>Tournament Date: <strong>{evt.tournamentDate ? new Date(evt.tournamentDate).toLocaleDateString('en-IN') : 'TBA'}</strong></span>
