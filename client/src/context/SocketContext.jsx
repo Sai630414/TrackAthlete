@@ -64,6 +64,15 @@ export function SocketProvider({ children }) {
       setIsConnected(true);
     });
 
+    s.on('connect_error', (err) => {
+      // Gracefully handle socket connection errors in serverless environments
+      setIsConnected(false);
+    });
+
+    s.on('error', (err) => {
+      setIsConnected(false);
+    });
+
     s.on('disconnect', () => {
       console.log('Socket disconnected from server');
       setIsConnected(false);

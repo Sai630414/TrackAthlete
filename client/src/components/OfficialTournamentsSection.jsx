@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Calendar, Award, Shield, MapPin, Lock, Eye, FileText, ChevronLeft, ChevronRight, Users, CheckCircle, AlertCircle, X, Search, UserPlus, AlertTriangle } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -159,16 +159,28 @@ export default function OfficialTournamentsSection({ athleteSport }) {
       };
     }
   };
-  if (athleteSport) {
+
+  const eligibleEvents = useMemo(() => {
+    if (!athleteSport || !Array.isArray(upcomingEvents)) return [];
+    const normAthleteSport = normalize(athleteSport);
+    if (!normAthleteSport) return [];
+
+    const list = [];
     upcomingEvents.forEach(evt => {
+      if (!evt) return;
       if (evt.source === 'organizer' || evt.isOrganizerEvent) {
-        const matches = (evt.sports || []).filter(s => normalize(s.sportName) === normalize(athleteSport));
-        if (matches.length > 0) eligibleEvents.push({ ...evt, matchedSports: matches });
+        const matches = (evt.sports || []).filter(s => normalize(s?.sportName) === normAthleteSport);
+        if (matches.length > 0) {
+          list.push({ ...evt, matchedSports: matches });
+        }
       } else {
-        if (normalize(evt.sport) === normalize(athleteSport)) eligibleEvents.push(evt);
+        if (normalize(evt.sport) === normAthleteSport) {
+          list.push(evt);
+        }
       }
     });
-  }
+    return list;
+  }, [upcomingEvents, athleteSport]);
 
   if (loading) {
     return (
@@ -424,9 +436,9 @@ export default function OfficialTournamentsSection({ athleteSport }) {
                         </div>
                       </div>
 
-                      {athleteSport && isOrg && evt.sports?.some(s => normalize(s.sportName) === normalize(athleteSport)) && (
+                      {athleteSport && isOrg && evt.sports?.some(s => normalize(s?.sportName) === normalize(athleteSport)) && (
                         <div className="pt-2 border-t border-[#e2eee4] space-y-1.5">
-                          {evt.sports.filter(s => normalize(s.sportName) === normalize(athleteSport)).map(sport => {
+                          {evt.sports.filter(s => normalize(s?.sportName) === normalize(athleteSport)).map(sport => {
                               const btn = getButtonProps(evt, sport);
                               return (
                                 <div key={sport._id} className="flex justify-between items-center">
