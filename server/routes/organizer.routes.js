@@ -55,7 +55,20 @@ router.post('/events', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 router.get('/events', async (req, res) => res.json({ events: await OrganizerEvent.find({ organizer: req.user._id }).sort({ eventDate: -1 }) }));
-router.get('/events/:id/registrations', async (req, res) => { const event = await OrganizerEvent.findOne({ _id: req.params.id, organizer: req.user._id }); if (!event) return res.status(404).json({ error: 'Event not found.' }); const registrations = await EventRegistration.find({ event: event._id }).populate('athlete', 'name athleteId email contactPhone').populate('team'); res.json({ event, registrations }); });
+router.get('/events/:id/registrations', async (req, res) => {
+  const event = await OrganizerEvent.findOne({ _id: req.params.id, organizer: req.user._id });
+  if (!event) return res.status(404).json({ error: 'Event not found.' });
+  const registrations = await EventRegistration.find({ event: event._id })
+    .populate('athlete', 'name athleteId email contactPhone')
+    .populate({
+      path: 'team',
+      populate: [
+        { path: 'captain', select: 'name athleteId email contactPhone' },
+        { path: 'members.athlete', select: 'name athleteId email contactPhone' }
+      ]
+    });
+  res.json({ event, registrations });
+});
 router.post('/events/:id/updates', async (req, res) => { try { const event = await OrganizerEvent.findOne({ _id: req.params.id, organizer: req.user._id }); if (!event || !req.body.subject || !req.body.message) return res.status(400).json({ error: 'Event, subject and message are required.' }); const filter = { event: event._id }; if (req.body.sportConfigId) filter.sportConfigId = req.body.sportConfigId; if (Array.isArray(req.body.registrationIds) && req.body.registrationIds.length) filter._id = { $in: req.body.registrationIds }; const registrations = await EventRegistration.find(filter).populate('athlete', 'email name'); const recipients = [...new Map(registrations.filter(r => r.athlete?.email).map(r => [r.athlete.email, r.athlete])).values()]; await Promise.allSettled(recipients.map(a => sendBrevoEmail({ toEmail: a.email, toName: a.name, subject: req.body.subject, textContent: req.body.message, htmlContent: `<p>${String(req.body.message).replace(/\n/g, '<br>')}</p>` }))); res.json({ sent: recipients.length }); } catch (err) { res.status(500).json({ error: err.message }); } });
 router.get('/ledger', async (req, res) => { const events = await OrganizerEvent.find({ organizer: req.user._id }).lean(); const ids = events.map(e => e._id); const counts = await EventRegistration.aggregate([{ $match: { event: { $in: ids } } }, { $group: { _id: '$event', registrations: { $sum: 1 } } }]); const byId = new Map(counts.map(x => [String(x._id), x.registrations])); res.json({ entries: events.map(e => ({ ...e, registrationCount: byId.get(String(e._id)) || 0, frozenSports: e.sports.filter(s => s.resultStatus === 'frozen').length, pendingSports: e.sports.filter(s => s.resultStatus === 'pending').length })) }); });
 router.post('/events/:id/results/:sportId', async (req, res) => { try { const event = await OrganizerEvent.findOne({ _id: req.params.id, organizer: req.user._id }); const sport = eventSport(event || {}, req.params.sportId); if (!event || !sport) return res.status(404).json({ error: 'Event sport not found.' }); if (sport.resultStatus === 'frozen') return res.status(400).json({ error: 'This sport has already been frozen.' }); const entries = (req.body.entries || []).map(x => ({ ...x, aadhaarHash: x.aadhaar ? hashAadhaar(x.aadhaar) : undefined })); if (entries.some(x => !x.name || (!x.aadhaarHash && !x.team) || !x.outcome)) return res.status(400).json({ error: 'Each result entry requires a name, outcome, and Aadhaar or a registered team.' }); const result = await OrganizerResult.findOneAndUpdate({ event: event._id, sportConfigId: sport._id }, { organizer: req.user._id, resultType: req.body.resultType, entries }, { new: true, upsert: true, runValidators: true }); res.json({ result }); } catch (err) { res.status(500).json({ error: err.message }); } });

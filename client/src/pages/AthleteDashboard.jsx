@@ -61,12 +61,33 @@ function getYouTubeEmbedUrl(url) {
 function MyEventRegistrations() {
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
-  useEffect(() => {
+  const [actionBusy, setActionBusy] = useState('');
+
+  const loadRegs = () => {
+    setLoading(true);
     api.get('/organizer-events/my/registrations')
       .then(({ data }) => setRegistrations(data.registrations || []))
       .catch(() => setRegistrations([]))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadRegs();
   }, []);
+
+  const handleCancelRequest = async (teamId) => {
+    if (!teamId) return;
+    setActionBusy(teamId);
+    try {
+      await api.post(`/organizer-events/teams/${teamId}/join-requests/cancel`);
+      loadRegs();
+    } catch {
+      // Ignore
+    } finally {
+      setActionBusy('');
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -83,13 +104,18 @@ function MyEventRegistrations() {
             {registrations.map(r => {
               const sport = r.event?.sports?.find(s => String(s._id) === String(r.sportConfigId));
               const isOrg = !r.source || r.source === 'organizer';
+              const isPendingJoin = r.status === 'join_request_pending';
               return (
                 <div key={r._id} className="border border-[#2f6d5a]/30 rounded-xl p-4 bg-white shadow-2xs space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-[#fef9e7] text-[#9a6c00] border border-[#f0d060]">
                       {isOrg ? '[ ORGANIZER EVENT ] Organizer Verified' : '[ FEDERATION ] Federation Recognized'}
                     </span>
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-[#f4f8f5] text-[#173235] border border-[#d2dad2]">
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded border ${
+                      isPendingJoin
+                        ? 'bg-[#fff8ea] text-[#9a6c00] border-[#e0c068]'
+                        : 'bg-[#f4f8f5] text-[#173235] border-[#d2dad2]'
+                    }`}>
                       Status: {String(r.status).replaceAll('_', ' ').toUpperCase()}
                     </span>
                   </div>
@@ -109,6 +135,20 @@ function MyEventRegistrations() {
                     <span>·</span>
                     <span>Event Date: {r.event?.eventDate ? new Date(r.event.eventDate).toLocaleDateString('en-IN') : '—'}</span>
                   </div>
+
+                  {isPendingJoin && r.team?._id && (
+                    <div className="pt-2 border-t border-[#e2eee4] flex items-center justify-between">
+                      <span className="text-xs text-[#9a6c00] font-bold">Join request is awaiting team captain review.</span>
+                      <button
+                        type="button"
+                        disabled={actionBusy === r.team._id}
+                        onClick={() => handleCancelRequest(r.team._id)}
+                        className="px-2.5 py-1 rounded-lg border border-[#e07050] text-[#e07050] text-xs font-bold hover:bg-[#fff0ed] cursor-pointer disabled:opacity-50"
+                      >
+                        {actionBusy === r.team._id ? 'Cancelling…' : 'Cancel Request'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -375,7 +415,7 @@ export default function AthleteDashboard() {
             <User className="w-4 h-4 mr-1.5" /> Profile & Preferences
           </TabsTrigger>
           <TabsTrigger value="tournaments">
-            <Trophy className="w-4 h-4 mr-1.5" /> Tournaments & Video ({profile.tournaments?.length || 0})
+            <Trophy className="w-4 h-4 mr-1.5" /> Tournaments & Results Ledger
           </TabsTrigger>
           <TabsTrigger value="connect">
             <Users className="w-4 h-4 mr-1.5" />

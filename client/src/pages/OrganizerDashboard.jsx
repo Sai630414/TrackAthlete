@@ -2,5 +2,186 @@ import { useEffect, useState } from 'react'; import { Navigate } from 'react-rou
 const blankSport={sportName:'',competitionType:'individual',resultType:'positions',feeType:'free',feeAmount:0,minimumTeamSize:'',maximumTeamSize:''};
 const tags=sports=><div className="flex flex-wrap gap-1">{sports.map(s=><span key={s._id||s.sportName} className="px-2 py-1 rounded bg-[#e2eee4] border border-[#2f6d5a] text-[10px] font-bold">{s.sportName.toUpperCase()}</span>)}</div>;
 export default function OrganizerDashboard(){const {user,logout}=useAuth();const [tab,setTab]=useState('add'),[events,setEvents]=useState([]),[ledger,setLedger]=useState([]),[message,setMessage]=useState('');const [form,setForm]=useState({eventName:'',description:'',eventDate:'',registrationDeadline:'',teamFormationDeadline:'',resultSubmissionDeadline:'',venue:'',venueAddress:{city:''},rules:'',sports:[{...blankSport}]});const load=async()=>{try{const [e,l]=await Promise.all([api.get('/organizer/events'),api.get('/organizer/ledger')]);setEvents(e.data.events||[]);setLedger(l.data.entries||[])}catch(e){setMessage(e.response?.data?.error||'Could not load organizer data.')}};useEffect(()=>{load()},[]);const sport=(i,k,v)=>setForm(f=>({...f,sports:f.sports.map((s,x)=>x===i?{...s,[k]:v}:s)}));async function create(e){e.preventDefault();try{await api.post('/organizer/events',{...form,sports:form.sports.map(s=>({...s,minimumTeamSize:Number(s.minimumTeamSize)||undefined,maximumTeamSize:Number(s.maximumTeamSize)||undefined,feeAmount:Number(s.feeAmount)||0}))});setMessage('Event published.');setForm({...form,eventName:'',sports:[{...blankSport}]});load()}catch(e){setMessage(e.response?.data?.error||'Unable to publish event.')}}if(!user||user.role!=='organizer')return <Navigate to="/organizer/login" replace/>;return <div className="min-h-screen bg-[#f7f8f4] p-5 md:p-10 text-[#173235]"><header className="flex justify-between mb-8"><div><p className="eyebrow">ORGANIZER DASHBOARD · {user.organizerId}</p><h1 className="text-3xl font-bold">Welcome, {user.name}</h1></div><button onClick={logout} className="px-4 py-2 rounded bg-white border">Sign out</button></header><nav className="flex flex-wrap gap-2 mb-6">{[['add','Add Event'],['registrations','Registrations Received'],['results','Upload Results'],['ledger','Ledger View']].map(([id,label])=><button key={id} onClick={()=>setTab(id)} className={'px-4 py-2 rounded font-bold '+(tab===id?'bg-[#194e42] text-white':'bg-white border')}>{label}</button>)}</nav>{message&&<p className="mb-4 p-3 rounded bg-[#e2eee4]">{message}</p>}{tab==='add'&&<form onSubmit={create} className="max-w-4xl bg-white rounded-xl p-6 space-y-4"><h2 className="text-xl font-bold">Create organizer event</h2><input required className="w-full border p-2 rounded" placeholder="Event name" value={form.eventName} onChange={e=>setForm({...form,eventName:e.target.value})}/><div className="grid md:grid-cols-3 gap-3">{[['eventDate','Event date'],['registrationDeadline','Registration deadline'],['resultSubmissionDeadline','Result submission deadline']].map(([k,l])=><label key={k}>{l}<input required className="block w-full border p-2 rounded" type="datetime-local" value={form[k]} onChange={e=>setForm({...form,[k]:e.target.value})}/></label>)}</div><input required className="w-full border p-2 rounded" placeholder="Event venue / conducting location" value={form.venue} onChange={e=>setForm({...form,venue:e.target.value})}/><h3 className="font-bold">Sports included</h3>{form.sports.map((s,i)=><div key={i} className="border rounded p-3 grid md:grid-cols-3 gap-2"><input required className="border p-2 rounded" placeholder="Sport name" value={s.sportName} onChange={e=>sport(i,'sportName',e.target.value)}/><select className="border p-2 rounded" value={s.competitionType} onChange={e=>sport(i,'competitionType',e.target.value)}><option value="individual">Individual</option><option value="team">Team</option></select><select className="border p-2 rounded" value={s.resultType} onChange={e=>sport(i,'resultType',e.target.value)}><option value="positions">Positions</option><option value="medals">Gold / Silver / Bronze</option></select><select className="border p-2 rounded" value={s.feeType} onChange={e=>sport(i,'feeType',e.target.value)}><option value="free">Free</option><option value="per_participant">Per Participant</option><option value="per_team">Per Team</option></select>{s.competitionType==='team'&&<><input required type="number" min="1" className="border p-2 rounded" placeholder="Minimum team size" value={s.minimumTeamSize} onChange={e=>sport(i,'minimumTeamSize',e.target.value)}/><input required type="number" min="1" className="border p-2 rounded" placeholder="Maximum team size" value={s.maximumTeamSize} onChange={e=>sport(i,'maximumTeamSize',e.target.value)}/></>}<input type="number" min="0" className="border p-2 rounded" placeholder="Fee amount" value={s.feeAmount} onChange={e=>sport(i,'feeAmount',e.target.value)}/><button type="button" onClick={()=>setForm({...form,sports:form.sports.filter((_,x)=>x!==i)})}>Remove</button></div>)}<button type="button" className="border p-2 rounded" onClick={()=>setForm({...form,sports:[...form.sports,{...blankSport}]})}>+ Add Sport</button><button className="block bg-[#e07050] text-white px-5 py-2 rounded font-bold">Publish Event</button></form>}{tab==='registrations'&&<RegistrationView events={events}/>} {tab==='results'&&<ResultsView events={events} onMessage={setMessage} onDone={load}/>} {tab==='ledger'&&<section className="space-y-3">{ledger.map(e=><article key={e._id} className="bg-white p-4 rounded"><b>{e.eventName}</b>{tags(e.sports)}<p>{e.registrationCount} registrations · {e.teamCount||0} teams · {e.frozenSports} frozen · {e.pendingSports} pending</p></article>)}</section>}</div>}
-function RegistrationView({events}){const [selected,setSelected]=useState(null),[data,setData]=useState(null),[sport,setSport]=useState('');async function open(event){setSelected(event);setSport('');setData(null);const r=await api.get(`/organizer/events/${event._id}/registrations`);setData(r.data)}const shown=data?.registrations.filter(r=>!sport||String(r.sportConfigId)===sport)||[];return <section className="space-y-3">{events.map(e=><article key={e._id} className="bg-white p-4 rounded"><b>{e.eventName}</b>{tags(e.sports)}<button className="ml-3 underline" onClick={()=>open(e)}>View registrations</button></article>)}{selected&&data&&<article className="bg-white p-5 rounded"><h2 className="font-bold">{selected.eventName} registrations</h2><div className="flex flex-wrap gap-2 my-3"><button onClick={()=>setSport('')} className="border p-2 rounded">All ({data.registrations.length})</button>{selected.sports.map(s=><button key={s._id} onClick={()=>setSport(String(s._id))} className="border p-2 rounded">{s.sportName.toUpperCase()} ({data.registrations.filter(r=>String(r.sportConfigId)===String(s._id)).length})</button>)}</div>{shown.length?<div className="space-y-2">{shown.map(r=><div key={r._id} className="border p-3 rounded text-sm"><b>{r.type==='team'?r.team?.name:r.athlete?.name}</b> · {r.type} · {r.status}<br/><span>{r.athlete?.athleteId} · {r.athlete?.email}</span></div>)}</div>:<p>No registrations for this sport.</p>}</article>}</section>}
+function RegistrationView({events}){
+  const [selected,setSelected]=useState(null), [data,setData]=useState(null), [sport,setSport]=useState('');
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailMessage, setEmailMessage] = useState('');
+  const [emailStatus, setEmailStatus] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
+
+  async function open(event){
+    setSelected(event); setSport(''); setData(null); setShowEmailModal(false); setEmailStatus('');
+    const r=await api.get(`/organizer/events/${event._id}/registrations`);
+    setData(r.data);
+  }
+
+  async function sendUpdates(e){
+    e.preventDefault();
+    if (!emailSubject.trim() || !emailMessage.trim()) return;
+    setSendingEmail(true); setEmailStatus('');
+    try {
+      const res = await api.post(`/organizer/events/${selected._id}/updates`, {
+        subject: emailSubject.trim(),
+        message: emailMessage.trim(),
+        sportConfigId: sport || undefined
+      });
+      setEmailStatus(`✓ Event update successfully emailed to ${res.data.sent} participant(s) via Brevo.`);
+      setEmailSubject('');
+      setEmailMessage('');
+    } catch(err){
+      setEmailStatus(err.response?.data?.error || 'Failed to send event update email.');
+    } finally {
+      setSendingEmail(false);
+    }
+  }
+
+  const shown=data?.registrations.filter(r=>!sport||String(r.sportConfigId)===sport)||[];
+
+  return (
+    <section className="space-y-4">
+      {events.map(e => (
+        <article key={e._id} className="bg-white p-5 rounded-xl border border-[#d8ded5] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <b className="text-base text-[#173235]">{e.eventName}</b>
+            <div className="mt-1">{tags(e.sports)}</div>
+          </div>
+          <button className="px-4 py-2 rounded-lg bg-[#194e42] text-white text-xs font-bold cursor-pointer hover:bg-[#143d34] self-start sm:self-auto" onClick={()=>open(e)}>
+            View Registrations
+          </button>
+        </article>
+      ))}
+
+      {selected && data && (
+        <article className="bg-white p-6 rounded-xl border border-[#d8ded5] shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-4">
+            <div>
+              <h2 className="font-extrabold text-lg text-[#173235]">{selected.eventName} — Registrations Received</h2>
+              <p className="text-xs text-[#526668]">Total Registrations: <strong>{data.registrations.length}</strong></p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setShowEmailModal(!showEmailModal); setEmailStatus(''); }}
+              className="px-4 py-2 rounded-lg bg-[#e07050] text-white text-xs font-bold cursor-pointer hover:bg-[#c95d3e]"
+            >
+              ✉ Email Participant Updates
+            </button>
+          </div>
+
+          {showEmailModal && (
+            <form onSubmit={sendUpdates} className="p-4 bg-[#f8faf7] border border-[#2f6d5a] rounded-xl space-y-3">
+              <h4 className="font-bold text-xs text-[#194e42] uppercase tracking-wider">
+                Send Participant Update via Brevo ({sport ? `Filtered Sport: ${selected.sports.find(s=>String(s._id)===sport)?.sportName?.toUpperCase()}` : 'All Event Participants'})
+              </h4>
+              {emailStatus && (
+                <div className="p-2.5 rounded-lg text-xs font-bold bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
+                  {emailStatus}
+                </div>
+              )}
+              <input
+                required
+                type="text"
+                placeholder="Email Subject (e.g. Tournament Reporting Time & Schedule)"
+                value={emailSubject}
+                onChange={e=>setEmailSubject(e.target.value)}
+                className="w-full border border-[#d8ded5] p-2 rounded-lg text-xs text-[#173235] bg-white"
+              />
+              <textarea
+                required
+                rows={3}
+                placeholder="Write your update message to participants here…"
+                value={emailMessage}
+                onChange={e=>setEmailMessage(e.target.value)}
+                className="w-full border border-[#d8ded5] p-2 rounded-lg text-xs text-[#173235] bg-white"
+              />
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={()=>setShowEmailModal(false)} className="px-3 py-1.5 border rounded-lg text-xs font-bold text-[#526668] cursor-pointer">
+                  Cancel
+                </button>
+                <button type="submit" disabled={sendingEmail} className="px-4 py-1.5 rounded-lg bg-[#194e42] text-white text-xs font-bold cursor-pointer disabled:opacity-50">
+                  {sendingEmail ? 'Sending via Brevo…' : 'Send Update Now'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          <div className="flex flex-wrap gap-2 my-3">
+            <button
+              onClick={()=>setSport('')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition ${!sport ? 'bg-[#194e42] text-white' : 'bg-white border text-[#173235]'}`}
+            >
+              All ({data.registrations.length})
+            </button>
+            {selected.sports.map(s => (
+              <button
+                key={s._id}
+                onClick={()=>setSport(String(s._id))}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition ${sport===String(s._id) ? 'bg-[#194e42] text-white' : 'bg-white border text-[#173235]'}`}
+              >
+                [{s.sportName.toUpperCase()}] ({data.registrations.filter(r=>String(r.sportConfigId)===String(s._id)).length})
+              </button>
+            ))}
+          </div>
+
+          {shown.length === 0 ? (
+            <p className="text-xs text-[#697c7c] py-4 text-center border border-dashed rounded-lg">No registrations received for this sport yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {shown.map(r => {
+                const isTeam = r.type === 'team';
+                const team = r.team;
+                const sportCfg = selected.sports?.find(s => String(s._id) === String(r.sportConfigId));
+                return (
+                  <div key={r._id} className="border border-[#d8ded5] p-4 rounded-xl text-xs space-y-2 bg-white shadow-2xs">
+                    <div className="flex flex-wrap justify-between items-start gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded bg-[#e2eee4] text-[#194e42] font-extrabold uppercase border border-[#2f6d5a] text-[10px]">
+                          [{sportCfg?.sportName?.toUpperCase() || 'SPORT'}]
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-[#f4f8f5] text-[#173235] font-bold border text-[10px] uppercase">
+                          {r.type}
+                        </span>
+                        <b className="text-sm text-[#173235]">
+                          {isTeam ? `Team: ${team?.name || 'Unnamed Team'}` : r.athlete?.name}
+                        </b>
+                      </div>
+                      <span className="px-2.5 py-0.5 rounded bg-[#e2eee4] text-[#194e42] font-bold text-[11px] border">
+                        Status: {String(r.status).replaceAll('_', ' ').toUpperCase()}
+                      </span>
+                    </div>
+
+                    {!isTeam ? (
+                      <div className="text-[#526668] space-y-0.5">
+                        <div>Athlete ID: <strong>{r.athlete?.athleteId || '—'}</strong> · Email: {r.athlete?.email || '—'} · Mobile: {r.athlete?.contactPhone || '—'}</div>
+                        <div>Registered Date: {r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN') : '—'}</div>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5 pt-1 text-[#526668]">
+                        <div>
+                          Captain: <strong>{team?.captain?.name || 'Athlete'}</strong> ({team?.captain?.athleteId || '—'}) · {team?.captain?.email || ''} · {team?.captain?.contactPhone || ''}
+                        </div>
+                        {team?.members?.length > 0 && (
+                          <div>
+                            <strong className="text-[#173235]">Registered TrackAthlete Members:</strong>{' '}
+                            {team.members.map(m => `${m.athlete?.name || 'Member'} (${m.athlete?.athleteId || 'Athlete'}) [${m.status}]`).join(', ')}
+                          </div>
+                        )}
+                        {team?.manualPlayers?.length > 0 && (
+                          <div className="bg-[#fff8ea] p-2 rounded-lg border border-[#e0c068] text-[#9a6c00]">
+                            <strong>External / Manual Players ({team.manualPlayers.length}):</strong>{' '}
+                            {team.manualPlayers.map(p => `${p.name} (Mobile: ${p.mobile}${p.email ? ` · ${p.email}` : ''})`).join(', ')}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </article>
+      )}
+    </section>
+  );
+}
 function ResultsView({events,onMessage,onDone}){const [pick,setPick]=useState(null),[teams,setTeams]=useState([]),[entry,setEntry]=useState({name:'',aadhaar:'',mobile:'',outcome:'',certificateUrl:'',team:''});useEffect(()=>{if(!pick||pick.sport.competitionType!=='team')return setTeams([]);api.get(`/organizer/events/${pick.event._id}/registrations`).then(r=>setTeams([...new Map(r.data.registrations.filter(x=>String(x.sportConfigId)===String(pick.sport._id)&&x.team).map(x=>[x.team._id,x.team])).values()]));},[pick]);async function save(freeze){try{if(!pick)return;await api.post(`/organizer/events/${pick.event._id}/results/${pick.sport._id}`,{resultType:pick.sport.resultType||'positions',entries:[entry]});if(freeze)await api.post(`/organizer/events/${pick.event._id}/results/${pick.sport._id}/freeze`);onMessage(freeze?`${pick.sport.sportName} result frozen.`:'Result draft saved.');onDone()}catch(e){onMessage(e.response?.data?.error||'Could not save result.')}}return <section className="space-y-3">{events.map(event=><article key={event._id} className="bg-white p-4 rounded"><b>{event.eventName}</b><div className="flex flex-wrap gap-2 mt-2">{event.sports.map(s=><button disabled={s.resultStatus==='frozen'} onClick={()=>{setPick({event,sport:s});setEntry({name:'',aadhaar:'',mobile:'',outcome:'',certificateUrl:'',team:''})}} key={s._id} className="border p-2 rounded disabled:opacity-50">{s.sportName.toUpperCase()} · {s.competitionType} · {s.resultStatus}</button>)}</div></article>)}{pick&&<article className="bg-white p-5 rounded space-y-3"><h2 className="font-bold">{pick.event.eventName} — {pick.sport.sportName.toUpperCase()}</h2><p>{pick.sport.competitionType} · {pick.sport.resultType||'positions'} · prototype publishing enabled</p>{pick.sport.competitionType==='team'&&<select className="border p-2 rounded w-full" value={entry.team} onChange={e=>{const team=teams.find(x=>x._id===e.target.value);setEntry({...entry,team:e.target.value,name:team?.name||''})}}><option value="">Select registered team</option>{teams.map(t=><option key={t._id} value={t._id}>{t.name} · {t.status}</option>)}</select>}<input className="border p-2 rounded w-full" placeholder={pick.sport.competitionType==='team'?'Team / winner name':'Person name'} value={entry.name} onChange={e=>setEntry({...entry,name:e.target.value})}/><input className="border p-2 rounded w-full" placeholder="Aadhaar (securely hashed on server)" value={entry.aadhaar} onChange={e=>setEntry({...entry,aadhaar:e.target.value})}/><input className="border p-2 rounded w-full" placeholder="Mobile" value={entry.mobile} onChange={e=>setEntry({...entry,mobile:e.target.value})}/><input className="border p-2 rounded w-full" placeholder={pick.sport.resultType==='medals'?'Gold, Silver or Bronze':'Position 1, Position 2…'} value={entry.outcome} onChange={e=>setEntry({...entry,outcome:e.target.value})}/><input className="border p-2 rounded w-full" placeholder="Certificate URL (optional)" value={entry.certificateUrl} onChange={e=>setEntry({...entry,certificateUrl:e.target.value})}/><div className="flex gap-2"><button onClick={()=>save(false)} className="border p-2 rounded">Save draft</button><button onClick={()=>save(true)} className="bg-[#e07050] text-white p-2 rounded">Publish & Freeze Sport</button></div></article>}</section>}

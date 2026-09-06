@@ -562,13 +562,27 @@ function TeamRegistrationModal({ event, sport, onClose, onSuccess }) {
   const [selectedCaptain, setSelectedCaptain] = useState(null);
   const [captainSearchQuery, setCaptainSearchQuery] = useState('');
   const [captainSearchResults, setCaptainSearchResults] = useState([]);
+  
+  // Registered members
   const [members, setMembers] = useState([]);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [memberSearchResults, setMemberSearchResults] = useState([]);
+
+  // Manual / External players
+  const [addMemberMode, setAddMemberMode] = useState('registered'); // 'registered' | 'manual'
+  const [manualName, setManualName] = useState('');
+  const [manualMobile, setManualMobile] = useState('');
+  const [manualEmail, setManualEmail] = useState('');
+  const [manualPlayers, setManualPlayers] = useState([]);
+  const [manualError, setManualError] = useState('');
+
   const [existingTeams, setExistingTeams] = useState([]);
   const [loadingTeams, setLoadingTeams] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Total team size = creator (1) + (other captain ? 1 : 0) + members.length + manualPlayers.length
+  const totalTeamSize = 1 + (captainType === 'other' && selectedCaptain ? 1 : 0) + members.length + manualPlayers.length;
 
   useEffect(() => {
     if (activeTab === 'join') {
@@ -595,6 +609,40 @@ function TeamRegistrationModal({ event, sport, onClose, onSuccess }) {
     }
   };
 
+  const handleAddManualPlayer = (e) => {
+    e.preventDefault();
+    setManualError('');
+    const name = manualName.trim();
+    const cleanMobile = manualMobile.replace(/\D/g, '');
+    const email = manualEmail.trim().toLowerCase();
+
+    if (!name) {
+      setManualError('Player name is required.');
+      return;
+    }
+    if (!cleanMobile || cleanMobile.length < 10 || cleanMobile.length > 13) {
+      setManualError('Valid 10-digit mobile number is required.');
+      return;
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setManualError('Invalid email format.');
+      return;
+    }
+    if (manualPlayers.some(p => p.mobile.replace(/\D/g, '') === cleanMobile)) {
+      setManualError('A player with this mobile number is already added.');
+      return;
+    }
+    if (totalTeamSize >= sport.maximumTeamSize) {
+      setManualError(`Team has reached maximum team size of ${sport.maximumTeamSize}.`);
+      return;
+    }
+
+    setManualPlayers([...manualPlayers, { name, mobile: manualMobile.trim(), email }]);
+    setManualName('');
+    setManualMobile('');
+    setManualEmail('');
+  };
+
   const handleCreateTeam = async (e) => {
     e.preventDefault();
     setError('');
@@ -602,19 +650,24 @@ function TeamRegistrationModal({ event, sport, onClose, onSuccess }) {
       setError('Please enter a team name.');
       return;
     }
+    const captainId = captainType === 'myself' ? undefined : selectedCaptain?._id;
+    if (captainType === 'other' && !captainId) {
+      setError('Please search and select a team captain.');
+      return;
+    }
+    if (totalTeamSize > sport.maximumTeamSize) {
+      setError(`Team size exceeds maximum of ${sport.maximumTeamSize}.`);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const memberIds = members.map(m => m._id);
-      const captainId = captainType === 'myself' ? undefined : selectedCaptain?._id;
-      if (captainType === 'other' && !captainId) {
-        setError('Please search and select a team captain.');
-        setSubmitting(false);
-        return;
-      }
       await api.post(`/organizer-events/${event._id}/sports/${sport._id}/teams`, {
         name: teamName.trim(),
         captainId,
-        memberIds
+        memberIds,
+        manualPlayers
       });
       onSuccess(`Team "${teamName.trim()}" created successfully!`);
     } catch (err) {
@@ -646,7 +699,7 @@ function TeamRegistrationModal({ event, sport, onClose, onSuccess }) {
               <Users className="w-4 h-4 text-[#cc694e]" /> Team Registration — {event.eventName}
             </h3>
             <p className="text-xs text-[#d8ded5] mt-0.5">
-              Sport: <strong className="uppercase">[{sport.sportName.toUpperCase()}]</strong> · Team Size: {sport.minimumTeamSize}–{sport.maximumTeamSize} athletes
+              Sport: <strong className="uppercase">[{sport.sportName.toUpperCase()}]</strong> · Size: {sport.minimumTeamSize}–{sport.maximumTeamSize} athletes
             </p>
           </div>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/10 text-white cursor-pointer">
@@ -770,61 +823,186 @@ function TeamRegistrationModal({ event, sport, onClose, onSuccess }) {
                 )}
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#173235] mb-1">
-                  Add Team Members (Optional — max {sport.maximumTeamSize})
-                </label>
-                <div className="space-y-2">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Search and add registered athletes…"
-                      value={memberSearchQuery}
-                      onChange={(e) => {
-                        setMemberSearchQuery(e.target.value);
-                        searchAthletes(e.target.value, 'member');
-                      }}
-                      className="w-full border border-[#d8ded5] rounded-lg p-2 text-xs text-[#173235]"
-                    />
-                    <UserPlus className="w-3.5 h-3.5 text-[#526668] absolute right-2.5 top-3" />
-                  </div>
-                  {memberSearchResults.length > 0 && (
-                    <div className="border border-[#d8ded5] rounded-lg mt-1 max-h-36 overflow-y-auto bg-white shadow-xs">
-                      {memberSearchResults.map(a => (
-                        <div
-                          key={a._id}
-                          onClick={() => {
-                            if (!members.some(m => m._id === a._id)) {
-                              setMembers([...members, a]);
-                            }
-                            setMemberSearchResults([]);
-                            setMemberSearchQuery('');
-                          }}
-                          className="p-2 hover:bg-[#e2eee4] cursor-pointer text-xs flex justify-between border-b last:border-0"
-                        >
-                          <span><strong>{a.name}</strong> ({a.athleteId})</span>
-                          <span className="text-[#194e42] font-bold">+ Add</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+              {/* Team Members Section */}
+              <div className="border-t border-[#e2eee4] pt-3">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-xs font-bold text-[#173235]">Add Team Members</label>
+                  <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-[#f4f8f5] text-[#194e42] border border-[#d2dad2]">
+                    Total: {totalTeamSize} / {sport.maximumTeamSize} athletes (Min: {sport.minimumTeamSize})
+                  </span>
+                </div>
 
-                  {members.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {members.map(m => (
-                        <span key={m._id} className="px-2 py-1 bg-[#e2eee4] border border-[#2f6d5a] rounded-md text-xs font-bold text-[#194e42] flex items-center gap-1">
-                          {m.name}
-                          <button
-                            type="button"
-                            onClick={() => setMembers(members.filter(x => x._id !== m._id))}
-                            className="cursor-pointer hover:text-red-600 ml-1"
-                          >
-                            ✕
-                          </button>
-                        </span>
-                      ))}
+                <div className="flex gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => { setAddMemberMode('registered'); setManualError(''); }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition ${
+                      addMemberMode === 'registered' ? 'bg-[#194e42] text-white' : 'bg-white border border-[#d2dad2] text-[#173235]'
+                    }`}
+                  >
+                    ADD REGISTERED ATHLETE
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setAddMemberMode('manual'); setManualError(''); }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition ${
+                      addMemberMode === 'manual' ? 'bg-[#194e42] text-white' : 'bg-white border border-[#d2dad2] text-[#173235]'
+                    }`}
+                  >
+                    ADD PLAYER MANUALLY
+                  </button>
+                </div>
+
+                {addMemberMode === 'registered' ? (
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Search and add registered athletes…"
+                        value={memberSearchQuery}
+                        onChange={(e) => {
+                          setMemberSearchQuery(e.target.value);
+                          searchAthletes(e.target.value, 'member');
+                        }}
+                        className="w-full border border-[#d8ded5] rounded-lg p-2 text-xs text-[#173235]"
+                      />
+                      <UserPlus className="w-3.5 h-3.5 text-[#526668] absolute right-2.5 top-3" />
                     </div>
-                  )}
+                    {memberSearchResults.length > 0 && (
+                      <div className="border border-[#d8ded5] rounded-lg mt-1 max-h-36 overflow-y-auto bg-white shadow-xs">
+                        {memberSearchResults.map(a => (
+                          <div
+                            key={a._id}
+                            onClick={() => {
+                              if (totalTeamSize >= sport.maximumTeamSize) {
+                                setError(`Team exceeds maximum size of ${sport.maximumTeamSize}.`);
+                                return;
+                              }
+                              if (!members.some(m => m._id === a._id)) {
+                                setMembers([...members, a]);
+                              }
+                              setMemberSearchResults([]);
+                              setMemberSearchQuery('');
+                            }}
+                            className="p-2 hover:bg-[#e2eee4] cursor-pointer text-xs flex justify-between border-b last:border-0"
+                          >
+                            <span><strong>{a.name}</strong> ({a.athleteId})</span>
+                            <span className="text-[#194e42] font-bold">+ Add</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-3 bg-[#f9faf8] border border-[#d8ded5] rounded-xl space-y-2">
+                    {manualError && (
+                      <div className="text-[11px] text-red-600 font-bold">{manualError}</div>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#526668] mb-0.5">Player Name *</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Rahul Kumar"
+                          value={manualName}
+                          onChange={e => setManualName(e.target.value)}
+                          className="w-full border border-[#d8ded5] rounded-lg p-1.5 text-xs text-[#173235]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#526668] mb-0.5">Mobile Number *</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 9876543210"
+                          value={manualMobile}
+                          onChange={e => setManualMobile(e.target.value)}
+                          className="w-full border border-[#d8ded5] rounded-lg p-1.5 text-xs text-[#173235]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-[#526668] mb-0.5">Email (Optional)</label>
+                        <input
+                          type="email"
+                          placeholder="e.g. rahul@example.com"
+                          value={manualEmail}
+                          onChange={e => setManualEmail(e.target.value)}
+                          className="w-full border border-[#d8ded5] rounded-lg p-1.5 text-xs text-[#173235]"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end pt-1">
+                      <button
+                        type="button"
+                        onClick={handleAddManualPlayer}
+                        className="px-3 py-1 rounded-lg bg-[#194e42] text-white text-xs font-bold cursor-pointer hover:bg-[#123930]"
+                      >
+                        + Add Manual Player
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Team Roster display */}
+                <div className="space-y-1.5 mt-3">
+                  <div className="text-[11px] font-extrabold text-[#194e42] uppercase tracking-wider">
+                    Current Team Roster:
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <span className="px-2.5 py-1 bg-[#f4f8f5] border border-[#2f6d5a] rounded-lg text-xs font-bold text-[#194e42]">
+                      You (Team Creator {captainType === 'myself' ? '& Captain' : ''})
+                    </span>
+
+                    {captainType === 'other' && selectedCaptain && (
+                      <span className="px-2.5 py-1 bg-[#e2eee4] border border-[#2f6d5a] rounded-lg text-xs font-bold text-[#194e42] flex items-center gap-1">
+                        Captain: {selectedCaptain.name} ({selectedCaptain.athleteId})
+                      </span>
+                    )}
+
+                    {members.map(m => (
+                      <span key={m._id} className="px-2 py-1 bg-[#e2eee4] border border-[#2f6d5a] rounded-lg text-xs font-bold text-[#194e42] flex items-center gap-1.5">
+                        <span className="text-[9px] bg-[#194e42] text-white px-1.5 py-0.2 rounded font-extrabold">REGISTERED</span>
+                        {m.name} ({m.athleteId})
+                        <button
+                          type="button"
+                          onClick={() => setMembers(members.filter(x => x._id !== m._id))}
+                          className="cursor-pointer hover:text-red-600 ml-1 font-bold"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))}
+
+                    {manualPlayers.map((p, idx) => (
+                      <span key={`manual-${idx}`} className="px-2 py-1 bg-[#fff8ea] border border-[#e0c068] rounded-lg text-xs font-bold text-[#9a6c00] flex items-center gap-1.5">
+                        <span className="text-[9px] bg-[#d97706] text-white px-1.5 py-0.2 rounded font-extrabold">EXTERNAL</span>
+                        {p.name} · {p.mobile}
+                        <button
+                          type="button"
+                          onClick={() => setManualPlayers(manualPlayers.filter((_, i) => i !== idx))}
+                          className="cursor-pointer hover:text-red-600 ml-1 font-bold"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="mt-2 text-xs">
+                    {totalTeamSize < sport.minimumTeamSize ? (
+                      <span className="text-[#9a6c00] font-bold">
+                        ⚠️ Incomplete: {sport.minimumTeamSize - totalTeamSize} more player(s) required to reach minimum team size of {sport.minimumTeamSize}.
+                      </span>
+                    ) : totalTeamSize === sport.maximumTeamSize ? (
+                      <span className="text-[#194e42] font-bold">
+                        ✓ Full: Maximum team size of {sport.maximumTeamSize} reached.
+                      </span>
+                    ) : (
+                      <span className="text-[#194e42] font-bold">
+                        ✓ Valid: Minimum team size satisfied. {sport.maximumTeamSize - totalTeamSize} slot(s) available.
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 

@@ -31,11 +31,253 @@ router.get('/:id', async (req, res) => { const event = await OrganizerEvent.find
 router.use(verifyToken, requireRoles('athlete'));
 router.get('/:id/eligibility', async (req, res) => { const event = await OrganizerEvent.findById(req.params.id); if (!event) return res.status(404).json({ error: 'Event not found.' }); const sport = String(req.user.sport || ''); const eligibleSports = event.sports.filter(s => sameSport(s.sportName, sport)).map(s => s._id); res.json({ eligible: eligibleSports.length > 0, eligibleSports, athleteSport: sport }); });
 router.post('/:id/register', async (req, res) => { try { const event = await OrganizerEvent.findById(req.params.id); const sport = sportFor(event, req.body.sportConfigId); if (!event || !sport) return res.status(404).json({ error: 'Event sport not found.' }); if (new Date() > event.registrationDeadline) return res.status(400).json({ error: 'Registration deadline has passed.' }); if (!sameSport(sport.sportName, req.user.sport)) return res.status(403).json({ error: 'Your registered sport is not included in this event.' }); if (sport.competitionType !== 'individual') return res.status(400).json({ error: 'Use team registration for this sport.' }); const registration = await EventRegistration.create({ event: event._id, sportConfigId: sport._id, athlete: req.user._id, type: 'individual', status: 'registered' }); res.status(201).json({ registration }); } catch (err) { if (err.code === 11000) return res.status(409).json({ error: 'You already have a registration for this event sport.' }); res.status(500).json({ error: err.message }); } });
-router.get('/:id/sports/:sportId/teams', async (req, res) => { const event = await OrganizerEvent.findById(req.params.id); const sport = sportFor(event, req.params.sportId); if (!sport || sport.competitionType !== 'team') return res.status(404).json({ error: 'Team sport not found.' }); const teams = await EventTeam.find({ event: event._id, sportConfigId: sport._id, status: { $nin: ['terminated', 'completed'] } }).populate('captain', 'name athleteId').populate('members.athlete', 'name athleteId'); res.json({ teams: teams.map(t => ({ ...t.toJSON(), confirmedSize: t.members.filter(m => m.status === 'confirmed').length, maximumTeamSize: sport.maximumTeamSize })) }); });
-router.post('/:id/sports/:sportId/teams', async (req, res) => { try { const event = await OrganizerEvent.findById(req.params.id); const sport = sportFor(event, req.params.sportId); if (!sport || sport.competitionType !== 'team') return res.status(400).json({ error: 'Team sport not found.' }); if (new Date() > new Date(event.teamFormationDeadline || event.registrationDeadline)) return res.status(400).json({ error: 'Team formation deadline has passed.' }); if (!sameSport(sport.sportName, req.user.sport)) return res.status(403).json({ error: 'Your registered sport is not included in this event.' }); const captainId = req.body.captainId || req.user._id; const captain = await require('../models/User').findOne({ _id: captainId, role: 'athlete' }); if (!captain) return res.status(400).json({ error: 'Captain must be an existing athlete.' }); const ids = [...new Set([String(req.user._id), ...((req.body.memberIds || []).map(String)), String(captainId)])]; if (ids.length > sport.maximumTeamSize) return res.status(400).json({ error: 'Team exceeds the organizer maximum.' }); const existing = await EventRegistration.findOne({ event: event._id, sportConfigId: sport._id, athlete: { $in: ids } }); if (existing) return res.status(409).json({ error: 'A member is already confirmed/registered for this event sport.' }); const ready = ids.length >= sport.minimumTeamSize && String(captainId) === String(req.user._id); const team = await EventTeam.create({ event: event._id, sportConfigId: sport._id, name: req.body.name, captain: captainId, captainConfirmed: String(captainId) === String(req.user._id), status: ready ? 'confirmed' : 'forming', members: ids.map(athlete => ({ athlete, status: String(athlete) === String(captainId) && String(captainId) !== String(req.user._id) ? 'pending_captain' : 'confirmed' })) }); await EventRegistration.insertMany(ids.map(athlete => ({ event: event._id, sportConfigId: sport._id, athlete, type: 'team', team: team._id, status: String(athlete) === String(captainId) && String(captainId) !== String(req.user._id) ? 'pending' : (ready ? 'confirmed' : 'team_incomplete') }))); res.status(201).json({ team }); } catch (err) { if (err.code === 11000) return res.status(409).json({ error: 'A team with this name exists, or a member already participates.' }); res.status(500).json({ error: err.message }); } });
-router.post('/teams/:teamId/join-requests', async (req, res) => { try { const team = await EventTeam.findById(req.params.teamId); const event = await OrganizerEvent.findById(team?.event); const sport = sportFor(event, team?.sportConfigId); if (!team || !sport || team.status === 'terminated') return res.status(404).json({ error: 'Team not available.' }); if (team.members.filter(x => x.status === 'confirmed').length >= sport.maximumTeamSize) return res.status(400).json({ error: 'Team is full.' }); if (!sameSport(sport.sportName, req.user.sport)) return res.status(403).json({ error: 'Your registered sport does not match this team.' }); if (await EventRegistration.findOne({ event: event._id, sportConfigId: sport._id, athlete: req.user._id })) return res.status(409).json({ error: 'You already participate in this event sport.' }); if (team.joinRequests.some(r => String(r.athlete) === String(req.user._id) && r.status === 'pending')) return res.status(409).json({ error: 'A join request is already pending.' }); team.joinRequests.push({ athlete: req.user._id }); await team.save(); res.status(201).json({ team }); } catch (err) { res.status(500).json({ error: err.message }); } });
-router.post('/teams/:teamId/join-requests/:athleteId/:action', async (req, res) => { try { const team = await EventTeam.findById(req.params.teamId); if (!team || String(team.captain) !== String(req.user._id)) return res.status(403).json({ error: 'Only the team captain can action requests.' }); const event = await OrganizerEvent.findById(team.event); const sport = sportFor(event, team.sportConfigId); const request = team.joinRequests.find(r => String(r.athlete) === req.params.athleteId && r.status === 'pending'); if (!request || !['accept', 'reject'].includes(req.params.action)) return res.status(400).json({ error: 'Pending request not found.' }); if (req.params.action === 'accept') { if (team.members.filter(x => x.status === 'confirmed').length >= sport.maximumTeamSize) return res.status(400).json({ error: 'Team is full.' }); request.status = 'accepted'; team.members.push({ athlete: request.athlete }); await EventRegistration.create({ event: event._id, sportConfigId: sport._id, athlete: request.athlete, type: 'team', team: team._id, status: 'team_incomplete' }); } else request.status = 'rejected'; await team.save(); res.json({ team }); } catch (err) { res.status(500).json({ error: err.message }); } });
-router.post('/teams/:teamId/captain/confirm', async (req, res) => { try { const team = await EventTeam.findById(req.params.teamId); if (!team || String(team.captain) !== String(req.user._id)) return res.status(403).json({ error: 'Only the nominated captain can confirm captaincy.' }); team.captainConfirmed = true; const member = team.members.find(m => String(m.athlete) === String(req.user._id)); if (member) member.status = 'confirmed'; await EventRegistration.updateOne({ team: team._id, athlete: req.user._id }, { $set: { status: 'team_incomplete' } }); await team.save(); res.json({ team }); } catch (err) { res.status(500).json({ error: err.message }); } });
+async function checkTeamDeadlines(event) {
+  if (!event) return;
+  const deadline = new Date(event.teamFormationDeadline || event.registrationDeadline);
+  if (new Date() > deadline) {
+    const teams = await EventTeam.find({ event: event._id, status: 'forming' });
+    for (const team of teams) {
+      const sport = event.sports?.find(s => String(s._id) === String(team.sportConfigId));
+      const confirmedCount = team.members.filter(m => m.status === 'confirmed').length + (team.manualPlayers?.length || 0);
+      if (sport && confirmedCount < sport.minimumTeamSize) {
+        team.status = 'terminated';
+        team.terminationReason = 'Minimum team size not reached by team formation deadline.';
+        await team.save();
+        await EventRegistration.updateMany(
+          { team: team._id, status: { $in: ['team_incomplete', 'pending', 'forming', 'join_request_pending'] } },
+          { $set: { status: 'terminated' } }
+        );
+      } else if (sport && confirmedCount >= sport.minimumTeamSize && team.captainConfirmed) {
+        team.status = 'confirmed';
+        await team.save();
+        await EventRegistration.updateMany(
+          { team: team._id, status: 'team_incomplete' },
+          { $set: { status: 'confirmed' } }
+        );
+      }
+    }
+  }
+}
+
+router.get('/:id/sports/:sportId/teams', async (req, res) => {
+  try {
+    const event = await OrganizerEvent.findById(req.params.id);
+    const sport = sportFor(event, req.params.sportId);
+    if (!sport || sport.competitionType !== 'team') return res.status(404).json({ error: 'Team sport not found.' });
+
+    await checkTeamDeadlines(event);
+
+    const teams = await EventTeam.find({
+      event: event._id,
+      sportConfigId: sport._id,
+      status: { $nin: ['terminated', 'completed'] }
+    })
+    .populate('captain', 'name athleteId email contactPhone')
+    .populate('members.athlete', 'name athleteId email contactPhone');
+
+    const mapped = teams.map(t => {
+      const confirmedRegistered = t.members.filter(m => m.status === 'confirmed').length;
+      const manualCount = t.manualPlayers?.length || 0;
+      const confirmedSize = confirmedRegistered + manualCount;
+      const isFull = confirmedSize >= sport.maximumTeamSize;
+      return {
+        ...t.toJSON(),
+        confirmedSize,
+        maximumTeamSize: sport.maximumTeamSize,
+        minimumTeamSize: sport.minimumTeamSize,
+        isFull
+      };
+    });
+
+    res.json({ teams: mapped });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/:id/sports/:sportId/teams', async (req, res) => {
+  try {
+    const event = await OrganizerEvent.findById(req.params.id);
+    const sport = sportFor(event, req.params.sportId);
+    if (!sport || sport.competitionType !== 'team') return res.status(400).json({ error: 'Team sport not found.' });
+    if (new Date() > new Date(event.registrationDeadline)) return res.status(400).json({ error: 'Registration deadline has passed.' });
+    if (new Date() > new Date(event.teamFormationDeadline || event.registrationDeadline)) return res.status(400).json({ error: 'Team formation deadline has passed.' });
+    if (!sameSport(sport.sportName, req.user.sport)) return res.status(403).json({ error: 'Your registered sport is not included in this event.' });
+
+    const captainId = req.body.captainId || req.user._id;
+    const User = require('../models/User');
+    const captain = await User.findOne({ _id: captainId, role: 'athlete' });
+    if (!captain) return res.status(400).json({ error: 'Captain must be an existing registered athlete.' });
+
+    // Validate manual external players
+    const rawManual = Array.isArray(req.body.manualPlayers) ? req.body.manualPlayers : [];
+    const manualPlayers = [];
+    const seenMobiles = new Set();
+    for (const p of rawManual) {
+      const name = String(p.name || '').trim();
+      const mobileDigits = String(p.mobile || '').replace(/\D/g, '');
+      const email = String(p.email || '').trim().toLowerCase();
+      if (!name) return res.status(400).json({ error: 'Each manual player must have a valid name.' });
+      if (!mobileDigits || mobileDigits.length < 10 || mobileDigits.length > 13) {
+        return res.status(400).json({ error: `Invalid mobile number for player "${name}". Must be at least 10 digits.` });
+      }
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ error: `Invalid email address for player "${name}".` });
+      }
+      if (seenMobiles.has(mobileDigits)) {
+        return res.status(400).json({ error: `Duplicate manual player with mobile "${p.mobile}" in the same team.` });
+      }
+      seenMobiles.add(mobileDigits);
+      manualPlayers.push({ name, mobile: p.mobile.trim(), email });
+    }
+
+    const registeredIds = [...new Set([String(req.user._id), ...((req.body.memberIds || []).map(String)), String(captainId)])];
+    const totalSize = registeredIds.length + manualPlayers.length;
+
+    if (totalSize > sport.maximumTeamSize) {
+      return res.status(400).json({ error: `Team size (${totalSize}) exceeds the maximum allowed team size of ${sport.maximumTeamSize}.` });
+    }
+
+    // Check if any registered member already participates in this event sport
+    const existing = await EventRegistration.findOne({
+      event: event._id,
+      sportConfigId: sport._id,
+      athlete: { $in: registeredIds },
+      status: { $in: ['confirmed', 'registered', 'team_incomplete', 'join_request_pending'] }
+    });
+    if (existing) {
+      return res.status(409).json({ error: 'A member is already registered or part of another team for this event sport.' });
+    }
+
+    const captainConfirmed = String(captainId) === String(req.user._id);
+    const ready = totalSize >= sport.minimumTeamSize && captainConfirmed;
+
+    const team = await EventTeam.create({
+      event: event._id,
+      sportConfigId: sport._id,
+      name: String(req.body.name || '').trim(),
+      captain: captainId,
+      captainConfirmed,
+      status: ready ? 'confirmed' : 'forming',
+      members: registeredIds.map(athlete => ({
+        athlete,
+        status: String(athlete) === String(captainId) && !captainConfirmed ? 'pending_captain' : 'confirmed'
+      })),
+      manualPlayers
+    });
+
+    await EventRegistration.insertMany(registeredIds.map(athlete => ({
+      event: event._id,
+      sportConfigId: sport._id,
+      athlete,
+      type: 'team',
+      team: team._id,
+      status: String(athlete) === String(captainId) && !captainConfirmed ? 'pending' : (ready ? 'confirmed' : 'team_incomplete')
+    })));
+
+    res.status(201).json({ team });
+  } catch (err) {
+    if (err.code === 11000) return res.status(409).json({ error: 'A team with this name already exists for this event sport.' });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/teams/:teamId/join-requests', async (req, res) => {
+  try {
+    const team = await EventTeam.findById(req.params.teamId);
+    const event = await OrganizerEvent.findById(team?.event);
+    const sport = sportFor(event, team?.sportConfigId);
+    if (!team || !sport || team.status === 'terminated') return res.status(404).json({ error: 'Team is not available.' });
+    if (new Date() > new Date(event.registrationDeadline)) return res.status(400).json({ error: 'Registration deadline has passed.' });
+
+    const confirmedCount = team.members.filter(x => x.status === 'confirmed').length + (team.manualPlayers?.length || 0);
+    if (confirmedCount >= sport.maximumTeamSize) return res.status(400).json({ error: 'Team is full.' });
+    if (!sameSport(sport.sportName, req.user.sport)) return res.status(403).json({ error: 'Your registered sport does not match this team.' });
+
+    const existingReg = await EventRegistration.findOne({
+      event: event._id,
+      sportConfigId: sport._id,
+      athlete: req.user._id,
+      status: { $in: ['confirmed', 'registered', 'team_incomplete', 'join_request_pending'] }
+    });
+    if (existingReg) {
+      if (existingReg.status === 'join_request_pending') return res.status(409).json({ error: 'A join request is already pending for this team/sport.' });
+      return res.status(409).json({ error: 'You are already registered or part of a team for this event sport.' });
+    }
+
+    if (team.joinRequests.some(r => String(r.athlete) === String(req.user._id) && r.status === 'pending')) {
+      return res.status(409).json({ error: 'A join request is already pending.' });
+    }
+
+    team.joinRequests.push({ athlete: req.user._id, status: 'pending' });
+    await team.save();
+
+    await EventRegistration.create({
+      event: event._id,
+      sportConfigId: sport._id,
+      athlete: req.user._id,
+      type: 'team',
+      team: team._id,
+      status: 'join_request_pending'
+    });
+
+    res.status(201).json({ team, message: 'Join request sent successfully.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/teams/:teamId/join-requests/:athleteId/:action', async (req, res) => {
+  try {
+    const team = await EventTeam.findById(req.params.teamId);
+    if (!team || String(team.captain) !== String(req.user._id)) return res.status(403).json({ error: 'Only the team captain can action join requests.' });
+    const event = await OrganizerEvent.findById(team.event);
+    const sport = sportFor(event, team.sportConfigId);
+    const request = team.joinRequests.find(r => String(r.athlete) === req.params.athleteId && r.status === 'pending');
+    if (!request || !['accept', 'reject'].includes(req.params.action)) return res.status(400).json({ error: 'Pending request not found.' });
+
+    if (req.params.action === 'accept') {
+      const currentSize = team.members.filter(x => x.status === 'confirmed').length + (team.manualPlayers?.length || 0);
+      if (currentSize >= sport.maximumTeamSize) return res.status(400).json({ error: 'Team is already full.' });
+      request.status = 'accepted';
+      team.members.push({ athlete: request.athlete, status: 'confirmed' });
+      const newTotal = currentSize + 1;
+      if (newTotal >= sport.minimumTeamSize && team.captainConfirmed) {
+        team.status = 'confirmed';
+      }
+      await EventRegistration.updateOne(
+        { event: event._id, sportConfigId: sport._id, athlete: request.athlete, team: team._id },
+        { status: newTotal >= sport.minimumTeamSize ? 'confirmed' : 'team_incomplete' }
+      );
+    } else {
+      request.status = 'rejected';
+      await EventRegistration.updateOne(
+        { event: event._id, sportConfigId: sport._id, athlete: request.athlete, team: team._id },
+        { status: 'rejected' }
+      );
+    }
+    await team.save();
+    res.json({ team, message: `Request ${req.params.action}ed.` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/teams/:teamId/captain/confirm', async (req, res) => {
+  try {
+    const team = await EventTeam.findById(req.params.teamId);
+    if (!team || String(team.captain) !== String(req.user._id)) return res.status(403).json({ error: 'Only the nominated captain can confirm captaincy.' });
+    team.captainConfirmed = true;
+    const member = team.members.find(m => String(m.athlete) === String(req.user._id));
+    if (member) member.status = 'confirmed';
+    await EventRegistration.updateOne({ team: team._id, athlete: req.user._id }, { $set: { status: 'team_incomplete' } });
+    await team.save();
+    res.json({ team });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/teams/:teamId/captain/transfer', async (req, res) => {
   try {
     const team = await EventTeam.findById(req.params.teamId);
@@ -47,10 +289,50 @@ router.post('/teams/:teamId/captain/transfer', async (req, res) => {
     team.captainConfirmed = true;
     await team.save();
     res.json({ team, message: 'Captaincy successfully transferred.' });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
-router.post('/teams/:teamId/join-requests/cancel', async (req, res) => { try { const team = await EventTeam.findById(req.params.teamId); const request = team?.joinRequests.find(r => String(r.athlete) === String(req.user._id) && r.status === 'pending'); if (!request) return res.status(404).json({ error: 'Pending request not found.' }); request.status = 'cancelled'; await team.save(); res.json({ team }); } catch (err) { res.status(500).json({ error: err.message }); } });
-router.get('/my/registrations', async (req, res) => { const registrations = await EventRegistration.find({ athlete: req.user._id }).populate({ path: 'event', select: 'eventName eventDate venue sports organizer', populate: { path: 'organizer', select: 'name organizationName organizerId' } }).populate('team', 'name status captain members'); res.json({ registrations }); });
+
+router.post('/teams/:teamId/join-requests/cancel', async (req, res) => {
+  try {
+    const team = await EventTeam.findById(req.params.teamId);
+    if (!team) return res.status(404).json({ error: 'Team not found.' });
+    const request = team.joinRequests.find(r => String(r.athlete) === String(req.user._id) && r.status === 'pending');
+    if (!request) return res.status(404).json({ error: 'Pending request not found.' });
+    request.status = 'cancelled';
+    await team.save();
+    await EventRegistration.deleteOne({
+      event: team.event,
+      sportConfigId: team.sportConfigId,
+      athlete: req.user._id,
+      status: 'join_request_pending'
+    });
+    res.json({ message: 'Pending join request cancelled.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/my/registrations', async (req, res) => {
+  try {
+    const registrations = await EventRegistration.find({ athlete: req.user._id })
+      .populate({
+        path: 'event',
+        select: 'eventName eventDate venue sports organizer registrationDeadline',
+        populate: { path: 'organizer', select: 'name organizationName organizerId' }
+      })
+      .populate({
+        path: 'team',
+        select: 'name status captain captainConfirmed members manualPlayers',
+        populate: { path: 'captain', select: 'name athleteId' }
+      })
+      .sort({ createdAt: -1 });
+    res.json({ registrations });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 router.get('/my/achievements', async (req, res) => { const achievements = await OrganizerAchievement.find({ athlete: req.user._id }).populate('event', 'eventName eventDate').populate('organizer', 'name organizationName organizerId').sort({ createdAt: -1 }); res.json({ achievements }); });
 router.get('/athletes/search', async (req, res) => { const q = String(req.query.q || '').trim(); if (q.length < 2) return res.json({ athletes: [] }); const athletes = await require('../models/User').find({ role: 'athlete', $or: [{ athleteId: new RegExp(escaped(q), 'i') }, { email: new RegExp(escaped(q), 'i') }, { contactPhone: new RegExp(escaped(q), 'i') }] }).select('name athleteId email contactPhone sport').limit(10); res.json({ athletes }); });
 module.exports = router;

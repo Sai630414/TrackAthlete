@@ -47,8 +47,10 @@ router.get('/upcoming', async (req, res) => {
 router.get('/completed', async (req, res) => {
   try {
     const completedAchievements = await OfficialAchievement.find({
-      verificationStatus: 'FROZEN',
-      isFrozen: true
+      $or: [
+        { verificationStatus: { $in: ['FROZEN', 'VERIFIED'] } },
+        { isFrozen: true }
+      ]
     })
     .select('-aadhaarHash -athleteIdentityReference')
     .populate('federation', 'name federationId sport state')

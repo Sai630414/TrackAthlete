@@ -19,13 +19,20 @@ const readSession = (key) => {
 
 api.interceptors.request.use((config) => {
   const isOrganizerRequest = /^\/?organizer(?:\/|$)/.test(config.url || '');
-  // Organizer APIs must never inherit a Federation or standard-portal token.
-  // Their session is deliberately isolated from the five normal workspaces.
+  const isFederationRequest = /^\/?federation(?:\/|$)/.test(config.url || '');
+
   const organizerSession = readSession(organizerSessionKey);
   const standardSession = readSession(standardSessionKey);
-  const token = isOrganizerRequest
-    ? organizerSession?.token
-    : (localStorage.getItem('trackathlete-federation-token') || standardSession?.token || localStorage.getItem('token') || localStorage.getItem('trackathlete-token'));
+
+  let token = null;
+  if (isOrganizerRequest) {
+    token = organizerSession?.token;
+  } else if (isFederationRequest) {
+    token = localStorage.getItem('trackathlete-federation-token');
+  } else {
+    // Normal athlete / parent / coach / sponsor / academy requests (including /organizer-events/)
+    token = standardSession?.token || localStorage.getItem('token') || localStorage.getItem('trackathlete-token');
+  }
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -38,12 +45,27 @@ api.interceptors.request.use((config) => {
 });
 
 api.interceptors.response.use(undefined, (error) => {
-  const isOrganizerRequest = /^\/?organizer(?:\/|$)/.test(error.config?.url || '');
-  if (isOrganizerRequest && error.response?.status === 401) {
-    localStorage.removeItem(organizerSessionKey);
-    const standard = readSession(standardSessionKey);
-    if (standard?.user?.role === 'organizer') localStorage.removeItem(standardSessionKey);
-    if (window.location.pathname.startsWith('/organizer')) window.location.assign('/organizer/login?session=expired');
+  const url = error.config?.url || '';
+  const isOrganizerRequest = /^\/?organizer(?:\/|$)/.test(url);
+  const isFederationRequest = /^\/?federation(?:\/|$)/.test(url);
+
+  if (error.response?.status === 401) {
+    if (isOrganizerRequest) {
+      localStorage.removeItem(organizerSessionKey);
+      if (window.location.pathname.startsWith('/organizer')) {
+        window.location.assign('/organizer/login?session=expired');
+      }
+    } else if (isFederationRequest) {
+      localStorage.removeItem('trackathlete-federation-token');
+      if (window.location.pathname.startsWith('/federation')) {
+        window.location.assign('/federation/login?session=expired');
+      }
+    } else {
+      localStorage.removeItem(standardSessionKey);
+      if (!window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/organizer') && !window.location.pathname.startsWith('/federation')) {
+        window.location.assign('/login?session=expired');
+      }
+    }
   }
   return Promise.reject(error);
 });
