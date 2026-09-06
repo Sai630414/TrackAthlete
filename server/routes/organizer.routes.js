@@ -23,7 +23,7 @@ const activeRegistration = event => new Date() <= new Date(event.registrationDea
 router.post('/auth/signup', async (req, res) => {
   try {
     const b = req.body; const email = cleanEmail(b.email);
-    if (!b.organizerType || !b.name || !b.designation || !b.mobile || !email || !b.password) return res.status(400).json({ error: 'Organizer type, name, designation, mobile, email and password are required.' });
+    if (!b.organizerType || !b.name || !b.designation || !b.mobile || !email || !b.password || !b.officialAddress?.line1 || !b.officialAddress?.city || !b.officialAddress?.state || !b.officialAddress?.pinCode || !b.officialAddress?.country) return res.status(400).json({ error: 'Complete the required organizer, contact and address fields.' });
     if (organizationTypes.has(b.organizerType) && !b.organizationName) return res.status(400).json({ error: 'Organization name is required for this organizer type.' });
     if (String(b.password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
     if (await Organizer.findOne({ email })) return res.status(409).json({ error: 'This official email is already registered.' });

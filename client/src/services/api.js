@@ -1,7 +1,14 @@
 import axios from 'axios';
 
+// Production must never fall back to localhost. VITE_API_URL may be either the
+// server origin or the full /api base, so normalize both safely.
+const configuredApiUrl = import.meta.env.VITE_API_URL;
+const apiBase = configuredApiUrl
+  ? `${configuredApiUrl.replace(/\/$/, '').replace(/\/api$/, '')}/api`
+  : (import.meta.env.PROD ? 'https://trackathletefederation-server.vercel.app/api' : 'http://localhost:5000/api');
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+  baseURL: apiBase
 });
 
 api.interceptors.request.use((config) => {
