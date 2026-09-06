@@ -61,7 +61,7 @@ app.use(async (_req, _res, next) => {
       if (event.teamFormationDeadline && event.teamFormationDeadline < now) {
         for (const sport of event.sports.filter(s => s.competitionType === 'team')) {
           const teams = await EventTeam.find({ event: event._id, sportConfigId: sport._id, status: 'forming' });
-          for (const team of teams) if (team.members.filter(m => m.status === 'confirmed').length < sport.minimumTeamSize) { team.status = 'terminated'; team.terminationReason = 'Minimum team size not reached by team formation deadline.'; await team.save(); }
+          for (const team of teams) if (team.members.filter(m => m.status === 'confirmed').length + (team.manualPlayers?.length || 0) < sport.minimumTeamSize) { team.status = 'terminated'; team.terminationReason = 'Minimum team size not reached by team formation deadline.'; await team.save(); }
         }
       }
     }

@@ -63,7 +63,9 @@ export default function OfficialTournamentsSection({ athleteSport }) {
         sportName: r.event?.sports?.find(s => String(s._id) === String(r.sportConfigId))?.sportName || 'Sport',
         source: 'organizer',
         isFrozen: r.isFrozen,
-        frozenAt: r.frozenAt
+        frozenAt: r.frozenAt,
+        certificateData: r.certificateData,
+        certificateFileName: r.certificateFileName
       })));
       setCompletedResults([...fedCompleted, ...orgCompleted].sort((a, b) => new Date(b.createdAt || b.frozenAt || 0) - new Date(a.createdAt || a.frozenAt || 0)));
     } catch (err) {
@@ -508,7 +510,7 @@ export default function OfficialTournamentsSection({ athleteSport }) {
                       </h4>
 
                       <p className="text-xs font-bold text-[#194e42] mt-0.5">
-                        Winner: <strong>{isOrg ? (resItem.name || 'Participant') : resItem.athleteName}</strong>
+                        Winner: <strong>{isOrg ? (resItem.teamName || resItem.name || 'Participant') : resItem.athleteName}</strong>
                       </p>
 
                       <p className="text-[11px] text-[#526668]">
