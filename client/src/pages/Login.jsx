@@ -45,7 +45,7 @@ export default function Login() {
 
   // Role-Specific Payload State
   const [parentFields, setParentFields] = useState({ childName: '', childAge: '', childSport: 'Taekwondo' });
-  const [athleteFields, setAthleteFields] = useState({ sport: 'Taekwondo', beltRank: '', age: '', federationState: 'Andhra Pradesh', aadhaarNumber: '', seekingSponsorship: false, sponsorshipReason: '' });
+  const [athleteFields, setAthleteFields] = useState({ sport: '', beltRank: '', age: '', federationState: 'Andhra Pradesh', aadhaarNumber: '', seekingSponsorship: false, sponsorshipReason: '' });
   const [coachFields, setCoachFields] = useState({ sport: 'Taekwondo', yearsExperience: '', certifications: '', acceptingAthletes: true });
   const [sponsorFields, setSponsorFields] = useState({ organizationName: '', budgetRange: '₹50,000 - ₹2,000,000', targetSports: 'Taekwondo' });
   const [academyFields, setAcademyFields] = useState({ academyName: '', sportsOffered: 'Taekwondo', contactPhone: '', address: '' });
@@ -79,7 +79,7 @@ export default function Login() {
         // Build role specific payload
         let rolePayload = {};
         if (role === 'parent') rolePayload = { childName: parentFields.childName, childAge: Number(parentFields.childAge) || 0, childSport: parentFields.childSport };
-        else if (role === 'athlete') rolePayload = { sport: athleteFields.sport, age: Number(athleteFields.age) || 0, beltRank: athleteFields.beltRank, federationState: athleteFields.federationState, aadhaarNumber: athleteFields.aadhaarNumber, seekingSponsorship: athleteFields.seekingSponsorship, sponsorshipReason: athleteFields.sponsorshipReason };
+        else if (role === 'athlete') rolePayload = { sport: String(athleteFields.sport || '').trim(), age: Number(athleteFields.age) || 0, beltRank: athleteFields.beltRank, federationState: athleteFields.federationState, aadhaarNumber: athleteFields.aadhaarNumber, seekingSponsorship: athleteFields.seekingSponsorship, sponsorshipReason: athleteFields.sponsorshipReason };
         else if (role === 'coach') rolePayload = { sport: coachFields.sport, yearsExperience: Number(coachFields.yearsExperience) || 0, certifications: coachFields.certifications.split(',').map(s => s.trim()).filter(Boolean), acceptingAthletes: coachFields.acceptingAthletes };
         else if (role === 'sponsor') rolePayload = { organizationName: sponsorFields.organizationName, budgetRange: sponsorFields.budgetRange, targetSports: sponsorFields.targetSports.split(',').map(s => s.trim()).filter(Boolean) };
         else if (role === 'academy') rolePayload = { academyName: academyFields.academyName, sportsOffered: academyFields.sportsOffered.split(',').map(s => s.trim()).filter(Boolean), contactPhone: academyFields.contactPhone, address: academyFields.address };
@@ -313,14 +313,8 @@ export default function Login() {
             {mode === 'signup' && role === 'athlete' && (
               <>
                 <div className="form-row">
-                  <label>Primary Sport
-                    <select value={athleteFields.sport} onChange={e => setAthleteFields({ ...athleteFields, sport: e.target.value })}>
-                      <option value="Taekwondo">Taekwondo</option>
-                      <option value="Badminton">Badminton</option>
-                      <option value="Table Tennis">Table Tennis</option>
-                      <option value="Athletics">Athletics</option>
-                      <option value="Boxing">Boxing</option>
-                    </select>
+                  <label>Sport *
+                    <input value={athleteFields.sport} onChange={e => setAthleteFields({ ...athleteFields, sport: e.target.value })} type="text" placeholder="e.g. Cricket" required />
                   </label>
                   <label>Age
                     <input value={athleteFields.age} onChange={e => setAthleteFields({ ...athleteFields, age: e.target.value })} type="number" min="5" max="40" placeholder="e.g. 16" required />

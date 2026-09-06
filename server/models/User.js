@@ -9,7 +9,7 @@ const UserSchema = new mongoose.Schema({
   // Athlete-specific
   athleteId: { type: String, default: null },
   aadhaarHash: { type: String, default: null },
-  sport: String,
+  sport: { type: String, trim: true },
   beltRank: String,
   age: Number,
   achievements: [String],

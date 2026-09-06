@@ -18,6 +18,7 @@ function withoutAadhaar(document) {
   delete value.athleteIdentityReference;
   delete value.aadhaar;
   delete value.aadhaarNumber;
+  if (value.sport) value.sport = String(value.sport).trim();
   return value;
 }
 

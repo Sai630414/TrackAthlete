@@ -17,6 +17,7 @@ const {
 router.post('/signup', async (req, res) => {
   try {
     const { name, email, password, role, rememberMe, city, state, aadhaarNumber, aadhaar, aadhaarHash: ignoredAadhaarHash, ...rest } = req.body;
+    if (rest.sport) rest.sport = String(rest.sport).trim();
     if (!name || !email || !password || !role) {
       return res.status(400).json({ error: 'Name, email, password, and role are required.' });
     }
@@ -65,13 +66,15 @@ router.post('/signup', async (req, res) => {
       city,
       state,
       aadhaarHash,
-      ...rest
+      ...rest,
+      sport: rest.sport ? String(rest.sport).trim() : (req.body.sport ? String(req.body.sport).trim() : undefined)
     };
     if (location) userPayload.location = location;
 
     const user = await User.create(userPayload);
     const athleteIdStr = `ATH-${user._id.toString().slice(-8).toUpperCase()}`;
     user.athleteId = athleteIdStr;
+    if (user.sport) user.sport = String(user.sport).trim();
     await user.save();
 
     // Auto-link historical official results by Aadhaar hash only.
@@ -91,6 +94,7 @@ router.post('/signup', async (req, res) => {
     const token = jwt.sign({ id: user._id, role: user.role }, jwtSecret, { expiresIn });
     
     const userObj = withoutAadhaar(user);
+    if (userObj.sport) userObj.sport = String(userObj.sport).trim();
     delete userObj.passwordHash;
     delete userObj.resetPasswordOTP;
 
