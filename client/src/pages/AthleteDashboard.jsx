@@ -25,7 +25,6 @@ import api from '../services/api';
 import ChatPanel from '../components/ChatPanel';
 import FederationVerifiedSection from '../components/FederationVerifiedSection';
 import OfficialTournamentsSection from '../components/OfficialTournamentsSection';
-import OrganizerEventsSection from '../components/OrganizerEventsSection';
 import FederationListsSection from '../components/FederationListsSection';
 import {
   Shield,
@@ -62,11 +61,62 @@ function getYouTubeEmbedUrl(url) {
 function MyEventRegistrations() {
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
-  useEffect(() => { api.get('/organizer-events/my/registrations').then(({ data }) => setRegistrations(data.registrations || [])).catch(() => setRegistrations([])).finally(() => setLoading(false)); }, []);
-  return <Card>
-    <CardHeader><CardTitle>My Event Registrations</CardTitle><CardDescription>Organizer event registrations, team memberships and join-request outcomes.</CardDescription></CardHeader>
-    <CardContent>{loading ? <p>Loading registrations…</p> : registrations.length === 0 ? <p className="text-sm text-[#526668]">You have no organizer event registrations yet.</p> : <div className="space-y-3">{registrations.map(r => { const sport = r.event?.sports?.find(s => String(s._id) === String(r.sportConfigId)); return <div key={r._id} className="border rounded-lg p-3"><div className="font-bold">{r.event?.eventName || 'Organizer event'}</div><div className="text-sm text-[#526668]">Sport: <b>{sport?.sportName || '—'}</b> · {r.type === 'team' ? `Team: ${r.team?.name || 'Team registration'}` : 'Individual'} · Status: <b>{String(r.status).replaceAll('_', ' ')}</b></div><div className="text-sm text-[#526668]">Organizer: {r.event?.organizer?.organizationName || r.event?.organizer?.name || '—'} · Venue: {r.event?.venue || '—'}</div><div className="text-sm text-[#526668]">Event date: {r.event?.eventDate ? new Date(r.event.eventDate).toLocaleDateString() : '—'}</div></div> })}</div>}</CardContent>
-  </Card>;
+  useEffect(() => {
+    api.get('/organizer-events/my/registrations')
+      .then(({ data }) => setRegistrations(data.registrations || []))
+      .catch(() => setRegistrations([]))
+      .finally(() => setLoading(false));
+  }, []);
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>My Event Registrations</CardTitle>
+        <CardDescription>Event registrations, team memberships and join-request outcomes.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <p className="text-sm text-[#526668]">Loading registrations…</p>
+        ) : registrations.length === 0 ? (
+          <p className="text-sm text-[#526668]">You have no event registrations yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {registrations.map(r => {
+              const sport = r.event?.sports?.find(s => String(s._id) === String(r.sportConfigId));
+              const isOrg = !r.source || r.source === 'organizer';
+              return (
+                <div key={r._id} className="border border-[#2f6d5a]/30 rounded-xl p-4 bg-white shadow-2xs space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-[#fef9e7] text-[#9a6c00] border border-[#f0d060]">
+                      {isOrg ? '[ ORGANIZER EVENT ] Organizer Verified' : '[ FEDERATION ] Federation Recognized'}
+                    </span>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-[#f4f8f5] text-[#173235] border border-[#d2dad2]">
+                      Status: {String(r.status).replaceAll('_', ' ').toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="font-extrabold text-[#173235] text-base">{r.event?.eventName || 'Event'}</div>
+                  <div className="flex flex-wrap gap-2 items-center text-xs text-[#526668]">
+                    {sport?.sportName && (
+                      <span className="px-2 py-0.5 rounded border border-[#2f6d5a] bg-[#e2eee4] text-[10px] font-extrabold text-[#194e42] uppercase">
+                        [{sport.sportName.toUpperCase()}]
+                      </span>
+                    )}
+                    <span>·</span>
+                    <span>{r.type === 'team' ? `Team: ${r.team?.name || 'Team registration'}` : 'Individual'}</span>
+                    <span>·</span>
+                    <span>Organizer: {r.event?.organizer?.organizationName || r.event?.organizer?.name || '—'}</span>
+                    <span>·</span>
+                    <span>Venue: {r.event?.venue || '—'}</span>
+                    <span>·</span>
+                    <span>Event Date: {r.event?.eventDate ? new Date(r.event.eventDate).toLocaleDateString('en-IN') : '—'}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function AthleteDashboard() {
@@ -434,8 +484,7 @@ export default function AthleteDashboard() {
 
         {/* ── TOURNAMENTS & VIDEO TAB ──────────────────────────────── */}
         <TabsContent value="tournaments" className="space-y-6">
-          <OrganizerEventsSection athleteSport={profile.sport} />
-          <OfficialTournamentsSection />
+          <OfficialTournamentsSection athleteSport={profile.sport} />
           <FederationVerifiedSection athleteUserId={user?._id} />
 
           <Card>
