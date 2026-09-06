@@ -24,7 +24,7 @@ import { useSocket } from '../context/SocketContext';
 import api from '../services/api';
 import ChatPanel from '../components/ChatPanel';
 import FederationVerifiedSection from '../components/FederationVerifiedSection';
-import OfficialTournamentsSection from '../components/OfficialTournamentsSection';
+import OfficialTournamentsSection, { TeamRegistrationModal } from '../components/OfficialTournamentsSection';
 import FederationListsSection from '../components/FederationListsSection';
 import {
   Shield,
@@ -59,9 +59,11 @@ function getYouTubeEmbedUrl(url) {
 }
 
 function MyEventRegistrations() {
+  const { user } = useAuth() || {};
   const [registrations, setRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionBusy, setActionBusy] = useState('');
+  const [manageTeamModal, setManageTeamModal] = useState(null);
 
   const loadRegs = () => {
     setLoading(true);
@@ -105,6 +107,19 @@ function MyEventRegistrations() {
               const sport = r.event?.sports?.find(s => String(s._id) === String(r.sportConfigId));
               const isOrg = !r.source || r.source === 'organizer';
               const isPendingJoin = r.status === 'join_request_pending';
+              const isTeam = r.type === 'team' && r.team;
+              const confirmedMembers = (r.team?.members?.filter(m => m.status === 'confirmed').length || 0) + (r.team?.manualPlayers?.length || 0);
+              const isCaptain = r.team && (
+                String(r.team.captain?._id || r.team.captain) === String(user?._id) ||
+                (user?.name && r.team.captain?.name && user.name.trim().toLowerCase() === r.team.captain.name.trim().toLowerCase())
+              );
+              const minSize = sport?.minimumTeamSize || 11;
+              const maxSize = sport?.maximumTeamSize || 15;
+              const isTerminated = r.team?.status === 'terminated' || r.status === 'terminated';
+              const teamStatusLabel = isTerminated
+                ? 'TERMINATED'
+                : (confirmedMembers < minSize ? 'INCOMPLETE' : (confirmedMembers >= maxSize ? 'FULL' : 'READY / CONFIRMED'));
+
               return (
                 <div key={r._id} className="border border-[#2f6d5a]/30 rounded-xl p-4 bg-white shadow-2xs space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -114,6 +129,8 @@ function MyEventRegistrations() {
                     <span className={`text-[11px] font-bold px-2 py-0.5 rounded border ${
                       isPendingJoin
                         ? 'bg-[#fff8ea] text-[#9a6c00] border-[#e0c068]'
+                        : isTerminated
+                        ? 'bg-[#fdf2f2] text-[#9b1c1c] border-[#f8b4b4]'
                         : 'bg-[#f4f8f5] text-[#173235] border-[#d2dad2]'
                     }`}>
                       Status: {String(r.status).replaceAll('_', ' ').toUpperCase()}
@@ -149,10 +166,36 @@ function MyEventRegistrations() {
                       </button>
                     </div>
                   )}
+
+                  {isTeam && !isPendingJoin && (
+                    <div className="pt-2 border-t border-[#e2eee4] flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-xs text-[#526668]">
+                        Team: <strong className="text-[#173235]">{r.team.name}</strong> · Captain: <strong>{r.team.captain?.name || (isCaptain ? user?.name : 'Athlete')}</strong> {isCaptain && '(You)'} · Members: <strong>{confirmedMembers} / {maxSize}</strong> · Status: <strong className={isTerminated ? 'text-[#9b1c1c]' : confirmedMembers < minSize ? 'text-[#9a6c00]' : 'text-[#194e42]'}>{teamStatusLabel}</strong>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setManageTeamModal({ event: r.event, sport })}
+                        className="px-3 py-1 rounded-lg bg-[#194e42] text-white text-xs font-bold hover:bg-[#173235] cursor-pointer"
+                      >
+                        {isCaptain ? 'VIEW / MANAGE TEAM' : 'VIEW TEAM'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
+        )}
+
+        {manageTeamModal && (
+          <TeamRegistrationModal
+            event={manageTeamModal.event}
+            sport={manageTeamModal.sport}
+            onClose={() => setManageTeamModal(null)}
+            onSuccess={() => {
+              loadRegs();
+            }}
+          />
         )}
       </CardContent>
     </Card>

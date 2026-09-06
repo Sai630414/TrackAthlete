@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, Award, Shield, MapPin, Lock, Eye, FileText, ChevronLeft, ChevronRight, Users, CheckCircle, AlertCircle, X, Search, UserPlus } from 'lucide-react';
+import { Calendar, Award, Shield, MapPin, Lock, Eye, FileText, ChevronLeft, ChevronRight, Users, CheckCircle, AlertCircle, X, Search, UserPlus, AlertTriangle } from 'lucide-react';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const normalize = (val) => String(val || '').trim().toLowerCase();
 
 export default function OfficialTournamentsSection({ athleteSport }) {
+  const { user } = useAuth() || {};
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [completedResults, setCompletedResults] = useState([]);
+  const [myRegistrations, setMyRegistrations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('upcoming');
   const [viewPdfModal, setViewPdfModal] = useState(null);
@@ -25,11 +28,13 @@ export default function OfficialTournamentsSection({ athleteSport }) {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [upRes, compRes, orgCompRes] = await Promise.all([
+      const [upRes, compRes, orgCompRes, myRegRes] = await Promise.all([
         api.get('/tournaments/upcoming').catch(() => ({ data: [] })),
         api.get('/tournaments/completed').catch(() => ({ data: [] })),
-        api.get('/organizer-events/completed').catch(() => ({ data: { results: [] } }))
+        api.get('/organizer-events/completed').catch(() => ({ data: { results: [] } })),
+        api.get('/organizer-events/my/registrations').catch(() => ({ data: { registrations: [] } }))
       ]);
+      setMyRegistrations(myRegRes.data?.registrations || []);
       const payload = upRes.data || [];
       const fedUpcoming = (Array.isArray(payload) ? payload : (payload.federationEvents || [])).map(e => ({
         ...e,
@@ -87,7 +92,73 @@ export default function OfficialTournamentsSection({ athleteSport }) {
     }
   };
 
-  const eligibleEvents = [];
+  const getButtonProps = (evt, sport) => {
+    const isClosed = evt.submissionDeadline && new Date(evt.submissionDeadline) < new Date();
+    if (sport.competitionType === 'team') {
+      const reg = myRegistrations.find(r =>
+        String(r.event?._id || r.event) === String(evt._id) &&
+        String(r.sportConfigId) === String(sport._id)
+      );
+      if (reg) {
+        if (reg.status === 'terminated') {
+          return {
+            label: 'TEAM TERMINATED',
+            className: 'px-2.5 py-1 rounded bg-[#64748b] text-white text-[11px] font-bold cursor-pointer hover:bg-[#475569]',
+            action: () => setTeamModal({ event: evt, sport })
+          };
+        }
+        if (reg.status === 'join_request_pending') {
+          return {
+            label: 'REQUEST PENDING',
+            className: 'px-2.5 py-1 rounded bg-[#d97706] text-white text-[11px] font-bold cursor-pointer hover:bg-[#b45309]',
+            action: () => setTeamModal({ event: evt, sport })
+          };
+        }
+        const isCaptain = reg.team && (
+          String(reg.team.captain?._id || reg.team.captain) === String(user?._id) ||
+          (user?.name && reg.team.captain?.name && user.name.trim().toLowerCase() === reg.team.captain.name.trim().toLowerCase())
+        );
+        if (isCaptain) {
+          return {
+            label: 'VIEW / MANAGE TEAM',
+            className: 'px-2.5 py-1 rounded bg-[#194e42] text-white text-[11px] font-bold cursor-pointer hover:bg-[#123930]',
+            action: () => setTeamModal({ event: evt, sport })
+          };
+        }
+        return {
+          label: 'VIEW TEAM',
+          className: 'px-2.5 py-1 rounded bg-[#2f6d5a] text-white text-[11px] font-bold cursor-pointer hover:bg-[#194e42]',
+          action: () => setTeamModal({ event: evt, sport })
+        };
+      }
+      return {
+        label: isClosed ? 'Closed' : 'Register Team',
+        disabled: isClosed,
+        className: 'px-2.5 py-1 rounded bg-[#194e42] text-white text-[11px] font-bold cursor-pointer disabled:opacity-50 hover:bg-[#123930]',
+        action: () => setTeamModal({ event: evt, sport })
+      };
+    } else {
+      const reg = myRegistrations.find(r =>
+        String(r.event?._id || r.event) === String(evt._id) &&
+        String(r.sportConfigId) === String(sport._id)
+      );
+      if (reg) {
+        return {
+          label: 'Registered',
+          disabled: true,
+          className: 'px-2.5 py-1 rounded bg-[#2f6d5a] text-white text-[11px] font-bold opacity-80 cursor-default',
+          action: () => {}
+        };
+      }
+      const isBusy = busyRegister === `${evt._id}:${sport._id}`;
+      return {
+        label: isClosed ? 'Closed' : isBusy ? 'Registering…' : 'Register',
+        disabled: isClosed || isBusy,
+        className: 'px-2.5 py-1 rounded bg-[#e07050] text-white text-[11px] font-bold cursor-pointer disabled:opacity-50 hover:bg-[#c95d3e]',
+        action: () => handleIndividualRegister(evt, sport)
+      };
+    }
+  };
   if (athleteSport) {
     upcomingEvents.forEach(evt => {
       if (evt.source === 'organizer' || evt.isOrganizerEvent) {
@@ -243,25 +314,19 @@ export default function OfficialTournamentsSection({ athleteSport }) {
                                     <div className="font-bold text-[#173235]">{isTeam ? 'Team Sport' : 'Individual'}</div>
                                     <div className="text-[#526668]">{feeLabel}</div>
                                   </div>
-                                  {isTeam ? (
-                                    <button
-                                      type="button"
-                                      disabled={isClosed}
-                                      onClick={() => setTeamModal({ event: evt, sport })}
-                                      className="px-3 py-1 rounded-md bg-[#194e42] text-white text-xs font-bold cursor-pointer disabled:opacity-50 hover:bg-[#173235]"
-                                    >
-                                      {isClosed ? 'Closed' : 'Register Team'}
-                                    </button>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      disabled={isClosed || busyRegister === `${evt._id}:${sport._id}`}
-                                      onClick={() => handleIndividualRegister(evt, sport)}
-                                      className="px-3 py-1 rounded-md bg-[#e07050] text-white text-xs font-bold cursor-pointer disabled:opacity-50 hover:bg-[#c95d3e]"
-                                    >
-                                      {isClosed ? 'Closed' : busyRegister === `${evt._id}:${sport._id}` ? 'Registering…' : 'Register'}
-                                    </button>
-                                  )}
+                                  {(() => {
+                                    const btn = getButtonProps(evt, sport);
+                                    return (
+                                      <button
+                                        type="button"
+                                        disabled={btn.disabled}
+                                        onClick={btn.action}
+                                        className={btn.className}
+                                      >
+                                        {btn.label}
+                                      </button>
+                                    );
+                                  })()}
                                 </div>
                               );
                             })}
@@ -362,32 +427,21 @@ export default function OfficialTournamentsSection({ athleteSport }) {
                       {athleteSport && isOrg && evt.sports?.some(s => normalize(s.sportName) === normalize(athleteSport)) && (
                         <div className="pt-2 border-t border-[#e2eee4] space-y-1.5">
                           {evt.sports.filter(s => normalize(s.sportName) === normalize(athleteSport)).map(sport => {
-                            const isTeam = sport.competitionType === 'team';
-                            return (
-                              <div key={sport._id} className="flex justify-between items-center">
-                                <span className="text-[10px] font-bold text-[#194e42]">Eligible</span>
-                                {isTeam ? (
+                              const btn = getButtonProps(evt, sport);
+                              return (
+                                <div key={sport._id} className="flex justify-between items-center">
+                                  <span className="text-[10px] font-bold text-[#194e42]">Eligible</span>
                                   <button
                                     type="button"
-                                    disabled={isClosed}
-                                    onClick={() => setTeamModal({ event: evt, sport })}
-                                    className="px-2.5 py-1 rounded bg-[#194e42] text-white text-[11px] font-bold cursor-pointer disabled:opacity-50"
+                                    disabled={btn.disabled}
+                                    onClick={btn.action}
+                                    className={btn.className}
                                   >
-                                    {isClosed ? 'Closed' : 'Team Register'}
+                                    {btn.label}
                                   </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    disabled={isClosed || busyRegister === `${evt._id}:${sport._id}`}
-                                    onClick={() => handleIndividualRegister(evt, sport)}
-                                    className="px-2.5 py-1 rounded bg-[#e07050] text-white text-[11px] font-bold cursor-pointer disabled:opacity-50"
-                                  >
-                                    {isClosed ? 'Closed' : busyRegister === `${evt._id}:${sport._id}` ? 'Registering…' : 'Register'}
-                                  </button>
-                                )}
-                              </div>
-                            );
-                          })}
+                                </div>
+                              );
+                            })}
                         </div>
                       )}
 
@@ -555,144 +609,285 @@ function RailControls({ onPrevious, onNext }) {
   );
 }
 
-function TeamRegistrationModal({ event, sport, onClose, onSuccess }) {
-  const [activeTab, setActiveTab] = useState('create');
+export function TeamRegistrationModal({ event, sport, onClose, onSuccess }) {
+  const { user } = useAuth() || {};
+
+  // Status state from MongoDB backend
+  const [statusLoading, setStatusLoading] = useState(true);
+  const [athleteStatus, setAthleteStatus] = useState('NOT_REGISTERED'); // 'NOT_REGISTERED' | 'TEAM_CAPTAIN' | 'TEAM_MEMBER' | 'JOIN_REQUEST_PENDING' | 'TERMINATED'
+  const [teamData, setTeamData] = useState(null);
+  const [statusError, setStatusError] = useState('');
+  const [actionSuccess, setActionSuccess] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+
+  // States for when athleteStatus === 'NOT_REGISTERED'
+  const [activeTab, setActiveTab] = useState('create'); // 'create' | 'join'
   const [teamName, setTeamName] = useState('');
   const [captainType, setCaptainType] = useState('myself');
   const [selectedCaptain, setSelectedCaptain] = useState(null);
   const [captainSearchQuery, setCaptainSearchQuery] = useState('');
   const [captainSearchResults, setCaptainSearchResults] = useState([]);
-  
-  // Registered members
+
+  // Registered members for creation
   const [members, setMembers] = useState([]);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [memberSearchResults, setMemberSearchResults] = useState([]);
 
-  // Manual / External players
+  // Manual / External players for creation
+  const [createAddMode, setCreateAddMode] = useState('registered'); // 'registered' | 'manual'
+  const [createManualName, setCreateManualName] = useState('');
+  const [createManualMobile, setCreateManualMobile] = useState('');
+  const [createManualEmail, setCreateManualEmail] = useState('');
+  const [createManualPlayers, setCreateManualPlayers] = useState([]);
+  const [createManualError, setCreateManualError] = useState('');
+
+  // Existing open teams to join
+  const [existingTeams, setExistingTeams] = useState([]);
+  const [loadingTeams, setLoadingTeams] = useState(false);
+
+  // States for when athleteStatus === 'TEAM_CAPTAIN' (adding members to existing team)
   const [addMemberMode, setAddMemberMode] = useState('registered'); // 'registered' | 'manual'
+  const [addRegisteredQuery, setAddRegisteredQuery] = useState('');
+  const [addRegisteredResults, setAddRegisteredResults] = useState([]);
   const [manualName, setManualName] = useState('');
   const [manualMobile, setManualMobile] = useState('');
   const [manualEmail, setManualEmail] = useState('');
-  const [manualPlayers, setManualPlayers] = useState([]);
-  const [manualError, setManualError] = useState('');
+  const [memberActionError, setMemberActionError] = useState('');
 
-  const [existingTeams, setExistingTeams] = useState([]);
-  const [loadingTeams, setLoadingTeams] = useState(false);
-  const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  // Total team size = creator (1) + (other captain ? 1 : 0) + members.length + manualPlayers.length
-  const totalTeamSize = 1 + (captainType === 'other' && selectedCaptain ? 1 : 0) + members.length + manualPlayers.length;
+  const loadBackendStatus = useCallback(async () => {
+    try {
+      setStatusLoading(true);
+      setStatusError('');
+      const { data } = await api.get(`/organizer-events/${event._id}/sports/${sport._id}/my-status`);
+      setAthleteStatus(data.status || 'NOT_REGISTERED');
+      setTeamData(data.team || null);
+    } catch (err) {
+      console.error('Error fetching team status:', err);
+      setStatusError('Unable to load current registration status from server.');
+      setAthleteStatus('NOT_REGISTERED');
+      setTeamData(null);
+    } finally {
+      setStatusLoading(false);
+    }
+  }, [event._id, sport._id]);
 
   useEffect(() => {
-    if (activeTab === 'join') {
+    loadBackendStatus();
+  }, [loadBackendStatus]);
+
+  // Load joinable teams when in NOT_REGISTERED and activeTab === 'join'
+  useEffect(() => {
+    if (athleteStatus === 'NOT_REGISTERED' && activeTab === 'join') {
       setLoadingTeams(true);
       api.get(`/organizer-events/${event._id}/sports/${sport._id}/teams`)
         .then(({ data }) => setExistingTeams(data.teams || []))
         .catch(() => setExistingTeams([]))
         .finally(() => setLoadingTeams(false));
     }
-  }, [activeTab, event._id, sport._id]);
+  }, [athleteStatus, activeTab, event._id, sport._id]);
 
   const searchAthletes = async (query, target) => {
     if (query.trim().length < 2) {
       if (target === 'captain') setCaptainSearchResults([]);
-      else setMemberSearchResults([]);
+      else if (target === 'member') setMemberSearchResults([]);
+      else if (target === 'existing_add') setAddRegisteredResults([]);
       return;
     }
     try {
       const { data } = await api.get(`/organizer-events/athletes/search?q=${encodeURIComponent(query)}`);
       if (target === 'captain') setCaptainSearchResults(data.athletes || []);
-      else setMemberSearchResults(data.athletes || []);
+      else if (target === 'member') setMemberSearchResults(data.athletes || []);
+      else if (target === 'existing_add') setAddRegisteredResults(data.athletes || []);
     } catch {
       // Ignore
     }
   };
 
-  const handleAddManualPlayer = (e) => {
+  // CREATE TEAM FLOW
+  const handleAddCreateManualPlayer = (e) => {
     e.preventDefault();
-    setManualError('');
-    const name = manualName.trim();
-    const cleanMobile = manualMobile.replace(/\D/g, '');
-    const email = manualEmail.trim().toLowerCase();
+    setCreateManualError('');
+    const name = createManualName.trim();
+    const cleanMobile = createManualMobile.replace(/\D/g, '');
+    const email = createManualEmail.trim().toLowerCase();
 
     if (!name) {
-      setManualError('Player name is required.');
+      setCreateManualError('Player name is required.');
       return;
     }
     if (!cleanMobile || cleanMobile.length < 10 || cleanMobile.length > 13) {
-      setManualError('Valid 10-digit mobile number is required.');
+      setCreateManualError('Valid 10-digit mobile number is required.');
       return;
     }
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setManualError('Invalid email format.');
+      setCreateManualError('Invalid email format.');
       return;
     }
-    if (manualPlayers.some(p => p.mobile.replace(/\D/g, '') === cleanMobile)) {
-      setManualError('A player with this mobile number is already added.');
+    if (createManualPlayers.some(p => p.mobile.replace(/\D/g, '') === cleanMobile)) {
+      setCreateManualError('A player with this mobile number is already added.');
       return;
     }
-    if (totalTeamSize >= sport.maximumTeamSize) {
-      setManualError(`Team has reached maximum team size of ${sport.maximumTeamSize}.`);
+    const totalSize = 1 + (captainType === 'other' && selectedCaptain ? 1 : 0) + members.length + createManualPlayers.length + 1;
+    if (totalSize > sport.maximumTeamSize) {
+      setCreateManualError(`Team has reached maximum team size of ${sport.maximumTeamSize}.`);
       return;
     }
 
-    setManualPlayers([...manualPlayers, { name, mobile: manualMobile.trim(), email }]);
-    setManualName('');
-    setManualMobile('');
-    setManualEmail('');
+    setCreateManualPlayers([...createManualPlayers, { name, mobile: createManualMobile.trim(), email }]);
+    setCreateManualName('');
+    setCreateManualMobile('');
+    setCreateManualEmail('');
   };
 
   const handleCreateTeam = async (e) => {
     e.preventDefault();
-    setError('');
+    setStatusError('');
     if (!teamName.trim()) {
-      setError('Please enter a team name.');
+      setStatusError('Please enter a team name.');
       return;
     }
     const captainId = captainType === 'myself' ? undefined : selectedCaptain?._id;
     if (captainType === 'other' && !captainId) {
-      setError('Please search and select a team captain.');
+      setStatusError('Please search and select a team captain.');
       return;
     }
-    if (totalTeamSize > sport.maximumTeamSize) {
-      setError(`Team size exceeds maximum of ${sport.maximumTeamSize}.`);
+    const totalSize = 1 + (captainType === 'other' && selectedCaptain ? 1 : 0) + members.length + createManualPlayers.length;
+    if (totalSize > sport.maximumTeamSize) {
+      setStatusError(`Team size exceeds maximum of ${sport.maximumTeamSize}.`);
       return;
     }
 
-    setSubmitting(true);
+    setActionLoading(true);
     try {
       const memberIds = members.map(m => m._id);
       await api.post(`/organizer-events/${event._id}/sports/${sport._id}/teams`, {
         name: teamName.trim(),
         captainId,
         memberIds,
-        manualPlayers
+        manualPlayers: createManualPlayers
       });
-      onSuccess(`Team "${teamName.trim()}" created successfully!`);
+      await loadBackendStatus();
+      onSuccess?.(`Team "${teamName.trim()}" created successfully!`);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to create team.');
+      setStatusError(err.response?.data?.error || 'Failed to create team.');
     } finally {
-      setSubmitting(false);
+      setActionLoading(false);
     }
   };
 
   const handleJoinRequest = async (teamId) => {
-    setError('');
-    setSubmitting(true);
+    setStatusError('');
+    setActionLoading(true);
     try {
       await api.post(`/organizer-events/teams/${teamId}/join-requests`);
-      onSuccess('Join request sent to the team captain!');
+      await loadBackendStatus();
+      onSuccess?.('Join request sent to the team captain!');
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to send join request.');
+      setStatusError(err.response?.data?.error || 'Failed to send join request.');
     } finally {
-      setSubmitting(false);
+      setActionLoading(false);
     }
   };
+
+  // EXISTING TEAM MANAGEMENT FLOW (Captain)
+  const handleAddRegisteredToExisting = async (athlete) => {
+    setMemberActionError('');
+    setActionLoading(true);
+    try {
+      const { data } = await api.post(`/organizer-events/teams/${teamData._id}/members`, {
+        type: 'registered',
+        athleteId: athlete._id
+      });
+      setTeamData(data.team);
+      setAddRegisteredQuery('');
+      setAddRegisteredResults([]);
+      setActionSuccess(`Added athlete "${athlete.name}" to team!`);
+      setTimeout(() => setActionSuccess(''), 3000);
+      onSuccess?.(`Added athlete "${athlete.name}" to team!`);
+    } catch (err) {
+      setMemberActionError(err.response?.data?.error || 'Failed to add athlete.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAddManualToExisting = async (e) => {
+    e.preventDefault();
+    setMemberActionError('');
+    const name = manualName.trim();
+    const cleanMobile = manualMobile.replace(/\D/g, '');
+    const email = manualEmail.trim().toLowerCase();
+
+    if (!name) {
+      setMemberActionError('Player name is required.');
+      return;
+    }
+    if (!cleanMobile || cleanMobile.length < 10 || cleanMobile.length > 13) {
+      setMemberActionError('Valid 10-digit mobile number is required.');
+      return;
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setMemberActionError('Invalid email address.');
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const { data } = await api.post(`/organizer-events/teams/${teamData._id}/members`, {
+        type: 'manual',
+        manualPlayer: { name, mobile: manualMobile.trim(), email }
+      });
+      setTeamData(data.team);
+      setManualName('');
+      setManualMobile('');
+      setManualEmail('');
+      setActionSuccess(`Added player "${name}" to team!`);
+      setTimeout(() => setActionSuccess(''), 3000);
+      onSuccess?.(`Added player "${name}" to team!`);
+    } catch (err) {
+      setMemberActionError(err.response?.data?.error || 'Failed to add manual player.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRemoveMember = async (type, identifier) => {
+    setMemberActionError('');
+    setActionLoading(true);
+    try {
+      const payload = type === 'registered' ? { type: 'registered', athleteId: identifier } : { type: 'manual', manualIndex: identifier };
+      const { data } = await api.delete(`/organizer-events/teams/${teamData._id}/members`, { data: payload });
+      setTeamData(data.team);
+      setActionSuccess('Member removed.');
+      setTimeout(() => setActionSuccess(''), 3000);
+      onSuccess?.('Member removed from team.');
+    } catch (err) {
+      setMemberActionError(err.response?.data?.error || 'Failed to remove member.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCancelJoinRequest = async () => {
+    setStatusError('');
+    setActionLoading(true);
+    try {
+      await api.post(`/organizer-events/teams/${teamData._id}/join-requests/cancel`);
+      await loadBackendStatus();
+      onSuccess?.('Pending join request cancelled.');
+    } catch (err) {
+      setStatusError(err.response?.data?.error || 'Failed to cancel join request.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const totalCreateSize = 1 + (captainType === 'other' && selectedCaptain ? 1 : 0) + members.length + createManualPlayers.length;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl max-w-xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-[#d8ded5]">
+        {/* MODAL HEADER */}
         <div className="p-4 bg-[#173235] text-white flex justify-between items-center">
           <div>
             <h3 className="font-bold text-sm flex items-center gap-2">
@@ -707,367 +902,748 @@ function TeamRegistrationModal({ event, sport, onClose, onSuccess }) {
           </button>
         </div>
 
-        <div className="flex border-b border-[#e2eee4] bg-[#f8faf7] p-2 gap-2">
-          <button
-            type="button"
-            onClick={() => { setActiveTab('create'); setError(''); }}
-            className={`flex-1 py-2 rounded-lg text-xs font-extrabold cursor-pointer transition-all ${
-              activeTab === 'create' ? 'bg-[#194e42] text-white shadow-xs' : 'text-[#194e42] bg-white border border-[#d2dad2]'
-            }`}
-          >
-            CREATE NEW TEAM
-          </button>
-          <button
-            type="button"
-            onClick={() => { setActiveTab('join'); setError(''); }}
-            className={`flex-1 py-2 rounded-lg text-xs font-extrabold cursor-pointer transition-all ${
-              activeTab === 'join' ? 'bg-[#194e42] text-white shadow-xs' : 'text-[#194e42] bg-white border border-[#d2dad2]'
-            }`}
-          >
-            JOIN EXISTING TEAM
-          </button>
-        </div>
-
-        <div className="p-5 flex-1 overflow-y-auto space-y-4">
-          {error && (
-            <div className="p-3 bg-[#fdf2f2] border border-[#f8b4b4] rounded-lg text-xs text-[#9b1c1c] font-bold">
-              {error}
-            </div>
-          )}
-
-          {activeTab === 'create' && (
-            <form onSubmit={handleCreateTeam} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-[#173235] mb-1">Team Name *</label>
-                <input
-                  required
-                  type="text"
-                  placeholder="e.g. Thunder Strikers"
-                  value={teamName}
-                  onChange={(e) => setTeamName(e.target.value)}
-                  className="w-full border border-[#d8ded5] rounded-lg p-2.5 text-xs text-[#173235] focus:outline-none focus:border-[#194e42]"
-                />
+        {/* LOADING STATE */}
+        {statusLoading ? (
+          <div className="p-10 text-center text-xs text-[#526668] space-y-2">
+            <div className="w-6 h-6 border-2 border-[#194e42] border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="font-bold">Checking team registration status from database…</p>
+          </div>
+        ) : (
+          <div className="p-5 flex-1 overflow-y-auto space-y-4">
+            {statusError && (
+              <div className="p-3 bg-[#fdf2f2] border border-[#f8b4b4] rounded-lg text-xs text-[#9b1c1c] font-bold">
+                {statusError}
               </div>
+            )}
+            {actionSuccess && (
+              <div className="p-3 bg-[#e2eee4] border border-[#2f6d5a] rounded-lg text-xs text-[#194e42] font-bold">
+                ✓ {actionSuccess}
+              </div>
+            )}
 
-              <div>
-                <label className="block text-xs font-bold text-[#173235] mb-1">Team Captain *</label>
-                <div className="flex gap-4 mb-2">
-                  <label className="flex items-center gap-1.5 text-xs text-[#173235] cursor-pointer">
-                    <input
-                      type="radio"
-                      name="captainType"
-                      checked={captainType === 'myself'}
-                      onChange={() => { setCaptainType('myself'); setSelectedCaptain(null); }}
-                    />
-                    <span>Myself</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 text-xs text-[#173235] cursor-pointer">
-                    <input
-                      type="radio"
-                      name="captainType"
-                      checked={captainType === 'other'}
-                      onChange={() => setCaptainType('other')}
-                    />
-                    <span>Another Registered Athlete</span>
-                  </label>
+            {/* 1. ATHLETE IS TEAM CAPTAIN */}
+            {athleteStatus === 'TEAM_CAPTAIN' && teamData && (
+              <div className="space-y-4">
+                <div className="p-4 bg-[#f8faf7] border border-[#2f6d5a] rounded-xl space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#194e42] text-white uppercase">
+                        Your Team (Captain)
+                      </span>
+                      <h4 className="font-extrabold text-base text-[#173235] mt-1">{teamData.name}</h4>
+                      <p className="text-xs text-[#526668]">
+                        Captain: <strong>{teamData.captain?.name}</strong> (You)
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-extrabold text-[#194e42]">
+                        {teamData.confirmedSize} / {sport.maximumTeamSize} Members
+                      </div>
+                      <div className="text-[10px] text-[#526668]">
+                        Min: {sport.minimumTeamSize} · Max: {sport.maximumTeamSize}
+                      </div>
+                      <div className="mt-1">
+                        {teamData.confirmedSize < sport.minimumTeamSize ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#fff8ea] text-[#9a6c00] border border-[#e0c068]">
+                            STATUS: INCOMPLETE
+                          </span>
+                        ) : teamData.confirmedSize >= sport.maximumTeamSize ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
+                            STATUS: FULL
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
+                            STATUS: READY / CONFIRMED
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ROSTER LIST */}
+                  <div className="border-t border-[#d8ded5] pt-3 space-y-2">
+                    <div className="text-xs font-extrabold text-[#173235] uppercase tracking-wider">
+                      Current Team Roster:
+                    </div>
+
+                    <div className="space-y-1.5 max-h-52 overflow-y-auto">
+                      {/* Captain */}
+                      <div className="p-2 bg-white rounded-lg border border-[#d8ded5] flex justify-between items-center text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-[#173235]">1. {teamData.captain?.name}</span>
+                          <span className="text-[9px] bg-[#194e42] text-white px-1.5 py-0.5 rounded font-extrabold">CAPTAIN</span>
+                        </div>
+                        <span className="text-[10px] text-[#526668]">TrackAthlete Athlete</span>
+                      </div>
+
+                      {/* Other registered athletes */}
+                      {teamData.members?.filter(m => String(m.athlete?._id || m.athlete) !== String(teamData.captain?._id || teamData.captain)).map((m, i) => (
+                        <div key={m.athlete?._id || i} className="p-2 bg-white rounded-lg border border-[#d8ded5] flex justify-between items-center text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-[#173235]">{i + 2}. {m.athlete?.name || 'Athlete'}</span>
+                            <span className="text-[9px] bg-[#2f6d5a] text-white px-1.5 py-0.5 rounded font-extrabold">REGISTERED</span>
+                            {m.athlete?.athleteId && <span className="text-[10px] text-[#526668]">({m.athlete.athleteId})</span>}
+                          </div>
+                          <button
+                            type="button"
+                            disabled={actionLoading}
+                            onClick={() => handleRemoveMember('registered', m.athlete?._id)}
+                            className="text-[#9b1c1c] text-[10px] font-bold hover:underline cursor-pointer disabled:opacity-50"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+
+                      {/* Manual External Players */}
+                      {teamData.manualPlayers?.map((p, idx) => (
+                        <div key={`man-${idx}`} className="p-2 bg-[#fffdf8] rounded-lg border border-[#e0c068] flex justify-between items-center text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-[#9a6c00]">{teamData.members?.length + idx + 1}. {p.name}</span>
+                            <span className="text-[9px] bg-[#d97706] text-white px-1.5 py-0.5 rounded font-extrabold">EXTERNAL</span>
+                            <span className="text-[10px] text-[#526668]">· {p.mobile}</span>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={actionLoading}
+                            onClick={() => handleRemoveMember('manual', idx)}
+                            className="text-[#9b1c1c] text-[10px] font-bold hover:underline cursor-pointer disabled:opacity-50"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-2 text-xs">
+                      {teamData.confirmedSize < sport.minimumTeamSize ? (
+                        <span className="text-[#9a6c00] font-bold">
+                          ⚠️ Incomplete: {sport.minimumTeamSize - teamData.confirmedSize} more player(s) required to reach minimum team size of {sport.minimumTeamSize}.
+                        </span>
+                      ) : teamData.confirmedSize >= sport.maximumTeamSize ? (
+                        <span className="text-[#194e42] font-bold">
+                          ✓ Full: Maximum team size of {sport.maximumTeamSize} reached.
+                        </span>
+                      ) : (
+                        <span className="text-[#194e42] font-bold">
+                          ✓ Valid: Minimum team size satisfied. {sport.maximumTeamSize - teamData.confirmedSize} slot(s) available.
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                {captainType === 'other' && (
-                  <div className="space-y-2">
-                    {selectedCaptain ? (
-                      <div className="p-2 bg-[#e2eee4] rounded-lg border border-[#2f6d5a] flex justify-between items-center text-xs">
-                        <div>
-                          <strong className="text-[#194e42]">{selectedCaptain.name}</strong> ({selectedCaptain.athleteId})
-                          <div className="text-[10px] text-[#526668]">{selectedCaptain.email}</div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedCaptain(null)}
-                          className="text-[#cc694e] font-bold cursor-pointer hover:underline text-[11px]"
-                        >
-                          Change
-                        </button>
+                {/* ADD TEAM MEMBER (If not full) */}
+                {teamData.confirmedSize < sport.maximumTeamSize ? (
+                  <div className="border border-[#d8ded5] rounded-xl p-4 bg-white space-y-3">
+                    <div className="flex justify-between items-center">
+                      <h5 className="font-extrabold text-xs uppercase text-[#173235]">Add Team Member</h5>
+                      <span className="text-[10px] text-[#526668]">Slots remaining: {sport.maximumTeamSize - teamData.confirmedSize}</span>
+                    </div>
+
+                    {memberActionError && (
+                      <div className="p-2 bg-[#fdf2f2] border border-[#f8b4b4] rounded text-xs text-[#9b1c1c] font-bold">
+                        {memberActionError}
                       </div>
-                    ) : (
-                      <div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setAddMemberMode('registered'); setMemberActionError(''); }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition ${
+                          addMemberMode === 'registered' ? 'bg-[#194e42] text-white' : 'bg-white border border-[#d2dad2] text-[#173235]'
+                        }`}
+                      >
+                        ADD REGISTERED ATHLETE
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setAddMemberMode('manual'); setMemberActionError(''); }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition ${
+                          addMemberMode === 'manual' ? 'bg-[#194e42] text-white' : 'bg-white border border-[#d2dad2] text-[#173235]'
+                        }`}
+                      >
+                        ADD PLAYER MANUALLY
+                      </button>
+                    </div>
+
+                    {addMemberMode === 'registered' ? (
+                      <div className="space-y-2">
                         <div className="relative">
                           <input
                             type="text"
                             placeholder="Search athlete by Name, Athlete ID, or Email…"
-                            value={captainSearchQuery}
+                            value={addRegisteredQuery}
                             onChange={(e) => {
-                              setCaptainSearchQuery(e.target.value);
-                              searchAthletes(e.target.value, 'captain');
+                              setAddRegisteredQuery(e.target.value);
+                              searchAthletes(e.target.value, 'existing_add');
                             }}
                             className="w-full border border-[#d8ded5] rounded-lg p-2 text-xs text-[#173235]"
                           />
                           <Search className="w-3.5 h-3.5 text-[#526668] absolute right-2.5 top-3" />
                         </div>
-                        {captainSearchResults.length > 0 && (
-                          <div className="border border-[#d8ded5] rounded-lg mt-1 max-h-36 overflow-y-auto bg-white shadow-xs">
-                            {captainSearchResults.map(a => (
+                        {addRegisteredResults.length > 0 && (
+                          <div className="border border-[#d8ded5] rounded-lg max-h-36 overflow-y-auto bg-white shadow-xs">
+                            {addRegisteredResults.map(a => (
                               <div
                                 key={a._id}
-                                onClick={() => { setSelectedCaptain(a); setCaptainSearchResults([]); }}
-                                className="p-2 hover:bg-[#e2eee4] cursor-pointer text-xs flex justify-between border-b last:border-0"
+                                className="p-2 hover:bg-[#e2eee4] text-xs flex justify-between items-center border-b last:border-0"
                               >
-                                <span><strong>{a.name}</strong> ({a.athleteId})</span>
-                                <span className="text-[#526668]">{a.sport}</span>
+                                <div>
+                                  <strong className="text-[#173235]">{a.name}</strong> ({a.athleteId})
+                                  <span className="text-[#526668] ml-2 text-[10px]">{a.sport}</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  disabled={actionLoading}
+                                  onClick={() => handleAddRegisteredToExisting(a)}
+                                  className="px-2 py-0.5 bg-[#194e42] text-white rounded text-[10px] font-bold hover:bg-[#123930] cursor-pointer disabled:opacity-50"
+                                >
+                                  + Add to Team
+                                </button>
                               </div>
                             ))}
                           </div>
                         )}
                       </div>
+                    ) : (
+                      <form onSubmit={handleAddManualToExisting} className="space-y-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-bold text-[#526668] mb-0.5">Player Name *</label>
+                            <input
+                              required
+                              type="text"
+                              placeholder="e.g. Rahul Kumar"
+                              value={manualName}
+                              onChange={e => setManualName(e.target.value)}
+                              className="w-full border border-[#d8ded5] rounded-lg p-1.5 text-xs text-[#173235]"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-[#526668] mb-0.5">Mobile Number *</label>
+                            <input
+                              required
+                              type="text"
+                              placeholder="e.g. 9876543210"
+                              value={manualMobile}
+                              onChange={e => setManualMobile(e.target.value)}
+                              className="w-full border border-[#d8ded5] rounded-lg p-1.5 text-xs text-[#173235]"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-[#526668] mb-0.5">Email (Optional)</label>
+                            <input
+                              type="email"
+                              placeholder="e.g. rahul@example.com"
+                              value={manualEmail}
+                              onChange={e => setManualEmail(e.target.value)}
+                              className="w-full border border-[#d8ded5] rounded-lg p-1.5 text-xs text-[#173235]"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-end pt-1">
+                          <button
+                            type="submit"
+                            disabled={actionLoading}
+                            className="px-3 py-1.5 rounded-lg bg-[#194e42] text-white text-xs font-bold cursor-pointer hover:bg-[#123930] disabled:opacity-50"
+                          >
+                            {actionLoading ? 'Adding…' : '+ Add Player'}
+                          </button>
+                        </div>
+                      </form>
                     )}
+                  </div>
+                ) : (
+                  <div className="p-3 bg-[#f4f8f5] border border-[#2f6d5a] rounded-xl text-center text-xs text-[#194e42] font-bold">
+                    ✓ Maximum team size reached ({sport.maximumTeamSize} athletes). Your roster is complete.
                   </div>
                 )}
               </div>
+            )}
 
-              {/* Team Members Section */}
-              <div className="border-t border-[#e2eee4] pt-3">
-                <div className="flex justify-between items-center mb-2">
-                  <label className="text-xs font-bold text-[#173235]">Add Team Members</label>
-                  <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-[#f4f8f5] text-[#194e42] border border-[#d2dad2]">
-                    Total: {totalTeamSize} / {sport.maximumTeamSize} athletes (Min: {sport.minimumTeamSize})
+            {/* 2. ATHLETE IS CONFIRMED TEAM MEMBER (Not Captain) */}
+            {athleteStatus === 'TEAM_MEMBER' && teamData && (
+              <div className="space-y-4">
+                <div className="p-4 bg-[#f8faf7] border border-[#2f6d5a] rounded-xl space-y-3">
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#194e42] text-white uppercase">
+                    Already Registered (Team Member)
                   </span>
-                </div>
+                  <h4 className="font-extrabold text-base text-[#173235] mt-1">{teamData.name}</h4>
+                  <p className="text-xs text-[#526668]">
+                    Captain: <strong>{teamData.captain?.name}</strong>
+                  </p>
+                  <div className="flex justify-between items-center pt-2 border-t border-[#d8ded5] text-xs">
+                    <div>Members: <strong>{teamData.confirmedSize} / {sport.maximumTeamSize}</strong></div>
+                    <div>Status: <strong className="text-[#194e42]">CONFIRMED</strong></div>
+                  </div>
 
-                <div className="flex gap-2 mb-3">
-                  <button
-                    type="button"
-                    onClick={() => { setAddMemberMode('registered'); setManualError(''); }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition ${
-                      addMemberMode === 'registered' ? 'bg-[#194e42] text-white' : 'bg-white border border-[#d2dad2] text-[#173235]'
-                    }`}
-                  >
-                    ADD REGISTERED ATHLETE
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setAddMemberMode('manual'); setManualError(''); }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition ${
-                      addMemberMode === 'manual' ? 'bg-[#194e42] text-white' : 'bg-white border border-[#d2dad2] text-[#173235]'
-                    }`}
-                  >
-                    ADD PLAYER MANUALLY
-                  </button>
-                </div>
-
-                {addMemberMode === 'registered' ? (
-                  <div className="space-y-2">
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Search and add registered athletes…"
-                        value={memberSearchQuery}
-                        onChange={(e) => {
-                          setMemberSearchQuery(e.target.value);
-                          searchAthletes(e.target.value, 'member');
-                        }}
-                        className="w-full border border-[#d8ded5] rounded-lg p-2 text-xs text-[#173235]"
-                      />
-                      <UserPlus className="w-3.5 h-3.5 text-[#526668] absolute right-2.5 top-3" />
+                  {/* ROSTER LIST */}
+                  <div className="border-t border-[#d8ded5] pt-3 space-y-2">
+                    <div className="text-xs font-extrabold text-[#173235] uppercase tracking-wider">
+                      Current Team Roster:
                     </div>
-                    {memberSearchResults.length > 0 && (
-                      <div className="border border-[#d8ded5] rounded-lg mt-1 max-h-36 overflow-y-auto bg-white shadow-xs">
-                        {memberSearchResults.map(a => (
+                    <div className="space-y-1.5 max-h-52 overflow-y-auto">
+                      <div className="p-2 bg-white rounded-lg border border-[#d8ded5] flex justify-between items-center text-xs">
+                        <span className="font-bold text-[#173235]">1. {teamData.captain?.name}</span>
+                        <span className="text-[9px] bg-[#194e42] text-white px-1.5 py-0.5 rounded font-extrabold">CAPTAIN</span>
+                      </div>
+                      {teamData.members?.filter(m => String(m.athlete?._id || m.athlete) !== String(teamData.captain?._id || teamData.captain)).map((m, i) => (
+                        <div key={m.athlete?._id || i} className="p-2 bg-white rounded-lg border border-[#d8ded5] flex justify-between items-center text-xs">
+                          <span className="font-bold text-[#173235]">{i + 2}. {m.athlete?.name || 'Athlete'}</span>
+                          <span className="text-[9px] bg-[#2f6d5a] text-white px-1.5 py-0.5 rounded font-extrabold">REGISTERED</span>
+                        </div>
+                      ))}
+                      {teamData.manualPlayers?.map((p, idx) => (
+                        <div key={`man-${idx}`} className="p-2 bg-[#fffdf8] rounded-lg border border-[#e0c068] flex justify-between items-center text-xs">
+                          <span className="font-bold text-[#9a6c00]">{teamData.members?.length + idx + 1}. {p.name}</span>
+                          <span className="text-[9px] bg-[#d97706] text-white px-1.5 py-0.5 rounded font-extrabold">EXTERNAL</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-[#f4f8f5] border border-[#d2dad2] rounded-xl text-xs text-[#526668]">
+                  ℹ️ You are a confirmed member of <strong>{teamData.name}</strong>. Team roster additions and modifications are managed exclusively by team captain <strong>{teamData.captain?.name}</strong>.
+                </div>
+              </div>
+            )}
+
+            {/* 3. JOIN REQUEST PENDING */}
+            {athleteStatus === 'JOIN_REQUEST_PENDING' && teamData && (
+              <div className="space-y-4">
+                <div className="p-4 bg-[#fff8ea] border border-[#e0c068] rounded-xl space-y-3">
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#d97706] text-white uppercase">
+                    Join Request Pending
+                  </span>
+                  <h4 className="font-extrabold text-base text-[#173235] mt-1">{teamData.name}</h4>
+                  <p className="text-xs text-[#526668]">
+                    Captain: <strong>{teamData.captain?.name}</strong>
+                  </p>
+                  <div className="text-xs text-[#9a6c00] font-bold">
+                    Status: PENDING CAPTAIN REVIEW
+                  </div>
+                  <p className="text-xs text-[#526668]">
+                    Your request to join this team has been submitted and is awaiting the team captain's approval. You cannot submit additional join requests for this event sport while one is pending.
+                  </p>
+                  <div className="pt-2 border-t border-[#e0c068] flex justify-end">
+                    <button
+                      type="button"
+                      disabled={actionLoading}
+                      onClick={handleCancelJoinRequest}
+                      className="px-3 py-1.5 rounded-lg border border-[#e07050] text-[#e07050] text-xs font-bold hover:bg-[#fff0ed] cursor-pointer disabled:opacity-50"
+                    >
+                      {actionLoading ? 'Cancelling…' : 'Cancel Request'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 4. TEAM TERMINATED */}
+            {athleteStatus === 'TERMINATED' && (
+              <div className="space-y-4">
+                <div className="p-4 bg-[#fdf2f2] border border-[#f8b4b4] rounded-xl space-y-3">
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#9b1c1c] text-white uppercase">
+                    Team Terminated
+                  </span>
+                  <h4 className="font-extrabold text-base text-[#173235] mt-1">
+                    {teamData?.name || 'Your Team'}
+                  </h4>
+                  <p className="text-xs text-[#9b1c1c] font-bold">
+                    {teamData?.terminationReason || 'This team was terminated because the minimum team size was not reached by the team formation deadline.'}
+                  </p>
+                  {event.registrationDeadline && new Date() <= new Date(event.registrationDeadline) ? (
+                    <div className="pt-2 border-t border-[#f8b4b4] flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => { setAthleteStatus('NOT_REGISTERED'); setTeamData(null); }}
+                        className="px-3 py-1.5 rounded-lg bg-[#194e42] text-white text-xs font-bold hover:bg-[#123930] cursor-pointer"
+                      >
+                        Register for Another Team
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-[11px] text-[#526668]">
+                      Registration deadline has passed. New registrations are closed.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 5. NOT REGISTERED (CREATE NEW TEAM / JOIN EXISTING TEAM) */}
+            {athleteStatus === 'NOT_REGISTERED' && (
+              <div className="space-y-4">
+                <div className="flex border-b border-[#e2eee4] bg-[#f8faf7] p-2 gap-2 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => { setActiveTab('create'); setStatusError(''); }}
+                    className={`flex-1 py-2 rounded-lg text-xs font-extrabold cursor-pointer transition-all ${
+                      activeTab === 'create' ? 'bg-[#194e42] text-white shadow-xs' : 'text-[#194e42] bg-white border border-[#d2dad2]'
+                    }`}
+                  >
+                    CREATE NEW TEAM
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setActiveTab('join'); setStatusError(''); }}
+                    className={`flex-1 py-2 rounded-lg text-xs font-extrabold cursor-pointer transition-all ${
+                      activeTab === 'join' ? 'bg-[#194e42] text-white shadow-xs' : 'text-[#194e42] bg-white border border-[#d2dad2]'
+                    }`}
+                  >
+                    JOIN EXISTING TEAM
+                  </button>
+                </div>
+
+                {activeTab === 'create' && (
+                  <form onSubmit={handleCreateTeam} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-[#173235] mb-1">Team Name *</label>
+                      <input
+                        required
+                        type="text"
+                        placeholder="e.g. Thunder Strikers"
+                        value={teamName}
+                        onChange={(e) => setTeamName(e.target.value)}
+                        className="w-full border border-[#d8ded5] rounded-lg p-2.5 text-xs text-[#173235] focus:outline-none focus:border-[#194e42]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-[#173235] mb-1">Team Captain *</label>
+                      <div className="flex gap-4 mb-2">
+                        <label className="flex items-center gap-1.5 text-xs text-[#173235] cursor-pointer">
+                          <input
+                            type="radio"
+                            name="captainType"
+                            checked={captainType === 'myself'}
+                            onChange={() => { setCaptainType('myself'); setSelectedCaptain(null); }}
+                          />
+                          <span>Myself</span>
+                        </label>
+                        <label className="flex items-center gap-1.5 text-xs text-[#173235] cursor-pointer">
+                          <input
+                            type="radio"
+                            name="captainType"
+                            checked={captainType === 'other'}
+                            onChange={() => setCaptainType('other')}
+                          />
+                          <span>Another Registered Athlete</span>
+                        </label>
+                      </div>
+
+                      {captainType === 'other' && (
+                        <div className="space-y-2">
+                          {selectedCaptain ? (
+                            <div className="p-2 bg-[#e2eee4] rounded-lg border border-[#2f6d5a] flex justify-between items-center text-xs">
+                              <div>
+                                <strong className="text-[#194e42]">{selectedCaptain.name}</strong> ({selectedCaptain.athleteId})
+                                <div className="text-[10px] text-[#526668]">{selectedCaptain.email}</div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedCaptain(null)}
+                                className="text-[#cc694e] font-bold cursor-pointer hover:underline text-[11px]"
+                              >
+                                Change
+                              </button>
+                            </div>
+                          ) : (
+                            <div>
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  placeholder="Search athlete by Name, Athlete ID, or Email…"
+                                  value={captainSearchQuery}
+                                  onChange={(e) => {
+                                    setCaptainSearchQuery(e.target.value);
+                                    searchAthletes(e.target.value, 'captain');
+                                  }}
+                                  className="w-full border border-[#d8ded5] rounded-lg p-2 text-xs text-[#173235]"
+                                />
+                                <Search className="w-3.5 h-3.5 text-[#526668] absolute right-2.5 top-3" />
+                              </div>
+                              {captainSearchResults.length > 0 && (
+                                <div className="border border-[#d8ded5] rounded-lg mt-1 max-h-36 overflow-y-auto bg-white shadow-xs">
+                                  {captainSearchResults.map(a => (
+                                    <div
+                                      key={a._id}
+                                      onClick={() => { setSelectedCaptain(a); setCaptainSearchResults([]); }}
+                                      className="p-2 hover:bg-[#e2eee4] cursor-pointer text-xs flex justify-between border-b last:border-0"
+                                    >
+                                      <span><strong>{a.name}</strong> ({a.athleteId})</span>
+                                      <span className="text-[#526668]">{a.sport}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Team Members Section */}
+                    <div className="border-t border-[#e2eee4] pt-3">
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="text-xs font-bold text-[#173235]">Add Team Members</label>
+                        <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-[#f4f8f5] text-[#194e42] border border-[#d2dad2]">
+                          Total: {totalCreateSize} / {sport.maximumTeamSize} athletes (Min: {sport.minimumTeamSize})
+                        </span>
+                      </div>
+
+                      <div className="flex gap-2 mb-3">
+                        <button
+                          type="button"
+                          onClick={() => { setCreateAddMode('registered'); setCreateManualError(''); }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition ${
+                            createAddMode === 'registered' ? 'bg-[#194e42] text-white' : 'bg-white border border-[#d2dad2] text-[#173235]'
+                          }`}
+                        >
+                          ADD REGISTERED ATHLETE
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setCreateAddMode('manual'); setCreateManualError(''); }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition ${
+                            createAddMode === 'manual' ? 'bg-[#194e42] text-white' : 'bg-white border border-[#d2dad2] text-[#173235]'
+                          }`}
+                        >
+                          ADD PLAYER MANUALLY
+                        </button>
+                      </div>
+
+                      {createAddMode === 'registered' ? (
+                        <div className="space-y-2">
+                          <div className="relative">
+                            <input
+                              type="text"
+                              placeholder="Search and add registered athletes…"
+                              value={memberSearchQuery}
+                              onChange={(e) => {
+                                setMemberSearchQuery(e.target.value);
+                                searchAthletes(e.target.value, 'member');
+                              }}
+                              className="w-full border border-[#d8ded5] rounded-lg p-2 text-xs text-[#173235]"
+                            />
+                            <UserPlus className="w-3.5 h-3.5 text-[#526668] absolute right-2.5 top-3" />
+                          </div>
+                          {memberSearchResults.length > 0 && (
+                            <div className="border border-[#d8ded5] rounded-lg mt-1 max-h-36 overflow-y-auto bg-white shadow-xs">
+                              {memberSearchResults.map(a => (
+                                <div
+                                  key={a._id}
+                                  onClick={() => {
+                                    if (totalCreateSize >= sport.maximumTeamSize) {
+                                      setStatusError(`Team exceeds maximum size of ${sport.maximumTeamSize}.`);
+                                      return;
+                                    }
+                                    if (!members.some(m => m._id === a._id)) {
+                                      setMembers([...members, a]);
+                                    }
+                                    setMemberSearchResults([]);
+                                    setMemberSearchQuery('');
+                                  }}
+                                  className="p-2 hover:bg-[#e2eee4] cursor-pointer text-xs flex justify-between border-b last:border-0"
+                                >
+                                  <span><strong>{a.name}</strong> ({a.athleteId})</span>
+                                  <span className="text-[#194e42] font-bold">+ Add</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-[#f9faf8] border border-[#d8ded5] rounded-xl space-y-2">
+                          {createManualError && (
+                            <div className="text-[11px] text-red-600 font-bold">{createManualError}</div>
+                          )}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <div>
+                              <label className="block text-[10px] font-bold text-[#526668] mb-0.5">Player Name *</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Rahul Kumar"
+                                value={createManualName}
+                                onChange={e => setCreateManualName(e.target.value)}
+                                className="w-full border border-[#d8ded5] rounded-lg p-1.5 text-xs text-[#173235]"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-[#526668] mb-0.5">Mobile Number *</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. 9876543210"
+                                value={createManualMobile}
+                                onChange={e => setCreateManualMobile(e.target.value)}
+                                className="w-full border border-[#d8ded5] rounded-lg p-1.5 text-xs text-[#173235]"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-[#526668] mb-0.5">Email (Optional)</label>
+                              <input
+                                type="email"
+                                placeholder="e.g. rahul@example.com"
+                                value={createManualEmail}
+                                onChange={e => setCreateManualEmail(e.target.value)}
+                                className="w-full border border-[#d8ded5] rounded-lg p-1.5 text-xs text-[#173235]"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex justify-end pt-1">
+                            <button
+                              type="button"
+                              onClick={handleAddCreateManualPlayer}
+                              className="px-3 py-1 rounded-lg bg-[#194e42] text-white text-xs font-bold cursor-pointer hover:bg-[#123930]"
+                            >
+                              + Add Manual Player
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Team Roster display */}
+                      <div className="space-y-1.5 mt-3">
+                        <div className="text-[11px] font-extrabold text-[#194e42] uppercase tracking-wider">
+                          Current Team Roster:
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <span className="px-2.5 py-1 bg-[#f4f8f5] border border-[#2f6d5a] rounded-lg text-xs font-bold text-[#194e42]">
+                            You (Team Creator {captainType === 'myself' ? '& Captain' : ''})
+                          </span>
+
+                          {captainType === 'other' && selectedCaptain && (
+                            <span className="px-2.5 py-1 bg-[#e2eee4] border border-[#2f6d5a] rounded-lg text-xs font-bold text-[#194e42] flex items-center gap-1">
+                              Captain: {selectedCaptain.name} ({selectedCaptain.athleteId})
+                            </span>
+                          )}
+
+                          {members.map(m => (
+                            <span key={m._id} className="px-2 py-1 bg-[#e2eee4] border border-[#2f6d5a] rounded-lg text-xs font-bold text-[#194e42] flex items-center gap-1.5">
+                              <span className="text-[9px] bg-[#194e42] text-white px-1.5 py-0.2 rounded font-extrabold">REGISTERED</span>
+                              {m.name} ({m.athleteId})
+                              <button
+                                type="button"
+                                onClick={() => setMembers(members.filter(x => x._id !== m._id))}
+                                className="cursor-pointer hover:text-red-600 ml-1 font-bold"
+                              >
+                                ✕
+                              </button>
+                            </span>
+                          ))}
+
+                          {createManualPlayers.map((p, idx) => (
+                            <span key={`manual-${idx}`} className="px-2 py-1 bg-[#fff8ea] border border-[#e0c068] rounded-lg text-xs font-bold text-[#9a6c00] flex items-center gap-1.5">
+                              <span className="text-[9px] bg-[#d97706] text-white px-1.5 py-0.2 rounded font-extrabold">EXTERNAL</span>
+                              {p.name} · {p.mobile}
+                              <button
+                                type="button"
+                                onClick={() => setCreateManualPlayers(createManualPlayers.filter((_, i) => i !== idx))}
+                                className="cursor-pointer hover:text-red-600 ml-1 font-bold"
+                              >
+                                ✕
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+
+                        <div className="mt-2 text-xs">
+                          {totalCreateSize < sport.minimumTeamSize ? (
+                            <span className="text-[#9a6c00] font-bold">
+                              ⚠️ Incomplete: {sport.minimumTeamSize - totalCreateSize} more player(s) required to reach minimum team size of {sport.minimumTeamSize}.
+                            </span>
+                          ) : totalCreateSize === sport.maximumTeamSize ? (
+                            <span className="text-[#194e42] font-bold">
+                              ✓ Full: Maximum team size of {sport.maximumTeamSize} reached.
+                            </span>
+                          ) : (
+                            <span className="text-[#194e42] font-bold">
+                              ✓ Valid: Minimum team size satisfied. {sport.maximumTeamSize - totalCreateSize} slot(s) available.
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-4 py-2 rounded-lg border border-[#d8ded5] text-xs font-bold text-[#526668] cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={actionLoading}
+                        className="px-5 py-2 rounded-lg bg-[#e07050] text-white text-xs font-bold cursor-pointer hover:bg-[#c95d3e] disabled:opacity-50"
+                      >
+                        {actionLoading ? 'Creating Team…' : 'Create & Register Team'}
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {activeTab === 'join' && (
+                  <div className="space-y-3">
+                    {loadingTeams ? (
+                      <div className="text-center py-6 text-xs text-[#697c7c]">Loading available teams…</div>
+                    ) : existingTeams.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-[#697c7c] bg-[#f8faf7] rounded-xl border border-dashed border-[#d8ded5]">
+                        No open teams available to join for this sport yet. You can create a new team using the "CREATE NEW TEAM" tab above!
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {existingTeams.map(t => (
                           <div
-                            key={a._id}
-                            onClick={() => {
-                              if (totalTeamSize >= sport.maximumTeamSize) {
-                                setError(`Team exceeds maximum size of ${sport.maximumTeamSize}.`);
-                                return;
-                              }
-                              if (!members.some(m => m._id === a._id)) {
-                                setMembers([...members, a]);
-                              }
-                              setMemberSearchResults([]);
-                              setMemberSearchQuery('');
-                            }}
-                            className="p-2 hover:bg-[#e2eee4] cursor-pointer text-xs flex justify-between border-b last:border-0"
+                            key={t._id}
+                            className="p-3 rounded-xl border border-[#d8ded5] bg-white flex items-center justify-between gap-3 shadow-2xs"
                           >
-                            <span><strong>{a.name}</strong> ({a.athleteId})</span>
-                            <span className="text-[#194e42] font-bold">+ Add</span>
+                            <div>
+                              <h5 className="font-extrabold text-sm text-[#173235]">{t.name}</h5>
+                              <div className="text-xs text-[#526668] mt-0.5">
+                                Captain: <strong>{t.captain?.name || 'Athlete'}</strong> ({t.captain?.athleteId})
+                              </div>
+                              <div className="text-[11px] text-[#194e42] font-bold mt-1">
+                                Members: {t.confirmedSize || 0} / {sport.maximumTeamSize} athletes
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              disabled={actionLoading}
+                              onClick={() => handleJoinRequest(t._id)}
+                              className="px-3 py-1.5 rounded-lg bg-[#194e42] text-white text-xs font-bold cursor-pointer hover:bg-[#173235] disabled:opacity-50"
+                            >
+                              Request to Join
+                            </button>
                           </div>
                         ))}
                       </div>
                     )}
                   </div>
-                ) : (
-                  <div className="p-3 bg-[#f9faf8] border border-[#d8ded5] rounded-xl space-y-2">
-                    {manualError && (
-                      <div className="text-[11px] text-red-600 font-bold">{manualError}</div>
-                    )}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <div>
-                        <label className="block text-[10px] font-bold text-[#526668] mb-0.5">Player Name *</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Rahul Kumar"
-                          value={manualName}
-                          onChange={e => setManualName(e.target.value)}
-                          className="w-full border border-[#d8ded5] rounded-lg p-1.5 text-xs text-[#173235]"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-[#526668] mb-0.5">Mobile Number *</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. 9876543210"
-                          value={manualMobile}
-                          onChange={e => setManualMobile(e.target.value)}
-                          className="w-full border border-[#d8ded5] rounded-lg p-1.5 text-xs text-[#173235]"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-[#526668] mb-0.5">Email (Optional)</label>
-                        <input
-                          type="email"
-                          placeholder="e.g. rahul@example.com"
-                          value={manualEmail}
-                          onChange={e => setManualEmail(e.target.value)}
-                          className="w-full border border-[#d8ded5] rounded-lg p-1.5 text-xs text-[#173235]"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex justify-end pt-1">
-                      <button
-                        type="button"
-                        onClick={handleAddManualPlayer}
-                        className="px-3 py-1 rounded-lg bg-[#194e42] text-white text-xs font-bold cursor-pointer hover:bg-[#123930]"
-                      >
-                        + Add Manual Player
-                      </button>
-                    </div>
-                  </div>
                 )}
-
-                {/* Team Roster display */}
-                <div className="space-y-1.5 mt-3">
-                  <div className="text-[11px] font-extrabold text-[#194e42] uppercase tracking-wider">
-                    Current Team Roster:
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <span className="px-2.5 py-1 bg-[#f4f8f5] border border-[#2f6d5a] rounded-lg text-xs font-bold text-[#194e42]">
-                      You (Team Creator {captainType === 'myself' ? '& Captain' : ''})
-                    </span>
-
-                    {captainType === 'other' && selectedCaptain && (
-                      <span className="px-2.5 py-1 bg-[#e2eee4] border border-[#2f6d5a] rounded-lg text-xs font-bold text-[#194e42] flex items-center gap-1">
-                        Captain: {selectedCaptain.name} ({selectedCaptain.athleteId})
-                      </span>
-                    )}
-
-                    {members.map(m => (
-                      <span key={m._id} className="px-2 py-1 bg-[#e2eee4] border border-[#2f6d5a] rounded-lg text-xs font-bold text-[#194e42] flex items-center gap-1.5">
-                        <span className="text-[9px] bg-[#194e42] text-white px-1.5 py-0.2 rounded font-extrabold">REGISTERED</span>
-                        {m.name} ({m.athleteId})
-                        <button
-                          type="button"
-                          onClick={() => setMembers(members.filter(x => x._id !== m._id))}
-                          className="cursor-pointer hover:text-red-600 ml-1 font-bold"
-                        >
-                          ✕
-                        </button>
-                      </span>
-                    ))}
-
-                    {manualPlayers.map((p, idx) => (
-                      <span key={`manual-${idx}`} className="px-2 py-1 bg-[#fff8ea] border border-[#e0c068] rounded-lg text-xs font-bold text-[#9a6c00] flex items-center gap-1.5">
-                        <span className="text-[9px] bg-[#d97706] text-white px-1.5 py-0.2 rounded font-extrabold">EXTERNAL</span>
-                        {p.name} · {p.mobile}
-                        <button
-                          type="button"
-                          onClick={() => setManualPlayers(manualPlayers.filter((_, i) => i !== idx))}
-                          className="cursor-pointer hover:text-red-600 ml-1 font-bold"
-                        >
-                          ✕
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="mt-2 text-xs">
-                    {totalTeamSize < sport.minimumTeamSize ? (
-                      <span className="text-[#9a6c00] font-bold">
-                        ⚠️ Incomplete: {sport.minimumTeamSize - totalTeamSize} more player(s) required to reach minimum team size of {sport.minimumTeamSize}.
-                      </span>
-                    ) : totalTeamSize === sport.maximumTeamSize ? (
-                      <span className="text-[#194e42] font-bold">
-                        ✓ Full: Maximum team size of {sport.maximumTeamSize} reached.
-                      </span>
-                    ) : (
-                      <span className="text-[#194e42] font-bold">
-                        ✓ Valid: Minimum team size satisfied. {sport.maximumTeamSize - totalTeamSize} slot(s) available.
-                      </span>
-                    )}
-                  </div>
-                </div>
               </div>
+            )}
+          </div>
+        )}
 
-              <div className="pt-3 border-t flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2 rounded-lg border border-[#d8ded5] text-xs font-bold text-[#526668] cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-5 py-2 rounded-lg bg-[#e07050] text-white text-xs font-bold cursor-pointer hover:bg-[#c95d3e] disabled:opacity-50"
-                >
-                  {submitting ? 'Creating Team…' : 'Create & Register Team'}
-                </button>
-              </div>
-            </form>
-          )}
-
-          {activeTab === 'join' && (
-            <div className="space-y-3">
-              {loadingTeams ? (
-                <div className="text-center py-6 text-xs text-[#697c7c]">Loading existing teams…</div>
-              ) : existingTeams.length === 0 ? (
-                <div className="p-6 text-center text-xs text-[#697c7c] bg-[#f8faf7] rounded-xl border border-dashed border-[#d8ded5]">
-                  No teams currently registered for this event sport yet. You can create a new team using the tab above!
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {existingTeams.map(t => {
-                    const isFull = t.confirmedSize >= sport.maximumTeamSize;
-                    return (
-                      <div
-                        key={t._id}
-                        className="p-3 rounded-xl border border-[#d8ded5] bg-white flex items-center justify-between gap-3 shadow-2xs"
-                      >
-                        <div>
-                          <h5 className="font-extrabold text-sm text-[#173235]">{t.name}</h5>
-                          <div className="text-xs text-[#526668] mt-0.5">
-                            Captain: <strong>{t.captain?.name || 'Athlete'}</strong> ({t.captain?.athleteId})
-                          </div>
-                          <div className="text-[11px] text-[#194e42] font-bold mt-1">
-                            Members: {t.confirmedSize || 0} / {sport.maximumTeamSize} athletes {isFull && '(Team Full)'}
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          disabled={isFull || submitting}
-                          onClick={() => handleJoinRequest(t._id)}
-                          className="px-3 py-1.5 rounded-lg bg-[#194e42] text-white text-xs font-bold cursor-pointer disabled:opacity-40 hover:bg-[#173235]"
-                        >
-                          {isFull ? 'Full' : 'Request to Join'}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        {/* MODAL FOOTER FOR EXISTING TEAM VIEWS */}
+        {athleteStatus !== 'NOT_REGISTERED' && !statusLoading && (
+          <div className="p-3 bg-[#f8faf7] border-t border-[#d8ded5] flex justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-1.5 rounded-lg bg-[#173235] text-white font-bold text-xs cursor-pointer hover:bg-[#12282a]"
+            >
+              Close
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
