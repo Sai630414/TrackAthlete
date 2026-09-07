@@ -674,6 +674,17 @@ router.get('/my/registrations', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-router.get('/my/achievements', async (req, res) => { const achievements = await OrganizerAchievement.find({ athlete: req.user._id }).populate('event', 'eventName eventDate').populate('organizer', 'name organizationName organizerId').sort({ createdAt: -1 }); res.json({ achievements }); });
+router.get('/my/achievements', async (req, res) => {
+  try {
+    const achievements = await OrganizerAchievement.find({ athlete: req.user._id })
+      .populate('athlete', 'name athleteId email sport')
+      .populate('event', 'eventName eventDate venue')
+      .populate('organizer', 'name organizationName organizerId')
+      .sort({ createdAt: -1 });
+    res.json({ achievements });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 router.get('/athletes/search', async (req, res) => { const q = String(req.query.q || '').trim(); if (q.length < 2) return res.json({ athletes: [] }); const athletes = await require('../models/User').find({ role: 'athlete', $or: [{ athleteId: new RegExp(escaped(q), 'i') }, { email: new RegExp(escaped(q), 'i') }, { contactPhone: new RegExp(escaped(q), 'i') }] }).select('name athleteId email contactPhone sport').limit(10); res.json({ athletes }); });
 module.exports = router;

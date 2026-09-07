@@ -209,6 +209,7 @@ function MyEventRegistrations() {
 }
 
 function OrganizerAchievementsSection({ athleteUserId }) {
+  const { user } = useAuth() || {};
   const [achievements, setAchievements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -304,6 +305,7 @@ function OrganizerAchievementsSection({ athleteUserId }) {
       <CardContent>
         <div className="space-y-3">
           {achievements.map((ach) => {
+            const athleteName = ach.athlete?.name || user?.name || 'Athlete';
             const rawCert = ach.certificateData;
             const pdfSrc = rawCert
               ? (rawCert.startsWith('data:') || rawCert.startsWith('http://') || rawCert.startsWith('https://') || rawCert.startsWith('blob:')
@@ -311,33 +313,55 @@ function OrganizerAchievementsSection({ athleteUserId }) {
                   : `data:application/pdf;base64,${rawCert}`)
               : null;
 
+            const eventDateStr = ach.event?.eventDate
+              ? new Date(ach.event.eventDate).toLocaleDateString('en-IN')
+              : 'Completed';
+
             return (
               <div key={ach._id} className="p-4 bg-white rounded-xl border border-[#d8ded5] shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
                       [ ORGANIZER EVENT ]
                     </span>
                     <span className="text-[10px] font-bold text-[#526668]">
                       Organizer Verified
                     </span>
+                    {ach.event?.eventName && ach.event.eventName.trim().toLowerCase() !== athleteName.trim().toLowerCase() && (
+                      <span className="text-[10px] font-semibold text-[#173235] bg-[#f4f8f5] px-2 py-0.5 rounded border border-[#d2dad2]">
+                        Tournament: {ach.event.eventName}
+                      </span>
+                    )}
                   </div>
-                  <h4 className="font-extrabold text-sm text-[#173235] mt-1.5">{ach.event?.eventName || 'Organizer Tournament'}</h4>
-                  <p className="text-xs text-[#526668] mt-0.5">
-                    {ach.sportName ? `[${ach.sportName.toUpperCase()}] ` : ''}{ach.teamName ? `Team: ${ach.teamName} · ` : ''}{ach.organizer?.organizationName || ach.organizer?.name || 'Tournament Organizer'} · {ach.event?.eventDate ? new Date(ach.event.eventDate).toLocaleDateString('en-IN') : 'Completed'}
+
+                  {/* Logged-in Athlete's actual name */}
+                  <h4 className="font-extrabold text-base text-[#173235] mt-1.5">
+                    {athleteName}
+                  </h4>
+
+                  {/* Sport, Team, Date */}
+                  <p className="text-xs text-[#526668] mt-0.5 flex flex-wrap items-center gap-1.5 font-medium">
+                    {ach.sportName && <span className="font-bold text-[#194e42]">[{ach.sportName.toUpperCase()}]</span>}
+                    {ach.teamName && <span>· Team: <strong className="text-[#173235]">{ach.teamName}</strong></span>}
+                    <span>· {eventDateStr}</span>
                   </p>
                 </div>
+
                 <div className="flex items-center gap-3 self-end sm:self-center">
                   <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
-                    {ach.outcome || (ach.position ? `Rank #${ach.position}` : (ach.medal ? `${ach.medal} Medal` : 'Verified Result'))}
+                    {ach.outcome || (ach.position ? `Rank #${ach.position}` : (ach.medal ? `${ach.medal} Medal` : '1st Place'))}
                   </span>
                   {pdfSrc && (
                     <button
                       type="button"
-                      onClick={() => setPdfModal({ data: pdfSrc, name: ach.certificateFileName || 'Certificate.pdf' })}
+                      onClick={() => setPdfModal({
+                        data: pdfSrc,
+                        name: ach.certificateFileName || `${athleteName}_Certificate.pdf`,
+                        title: `${athleteName} — Official Certificate`
+                      })}
                       className="px-3 py-1.5 rounded-lg bg-[#194e42] text-white text-xs font-bold hover:bg-[#143d34] transition flex items-center gap-1.5 cursor-pointer shadow-xs"
                     >
-                      <Eye size={12} /> Certificate
+                      <Eye size={12} /> View My Certificate
                     </button>
                   )}
                 </div>
@@ -352,7 +376,10 @@ function OrganizerAchievementsSection({ athleteUserId }) {
               <div className="flex justify-between items-center border-b pb-3">
                 <div className="flex items-center gap-2">
                   <FileText className="w-5 h-5 text-[#194e42]" />
-                  <h3 className="font-bold text-base text-[#173235]">Official Certificate Preview</h3>
+                  <div>
+                    <h3 className="font-bold text-base text-[#173235]">{pdfModal.title || 'Official Certificate Preview'}</h3>
+                    <p className="text-[11px] text-[#526668]">Personal Verified Certificate</p>
+                  </div>
                 </div>
                 <button
                   type="button"
