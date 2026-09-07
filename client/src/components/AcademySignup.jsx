@@ -175,10 +175,21 @@ export default function AcademySignup({ onSwitchRole, onSwitchToSignIn }) {
       return;
     }
 
-    // Validate Aadhaar if coach entered any
-    for (const sp of validSports) {
-      if (sp.coachAadhaar && sp.coachAadhaar.replace(/\D/g, '').length !== 12) {
-        setError(`Coach Aadhaar for ${sp.sportName || 'sport'} must contain exactly 12 digits or be left blank.`);
+    // Validate Coach Information (Coach NIS ID and TrackAthlete ID are optional, remaining all mandatory)
+    for (let i = 0; i < validSports.length; i++) {
+      const sp = validSports[i];
+      const sportLabel = sp.sportName ? sp.sportName.toUpperCase() : `Sport #${i + 1}`;
+      if (!sp.coachName || !sp.coachName.trim()) {
+        setError(`Coach Name is mandatory for ${sportLabel}.`);
+        return;
+      }
+      const cleanAadhaar = (sp.coachAadhaar || '').replace(/\D/g, '');
+      if (!cleanAadhaar || cleanAadhaar.length !== 12) {
+        setError(`Coach Aadhaar is mandatory for ${sportLabel} and must contain exactly 12 digits.`);
+        return;
+      }
+      if (!sp.coachCertificateData) {
+        setError(`Coach Certificate is mandatory for ${sportLabel}. Please upload a certificate (PDF or Image).`);
         return;
       }
     }
@@ -762,10 +773,11 @@ export default function AcademySignup({ onSwitchRole, onSwitchToSignIn }) {
 
                     <div>
                       <label className="block text-[11px] font-bold text-[#173235] uppercase tracking-wider mb-1">
-                        Coach Name (Optional)
+                        Coach Name *
                       </label>
                       <input
                         type="text"
+                        required
                         placeholder="e.g. Devraj Patil"
                         value={sp.coachName}
                         onChange={e => handleSportChange(idx, 'coachName', e.target.value)}
@@ -775,10 +787,13 @@ export default function AcademySignup({ onSwitchRole, onSwitchToSignIn }) {
 
                     <div>
                       <label className="block text-[11px] font-bold text-[#173235] uppercase tracking-wider mb-1">
-                        Coach Aadhaar (12 Digits - Optional)
+                        Coach Aadhaar (12 Digits) *
                       </label>
                       <input
                         type="password"
+                        required
+                        pattern="[0-9]{12}"
+                        minLength={12}
                         maxLength={12}
                         placeholder="12-digit Aadhaar number"
                         value={sp.coachAadhaar}
@@ -794,7 +809,7 @@ export default function AcademySignup({ onSwitchRole, onSwitchToSignIn }) {
                       </label>
                       <input
                         type="text"
-                        placeholder="e.g. NIS-2025-IND"
+                        placeholder="e.g. NIS-2025-IND (Optional)"
                         value={sp.coachNisId}
                         onChange={e => handleSportChange(idx, 'coachNisId', e.target.value)}
                         className="w-full px-3 py-2 text-xs sm:text-sm bg-white border border-[#d8ded5] rounded-lg focus:outline-none focus:border-[#2f6d5a]"
@@ -818,7 +833,7 @@ export default function AcademySignup({ onSwitchRole, onSwitchToSignIn }) {
                     {/* Coach Certificate Upload Area */}
                     <div className="sm:col-span-2 pt-1">
                       <label className="block text-[11px] font-bold text-[#173235] uppercase tracking-wider mb-1.5">
-                        Coach Certificate (Optional)
+                        Coach Certificate (PDF or Image) *
                       </label>
 
                       {sp.coachCertificateData ? (
@@ -840,7 +855,7 @@ export default function AcademySignup({ onSwitchRole, onSwitchToSignIn }) {
                       ) : (
                         <label className="border border-dashed border-[#2f6d5a]/40 hover:border-[#2f6d5a] rounded-xl p-3.5 bg-white flex items-center justify-center gap-2 text-xs text-[#2f6d5a] font-bold cursor-pointer transition hover:bg-[#eef6f2]">
                           <UploadCloud className="w-4 h-4" />
-                          <span>Upload Certificate (PDF or Image, max 5MB)</span>
+                          <span>Upload Certificate (PDF or Image, max 5MB) *</span>
                           <input
                             type="file"
                             accept=".pdf,image/*"

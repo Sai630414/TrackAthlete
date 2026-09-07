@@ -634,7 +634,8 @@ export default function Login({ initialMode }) {
                         />
                         <input
                           type="text"
-                          placeholder="Coach Name"
+                          required
+                          placeholder="Coach Name *"
                           value={sp.coachName}
                           onChange={e => updateSportRow(idx, 'coachName', e.target.value)}
                         />
@@ -642,11 +643,14 @@ export default function Login({ initialMode }) {
 
                       <div className="form-row">
                         <input
-                          type="text"
-                          maxLength="12"
-                          placeholder="Coach Aadhaar (12 digits)"
+                          type="password"
+                          required
+                          pattern="[0-9]{12}"
+                          minLength={12}
+                          maxLength={12}
+                          placeholder="Coach Aadhaar (12 digits) *"
                           value={sp.coachAadhaar}
-                          onChange={e => updateSportRow(idx, 'coachAadhaar', e.target.value)}
+                          onChange={e => updateSportRow(idx, 'coachAadhaar', e.target.value.replace(/\D/g, ''))}
                         />
                         <input
                           type="text"
@@ -665,10 +669,11 @@ export default function Login({ initialMode }) {
                         />
                         <input
                           type="file"
+                          required
                           accept=".pdf,image/*"
                           onChange={e => handleSportCertUpload(e, idx)}
                           style={{ fontSize: '10px' }}
-                          title="Upload Coach Certificate"
+                          title="Upload Coach Certificate *"
                         />
                       </div>
                     </div>
