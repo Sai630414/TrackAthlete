@@ -226,113 +226,116 @@ export default function AcademySignup({ onSwitchRole, onSwitchToSignIn }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f7f4] text-[#1d2c31] py-8 px-4 sm:px-6 lg:px-8">
-      {/* ── TOP HEADER / BRANDING BAR ── */}
-      <header className="max-w-4xl mx-auto flex items-center justify-between pb-6 border-b border-[#d8ded5] mb-8">
-        <Link to="/" className="flex items-center gap-2.5 group">
-          <div className="w-8 h-8 rounded-lg bg-[#cc694e] text-white flex items-center justify-center font-black text-sm shadow-xs group-hover:bg-[#b85b42] transition">
-            ta
-          </div>
-          <span className="font-extrabold text-xl tracking-tight text-[#173235]">
-            trackathlete
-          </span>
-        </Link>
-
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-[#526668] hidden sm:inline">Already registered?</span>
-          <button
-            type="button"
-            onClick={onSwitchToSignIn}
-            className="px-3.5 py-1.5 rounded-lg border border-[#2f6d5a] text-[#2f6d5a] hover:bg-[#e2eee4] text-xs font-bold transition cursor-pointer"
-          >
-            Sign In
-          </button>
+    <div className="login-page lg:!grid-cols-[clamp(290px,28vw,360px)_1fr] !grid-cols-1 min-h-screen">
+      {/* ── LEFT SIDE: ORIGINAL TRACKATHLETE BRANDING / STORY PANEL ── */}
+      <section className="login-story">
+        <div className="login-logo">
+          <span>ta</span> trackathlete
         </div>
-      </header>
+        <div className="story-copy">
+          <p className="eyebrow">ONE PLATFORM · FIVE VIEWPOINTS</p>
+          <h1>Every athlete needs a <em>way forward.</em></h1>
+          <p>From the first academy search to a verified opportunity, TrackAthlete helps the people around an athlete make the next decision with confidence.</p>
+        </div>
+        <div className="story-foot"><i /> Built for the Indian sports ecosystem</div>
+      </section>
 
-      {/* ── MAIN REGISTRATION CONTAINER ── */}
-      <main className="max-w-4xl mx-auto">
-        {/* Title & Context Indicator */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]/40 text-xs font-bold uppercase tracking-wider mb-3">
-            <Building2 className="w-3.5 h-3.5 text-[#cc694e]" />
-            Academy Registration
-          </div>
-
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-normal text-[#173235] tracking-tight" style={{ fontFamily: 'Georgia, serif' }}>
-            CREATE YOUR ACADEMY ACCOUNT
-          </h1>
-          <p className="text-xs sm:text-sm text-[#526668] mt-2 max-w-xl mx-auto">
-            Register your sports academy, manage certified coaching rosters, and connect with emerging athletes on TrackAthlete.
-          </p>
-
-          {/* Compact Role Switcher */}
-          <div className="mt-3 relative inline-block">
+      {/* ── RIGHT SIDE: ACADEMY REGISTRATION PANEL ── */}
+      <section className="login-panel min-h-screen py-8 sm:py-10 px-4 sm:px-8 lg:px-12 flex justify-center items-start overflow-y-auto">
+        <div className="w-full max-w-2xl">
+          {/* Top Help Header / Quick Sign In Link */}
+          <div className="flex items-center justify-between pb-3 mb-5 border-b border-[#d8ded5]">
+            <p className="login-help !m-0 !text-left text-xs text-[#526668]">
+              Organizing a competition? <Link to="/organizer/login" className="text-[#2f6d5a] font-semibold hover:underline">Open Organizer</Link>
+            </p>
             <button
               type="button"
-              onClick={() => setShowRoleMenu(!showRoleMenu)}
-              className="inline-flex items-center gap-1.5 text-xs text-[#526668] hover:text-[#173235] font-semibold cursor-pointer py-1 px-2.5 rounded-md hover:bg-black/5 transition"
+              onClick={onSwitchToSignIn}
+              className="text-xs font-bold text-[#cc694e] hover:underline cursor-pointer"
             >
-              <span>Signing up as an academy</span>
-              <span className="text-[#cc694e] font-bold underline decoration-dotted">Change account type</span>
-              <ChevronDown className="w-3.5 h-3.5 text-[#cc694e]" />
+              Already registered? Sign In →
             </button>
+          </div>
 
-            {showRoleMenu && (
-              <div className="absolute left-1/2 -translate-x-1/2 mt-1 w-56 bg-white rounded-xl shadow-xl border border-[#cbd5e1] p-1.5 z-30 text-left">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2 py-1">
-                  Choose Account Type
+          {/* Heading and Role Switcher */}
+          <div className="login-heading mb-6">
+            <p className="eyebrow !mb-1 text-[10px] font-extrabold tracking-widest text-[#cc694e] uppercase">
+              ACADEMY REGISTRATION
+            </p>
+            <h2 className="text-2xl sm:text-3xl font-semibold text-[#173235] tracking-tight m-0" style={{ fontFamily: 'Georgia, serif' }}>
+              Create your academy account.
+            </h2>
+            <p className="text-xs sm:text-sm text-[#697c7c] mt-1 mb-3">
+              Fill in your academy facility, contact details, coaching staff, and sports disciplines.
+            </p>
+
+            {/* Compact Role Switcher */}
+            <div className="relative inline-block">
+              <button
+                type="button"
+                onClick={() => setShowRoleMenu(!showRoleMenu)}
+                className="inline-flex items-center gap-1.5 text-xs text-[#526668] hover:text-[#173235] font-semibold cursor-pointer py-1 px-2.5 rounded-md bg-black/5 hover:bg-black/10 transition"
+              >
+                <span>Signing up as an academy</span>
+                <span className="text-[#cc694e] font-bold underline decoration-dotted">Change account type</span>
+                <ChevronDown className="w-3.5 h-3.5 text-[#cc694e]" />
+              </button>
+
+              {showRoleMenu && (
+                <div className="absolute left-0 mt-1 w-56 bg-white rounded-xl shadow-xl border border-[#cbd5e1] p-1.5 z-30 text-left">
+                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2 py-1">
+                    Choose Account Type
+                  </div>
+                  {roleOptions.map(opt => {
+                    const Icon = opt.icon;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => {
+                          setShowRoleMenu(false);
+                          if (opt.id === 'organizer') navigate('/organizer/login');
+                          else onSwitchRole(opt.id);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-[#f1f5f9] hover:text-[#173235] rounded-lg transition text-left cursor-pointer"
+                      >
+                        <Icon className="w-4 h-4 text-[#2f6d5a]" />
+                        <span>{opt.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
-                {roleOptions.map(opt => {
-                  const Icon = opt.icon;
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => {
-                        setShowRoleMenu(false);
-                        if (opt.id === 'organizer') navigate('/organizer/login');
-                        else onSwitchRole(opt.id);
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-[#f1f5f9] hover:text-[#173235] rounded-lg transition text-left cursor-pointer"
-                    >
-                      <Icon className="w-4 h-4 text-[#2f6d5a]" />
-                      <span>{opt.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Global Error Banner */}
-        {error && (
-          <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-start gap-2.5 shadow-xs">
-            <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <span className="font-bold">Registration Alert: </span>
-              {error}
+              )}
             </div>
-            <button type="button" onClick={() => setError('')} className="text-rose-600 hover:text-rose-900 font-bold ml-2">×</button>
           </div>
-        )}
 
-        {/* Global Success Banner */}
-        {successMsg && (
-          <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-center gap-2.5 shadow-xs">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-            <span>{successMsg}</span>
-          </div>
-        )}
+          {/* Global Error Banner */}
+          {error && (
+            <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-start gap-2.5 shadow-xs">
+              <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <span className="font-bold">Registration Alert: </span>
+                {error}
+              </div>
+              <button type="button" onClick={() => setError('')} className="text-rose-600 hover:text-rose-900 font-bold ml-2">×</button>
+            </div>
+          )}
 
-        {/* Form Card */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* ─────────────────────────────────────────────────────────────
-              SECTION 1: ACADEMY & CONTACT INFORMATION
-              ───────────────────────────────────────────────────────────── */}
-          <div className="bg-white border border-[#d8ded5] rounded-2xl p-5 sm:p-7 shadow-xs">
-            <div className="border-b border-[#e8ede6] pb-3 mb-5">
+          {/* Global Success Banner */}
+          {successMsg && (
+            <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-center gap-2.5 shadow-xs">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              <span>{successMsg}</span>
+            </div>
+          )}
+
+          {/* Form Card */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* ─────────────────────────────────────────────────────────────
+                SECTION 1: ACADEMY & CONTACT INFORMATION
+                ───────────────────────────────────────────────────────────── */}
+            <div className="bg-white border border-[#d8ded5] rounded-2xl p-5 sm:p-7 shadow-xs">
+              <div className="border-b border-[#e8ede6] pb-3 mb-5">
               <h2 className="text-sm font-bold uppercase tracking-wider text-[#173235] flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-[#2f6d5a]" />
                 1. Academy & Administrative Information
@@ -878,7 +881,8 @@ export default function AcademySignup({ onSwitchRole, onSwitchToSignIn }) {
             </div>
           </div>
         </form>
-      </main>
-    </div>
-  );
+      </div>
+    </section>
+  </div>
+);
 }
