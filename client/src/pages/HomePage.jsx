@@ -255,7 +255,11 @@ export default function HomePage() {
           const second = group.entries.find(e => e.priority === 2) || (group.entries.length > 1 && group.entries[1] !== first ? group.entries[1] : null);
 
           const winnerName = first ? (first.athleteName || first.entityName || first.teamName) : 'TBD';
-          const runnerUpName = second ? (second.athleteName || second.entityName || second.teamName) : (group.entries.length > 1 && group.entries[1] ? (group.entries[1].athleteName || group.entries[1].entityName || group.entries[1].teamName) : '—');
+          const distinctSecond = group.entries.find(e => {
+            const name = e.athleteName || e.entityName || e.teamName;
+            return name && name.toLowerCase() !== winnerName.toLowerCase();
+          });
+          const runnerUpName = distinctSecond ? (distinctSecond.athleteName || distinctSecond.entityName || distinctSecond.teamName) : '—';
 
           return {
             ...group,
