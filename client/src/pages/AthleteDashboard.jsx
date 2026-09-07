@@ -46,6 +46,7 @@ import {
   Trash2,
   PlayCircle,
   ExternalLink,
+  Calendar,
   X
 } from 'lucide-react';
 
@@ -202,6 +203,115 @@ function MyEventRegistrations() {
   );
 }
 
+function OrganizerAchievementsSection({ athleteUserId }) {
+  const [achievements, setAchievements] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [pdfModal, setPdfModal] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    setLoading(true);
+    api.get('/organizer-events/my/achievements')
+      .then(({ data }) => {
+        if (isMounted) setAchievements(data.achievements || []);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+    return () => { isMounted = false; };
+  }, [athleteUserId]);
+
+  if (loading || achievements.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Award className="w-5 h-5 text-[#cc694e]" /> Organizer Verified Achievements ({achievements.length})
+        </CardTitle>
+        <CardDescription>Official verified results and podium awards from organizer competitions</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {achievements.map((ach) => (
+            <div key={ach._id} className="p-4 bg-white rounded-xl border border-[#d8ded5] shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
+                    [ ORGANIZER EVENT ]
+                  </span>
+                  <span className="text-[10px] font-bold text-[#526668]">
+                    Organizer Verified
+                  </span>
+                </div>
+                <h4 className="font-extrabold text-sm text-[#173235] mt-1.5">{ach.event?.eventName || 'Organizer Tournament'}</h4>
+                <p className="text-xs text-[#526668] mt-0.5">
+                  {ach.organizer?.organizationName || ach.organizer?.name} · {ach.event?.eventDate ? new Date(ach.event.eventDate).toLocaleDateString('en-IN') : 'Completed'}
+                </p>
+              </div>
+              <div className="flex items-center gap-3 self-end sm:self-center">
+                <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
+                  {ach.outcome}
+                </span>
+                {ach.certificateData && (
+                  <button
+                    type="button"
+                    onClick={() => setPdfModal({ data: ach.certificateData, name: ach.certificateFileName || 'Certificate.pdf' })}
+                    className="px-3 py-1.5 rounded-lg bg-[#194e42] text-white text-xs font-bold hover:bg-[#143d34] transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Eye size={12} /> Certificate
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {pdfModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-xl border border-[#2f6d5a]">
+              <div className="flex justify-between items-center border-b pb-3">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-[#194e42]" />
+                  <h3 className="font-bold text-base text-[#173235]">Official Certificate Preview</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPdfModal(null)}
+                  className="p-1 rounded-lg text-[#697c7c] hover:text-[#173235] hover:bg-[#f4f8f5] transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-4 bg-[#f8faf7] rounded-xl border text-center space-y-3">
+                <p className="text-xs text-[#526668]">File: <b>{pdfModal.name}</b></p>
+                <div className="flex justify-center gap-3">
+                  <a
+                    href={pdfModal.data}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2 rounded-lg bg-[#194e42] text-white text-xs font-bold hover:bg-[#143d34] transition"
+                  >
+                    Open Certificate in New Tab
+                  </a>
+                  <a
+                    href={pdfModal.data}
+                    download={pdfModal.name}
+                    className="px-4 py-2 rounded-lg border border-[#2f6d5a] text-[#194e42] text-xs font-bold hover:bg-[#e2eee4] transition"
+                  >
+                    Download Certificate
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AthleteDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -209,7 +319,7 @@ export default function AthleteDashboard() {
 
   const [optInSponsorship, setOptInSponsorship] = useState(user?.seekingSponsorship ?? true);
   const [relocationFlexible, setRelocationFlexible] = useState(user?.relocationFlexible ?? true);
-  const [activeTab, setActiveTab] = useState('profile');
+  const [activeTab, setActiveTab] = useState('eligible');
   const [profile, setProfile] = useState({
     name: user?.name || '',
     sport: user?.sport || 'Taekwondo',
@@ -454,11 +564,14 @@ export default function AthleteDashboard() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="profile">
-            <User className="w-4 h-4 mr-1.5" /> Profile & Preferences
+          <TabsTrigger value="eligible">
+            <Trophy className="w-4 h-4 mr-1.5" /> Eligible For You
           </TabsTrigger>
-          <TabsTrigger value="tournaments">
-            <Trophy className="w-4 h-4 mr-1.5" /> Tournaments & Results Ledger
+          <TabsTrigger value="achievements">
+            <Award className="w-4 h-4 mr-1.5" /> Personal Achievements
+          </TabsTrigger>
+          <TabsTrigger value="event-registrations">
+            <Calendar className="w-4 h-4 mr-1.5" /> My Event Registrations
           </TabsTrigger>
           <TabsTrigger value="connect">
             <Users className="w-4 h-4 mr-1.5" />
@@ -476,8 +589,8 @@ export default function AthleteDashboard() {
           <TabsTrigger value="federation-lists">
             <Shield className="w-4 h-4 mr-1.5" /> Federation Lists
           </TabsTrigger>
-          <TabsTrigger value="event-registrations">
-            <Trophy className="w-4 h-4 mr-1.5" /> My Event Registrations
+          <TabsTrigger value="profile">
+            <User className="w-4 h-4 mr-1.5" /> Profile & Preferences
           </TabsTrigger>
         </TabsList>
 
@@ -565,10 +678,15 @@ export default function AthleteDashboard() {
           </div>
         </TabsContent>
 
-        {/* ── TOURNAMENTS & VIDEO TAB ──────────────────────────────── */}
-        <TabsContent value="tournaments" className="space-y-6">
-          <OfficialTournamentsSection athleteSport={profile.sport} />
+        {/* ── ELIGIBLE FOR YOU TAB ──────────────────────────────── */}
+        <TabsContent value="eligible" className="space-y-6">
+          <OfficialTournamentsSection athleteSport={profile.sport} eligibleOnly={true} />
+        </TabsContent>
+
+        {/* ── PERSONAL ACHIEVEMENTS TAB ─────────────────────────── */}
+        <TabsContent value="achievements" className="space-y-6">
           <FederationVerifiedSection athleteUserId={user?._id} />
+          <OrganizerAchievementsSection athleteUserId={user?._id} />
 
           <Card>
             <CardHeader>

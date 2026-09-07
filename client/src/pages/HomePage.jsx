@@ -37,6 +37,31 @@ function formatDate(dateStr) {
   }
 }
 
+function getRankPriority(item) {
+  const m = String(item.medal || '').toLowerCase();
+  const p = String(item.position || item.outcome || '').toLowerCase();
+  const d = String(item.description || '').toLowerCase();
+  const combined = `${m} ${p} ${d}`;
+  if (combined.includes('gold') || combined.includes('1st') || combined.includes('first') || combined.includes('winner') || combined.includes('champion') || p === '1') return 1;
+  if (combined.includes('silver') || combined.includes('2nd') || combined.includes('second') || combined.includes('runner') || p === '2') return 2;
+  if (combined.includes('bronze') || combined.includes('3rd') || combined.includes('third') || p === '3') return 3;
+  if (combined.includes('4th') || combined.includes('fourth') || p === '4') return 4;
+  return 99;
+}
+
+function getRankLabel(item, fallbackRank) {
+  const m = String(item.medal || '').trim();
+  const p = String(item.position || item.outcome || '').trim();
+  const d = String(item.description || '').trim();
+  if (m) return `${m} Medal`;
+  if (d && (d.toLowerCase().includes('prize') || d.toLowerCase().includes('place') || d.toLowerCase().includes('medalist'))) return d;
+  if (p) return (p.toLowerCase().includes('place') || p.toLowerCase().includes('rank') || p.toLowerCase().includes('winner')) ? p : `Rank ${p}`;
+  if (fallbackRank === 1) return 'Winner (1st Place / Gold)';
+  if (fallbackRank === 2) return 'Runner-up (2nd Place / Silver)';
+  if (fallbackRank === 3) return '3rd Place / Bronze';
+  return 'Participant';
+}
+
 export default function HomePage() {
   const { user } = useAuth() || {};
   const navigate = useNavigate();
@@ -132,49 +157,115 @@ export default function HomePage() {
     ])
       .then(([fedRes, orgRes]) => {
         if (!isMounted) return;
-        const fedList = (fedRes.data || []).map(ach => ({
-          _id: ach._id,
-          source: 'federation',
-          tournamentName: ach.tournamentName || ach.event?.eventName || 'Official Championship',
-          sport: ach.sport || ach.event?.sport || 'Sport',
-          eventDate: ach.eventDate || ach.event?.tournamentDate || ach.createdAt,
-          location: ach.event?.location || 'Official Venue',
-          outcome: ach.medal ? `${ach.medal} Medal` : (ach.position ? `Position ${ach.position}` : 'Participant'),
-          category: ach.category || ach.event?.category || 'State / National Level',
-          certificateData: ach.certificateData || null,
-          certificateFileName: ach.certificateFileName || 'Federation_Certificate.pdf',
-          athleteName: ach.athleteName || 'Verified Athlete',
-          athleteId: ach.athleteId || '',
-          federationName: ach.federation?.name || 'National Sports Federation',
-          isFrozen: ach.isFrozen,
-          frozenAt: ach.frozenAt
-        }));
+        const fedGroupMap = new Map();
+        (fedRes.data || []).forEach(ach => {
+          const tName = (ach.tournamentName || ach.event?.eventName || 'Official Championship').trim();
+          const key = normalize(tName);
+          if (!fedGroupMap.has(key)) {
+            fedGroupMap.set(key, {
+              _id: `fed-${ach.event?._id || ach._id}`,
+              source: 'federation',
+              tournamentName: tName,
+              sport: ach.sport || ach.event?.sport || 'Sport',
+              eventDate: ach.eventDate || ach.event?.tournamentDate || ach.createdAt,
+              location: ach.event?.location || 'Official Venue',
+              category: ach.category || ach.event?.category || 'State / National Level',
+              federation: ach.federation || ach.event?.federation || null,
+              isFrozen: ach.isFrozen,
+              frozenAt: ach.frozenAt || ach.createdAt,
+              certificateData: ach.certificateData || null,
+              certificateFileName: ach.certificateFileName || 'Federation_Certificate.pdf',
+              entries: []
+            });
+          }
 
-        const orgList = (orgRes.data?.results || []).flatMap(r => {
+          const group = fedGroupMap.get(key);
+          if (!group.certificateData && ach.certificateData) {
+            group.certificateData = ach.certificateData;
+            group.certificateFileName = ach.certificateFileName || 'Federation_Certificate.pdf';
+          }
+
+          const athleteName = ach.athlete?.name || ach.athleteName || 'Verified Athlete';
+          const priority = getRankPriority(ach);
+          const rankLabel = getRankLabel(ach, priority);
+
+          group.entries.push({
+            _id: ach._id,
+            athleteName,
+            athleteId: ach.athlete?.athleteId || ach.athleteId || '',
+            priority,
+            rankLabel,
+            medal: ach.medal,
+            position: ach.position,
+            description: ach.description,
+            category: ach.category || ach.event?.category,
+            certificateData: ach.certificateData,
+            certificateFileName: ach.certificateFileName || 'Federation_Certificate.pdf'
+          });
+        });
+
+        const orgGroupMap = new Map();
+        (orgRes.data?.results || []).forEach(r => {
           const event = r.event || {};
-          const entries = r.entries || [];
           const matchedSport = event.sports?.find(s => String(s._id) === String(r.sportConfigId));
           const sportName = matchedSport?.sportName || 'Sport';
+          const tName = (event.eventName || 'Organizer Tournament').trim();
+          const key = `${r.event?._id || normalize(tName)}_${String(r.sportConfigId || '')}`;
 
-          return entries.map(entry => ({
-            _id: `${r._id}-${entry._id || entry.name}`,
-            resultId: r._id,
+          const entriesList = (r.entries || []).map((entry, idx) => {
+            const entityName = entry.teamName || entry.name || entry.team?.name || 'Participant';
+            const priority = getRankPriority(entry);
+            const rankLabel = getRankLabel(entry, priority);
+            return {
+              _id: entry._id || `${r._id}-${idx}`,
+              entityName,
+              athleteName: entityName,
+              teamName: entityName,
+              priority,
+              rankLabel,
+              medal: entry.medal,
+              position: entry.position,
+              outcome: entry.outcome,
+              roster: entry.roster || [],
+              certificateData: r.certificateData,
+              certificateFileName: r.certificateFileName || 'Organizer_Certificate.pdf'
+            };
+          });
+
+          orgGroupMap.set(key, {
+            _id: `org-${r._id}`,
             source: 'organizer',
-            tournamentName: event.eventName || 'Organizer Event',
+            tournamentName: tName,
             sport: sportName,
             eventDate: event.eventDate || r.frozenAt || r.createdAt,
-            location: event.venue || 'Venue',
-            category: 'Organizer Event',
-            outcome: entry.position ? `Rank ${entry.position}` : (entry.medal ? `${entry.medal} Medal` : entry.outcome),
-            teamName: entry.teamName || entry.name,
-            roster: entry.roster || [],
+            location: event.venue || event.venueAddress?.city || 'Venue TBA',
+            category: 'Organizer Championship',
+            organizer: r.organizer || event.organizer || null,
+            isFrozen: r.isFrozen,
+            frozenAt: r.frozenAt || r.createdAt,
             certificateData: r.certificateData || null,
             certificateFileName: r.certificateFileName || 'Organizer_Certificate.pdf',
-            organizerName: r.organizer?.organizationName || r.organizer?.name || 'Organizer',
-            isFrozen: r.isFrozen,
-            frozenAt: r.frozenAt
-          }));
+            entries: entriesList
+          });
         });
+
+        const processGroup = (group) => {
+          group.entries.sort((a, b) => a.priority - b.priority);
+          const first = group.entries.find(e => e.priority === 1) || group.entries[0];
+          const second = group.entries.find(e => e.priority === 2) || (group.entries.length > 1 && group.entries[1] !== first ? group.entries[1] : null);
+
+          const winnerName = first ? (first.athleteName || first.entityName || first.teamName) : 'TBD';
+          const runnerUpName = second ? (second.athleteName || second.entityName || second.teamName) : (group.entries.length > 1 && group.entries[1] ? (group.entries[1].athleteName || group.entries[1].entityName || group.entries[1].teamName) : '—');
+
+          return {
+            ...group,
+            winner: winnerName,
+            runnerUp: runnerUpName
+          };
+        };
+
+        const fedList = Array.from(fedGroupMap.values()).map(processGroup);
+        const orgList = Array.from(orgGroupMap.values()).map(processGroup);
 
         const unified = [...fedList, ...orgList].sort((a, b) => {
           const tA = new Date(a.eventDate || a.frozenAt || 0).getTime();
@@ -246,8 +337,13 @@ export default function HomePage() {
         (res.tournamentName && res.tournamentName.toLowerCase().includes(q)) ||
         (res.location && res.location.toLowerCase().includes(q)) ||
         (res.sport && res.sport.toLowerCase().includes(q)) ||
-        (res.teamName && res.teamName.toLowerCase().includes(q)) ||
-        (res.athleteName && res.athleteName.toLowerCase().includes(q))
+        (res.winner && res.winner.toLowerCase().includes(q)) ||
+        (res.runnerUp && res.runnerUp.toLowerCase().includes(q)) ||
+        (res.entries && res.entries.some(e =>
+          (e.athleteName && e.athleteName.toLowerCase().includes(q)) ||
+          (e.entityName && e.entityName.toLowerCase().includes(q)) ||
+          (e.teamName && e.teamName.toLowerCase().includes(q))
+        ))
       );
 
       let matchesSport = true;
@@ -810,6 +906,15 @@ export default function HomePage() {
                           </span>
                         </div>
 
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                          <Shield size={14} style={{ color: '#2f6d5a', flexShrink: 0 }} />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <b>By:</b> {evt.source === 'federation'
+                              ? `${evt.federation?.name || 'National Federation'} (${evt.federation?.state || 'State'} HQ)`
+                              : (evt.organizer?.organizationName || evt.organizer?.name || 'Organizer')}
+                          </span>
+                        </div>
+
                         {evt.registrationDeadline && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                             <Clock size={14} style={{ color: '#cc694e', flexShrink: 0 }} />
@@ -1079,20 +1184,32 @@ export default function HomePage() {
                             <b>Location:</b> {res.location}
                           </span>
                         </div>
+                      </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                          <Award size={14} style={{ color: '#2f6d5a', flexShrink: 0 }} />
-                          <span>
-                            <b>Result:</b> <span style={{ color: '#194e42', fontWeight: 800 }}>{res.outcome}</span>
+                      {/* Winner & Runner-up Podium Card Summary */}
+                      <div style={{
+                        background: '#f4f8f3',
+                        border: '1px solid #d8ded5',
+                        borderRadius: 10,
+                        padding: '10px 12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 6,
+                        marginBottom: 14,
+                        fontSize: 12
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, overflow: 'hidden' }}>
+                          <span style={{ fontSize: 14, flexShrink: 0 }}>🥇</span>
+                          <span style={{ color: '#173235', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <b>Winner:</b> <span style={{ color: '#194e42', fontWeight: 800 }}>{res.winner || 'TBD'}</span>
                           </span>
                         </div>
-
-                        {res.teamName && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                            <Users size={14} style={{ color: '#526668', flexShrink: 0 }} />
-                            <span><b>Team:</b> {res.teamName}</span>
-                          </div>
-                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, overflow: 'hidden' }}>
+                          <span style={{ fontSize: 14, flexShrink: 0 }}>🥈</span>
+                          <span style={{ color: '#173235', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <b>Runner-up:</b> <span style={{ color: '#526668', fontWeight: 700 }}>{res.runnerUp || 'TBD'}</span>
+                          </span>
+                        </div>
                       </div>
                     </div>
 
@@ -1349,7 +1466,7 @@ export default function HomePage() {
                 </div>
 
                 <div>
-                  <span style={{ color: '#697c7c', display: 'block', fontSize: 11, fontWeight: 700 }}>VENUE &amp; LOCATION</span>
+                  <span style={{ color: '#697c7c', display: 'block', fontSize: 11, fontWeight: 700 }}>CONDUCTING VENUE &amp; LOCATION</span>
                   <span style={{ color: '#173235', fontWeight: 700 }}>
                     {selectedEventModal.venueName || selectedEventModal.location || 'Venue TBA'}
                   </span>
@@ -1365,11 +1482,37 @@ export default function HomePage() {
                 )}
 
                 <div>
-                  <span style={{ color: '#697c7c', display: 'block', fontSize: 11, fontWeight: 700 }}>ORGANIZED BY</span>
+                  <span style={{ color: '#697c7c', display: 'block', fontSize: 11, fontWeight: 700 }}>ORGANIZING BODY</span>
                   <span style={{ color: '#173235', fontWeight: 700 }}>
                     {selectedEventModal.federation?.name || selectedEventModal.organizer?.organizationName || selectedEventModal.organizer?.name || 'Verified Authority'}
                   </span>
                 </div>
+
+                {selectedEventModal.source === 'federation' ? (
+                  <>
+                    <div>
+                      <span style={{ color: '#697c7c', display: 'block', fontSize: 11, fontWeight: 700 }}>FEDERATION STATE HQ</span>
+                      <span style={{ color: '#173235', fontWeight: 700 }}>
+                        {selectedEventModal.federation?.state ? `${selectedEventModal.federation.state} State Headquarters` : 'National Headquarters'}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ color: '#697c7c', display: 'block', fontSize: 11, fontWeight: 700 }}>OFFICIAL PUBLIC CONTACT</span>
+                      <span style={{ color: '#173235', fontWeight: 700 }}>
+                        {selectedEventModal.federation?.officialPhone ? `Phone: ${selectedEventModal.federation.officialPhone}` : (selectedEventModal.federation?.officialEmail ? `Email: ${selectedEventModal.federation.officialEmail}` : 'Available on official portal')}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div>
+                    <span style={{ color: '#697c7c', display: 'block', fontSize: 11, fontWeight: 700 }}>CONTACT INFORMATION</span>
+                    <span style={{ color: '#173235', fontWeight: 700 }}>
+                      {selectedEventModal.organizer?.showContactDetailsPublicly
+                        ? `${selectedEventModal.organizer.phone || ''} ${selectedEventModal.organizer.email ? `(${selectedEventModal.organizer.email})` : ''}`
+                        : 'Official Communications via TrackAthlete Platform (Private)'}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Description */}
@@ -1586,7 +1729,7 @@ export default function HomePage() {
                   fontSize: 11,
                   fontWeight: 800
                 }}>
-                  Result: {selectedResultModal.outcome}
+                  IMMUTABLE &amp; FROZEN
                 </span>
               </div>
 
@@ -1609,29 +1752,159 @@ export default function HomePage() {
                 </div>
 
                 <div>
-                  <span style={{ color: '#697c7c', display: 'block', fontSize: 11, fontWeight: 700 }}>LOCATION / VENUE</span>
+                  <span style={{ color: '#697c7c', display: 'block', fontSize: 11, fontWeight: 700 }}>CONDUCTING VENUE</span>
                   <span style={{ color: '#173235', fontWeight: 700 }}>
                     {selectedResultModal.location}
                   </span>
                 </div>
 
                 <div>
-                  <span style={{ color: '#697c7c', display: 'block', fontSize: 11, fontWeight: 700 }}>PARTICIPANT / TEAM</span>
+                  <span style={{ color: '#697c7c', display: 'block', fontSize: 11, fontWeight: 700 }}>ORGANIZED BY</span>
                   <span style={{ color: '#173235', fontWeight: 700 }}>
-                    {selectedResultModal.teamName || selectedResultModal.athleteName}
+                    {selectedResultModal.source === 'federation'
+                      ? `${selectedResultModal.federation?.name || 'National Sports Federation'} (${selectedResultModal.federation?.state ? `${selectedResultModal.federation.state} State HQ` : 'National HQ'})`
+                      : (selectedResultModal.organizer?.organizationName || selectedResultModal.organizer?.name || 'Authorized Organizer')}
                   </span>
                 </div>
 
                 <div>
-                  <span style={{ color: '#697c7c', display: 'block', fontSize: 11, fontWeight: 700 }}>STATUS</span>
+                  <span style={{ color: '#697c7c', display: 'block', fontSize: 11, fontWeight: 700 }}>LEDGER STATUS</span>
                   <span style={{ color: '#194e42', fontWeight: 800 }}>
                     {selectedResultModal.isFrozen ? 'IMMUTABLE & FROZEN' : 'VERIFIED'}
                   </span>
                 </div>
               </div>
 
-              {/* Team Roster (If Organizer Team Sport) */}
-              {selectedResultModal.roster && selectedResultModal.roster.length > 0 && (
+              {/* Official Championship Results & Podium Breakdown */}
+              <div>
+                <h4 style={{ fontSize: 12, fontWeight: 800, color: '#173235', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Official Results &amp; Podium Ledger ({selectedResultModal.entries?.length || 0})
+                </h4>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {(selectedResultModal.entries || []).map((entry, idx) => {
+                    const name = entry.athleteName || entry.entityName || entry.teamName || 'Athlete';
+                    const medalIcon = entry.priority === 1 ? '🥇' : entry.priority === 2 ? '🥈' : entry.priority === 3 ? '🥉' : '🎖️';
+                    return (
+                      <div
+                        key={entry._id || idx}
+                        style={{
+                          background: '#ffffff',
+                          border: '1px solid #d8ded5',
+                          borderRadius: 12,
+                          padding: 14,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 8,
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 18 }}>{medalIcon}</span>
+                            <div>
+                              <div style={{ fontWeight: 800, fontSize: 14, color: '#173235' }}>{name}</div>
+                              <div style={{ fontSize: 11, color: '#697c7c' }}>
+                                {entry.category ? `${entry.category} • ` : ''}{entry.rankLabel || entry.description || entry.outcome || 'Participant'}
+                                {entry.athleteId ? ` • ID: ${entry.athleteId}` : ''}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{
+                              padding: '3px 8px',
+                              borderRadius: 6,
+                              background: entry.priority === 1 ? '#fdf4e7' : '#e2eee4',
+                              color: entry.priority === 1 ? '#92400e' : '#194e42',
+                              border: '1px solid rgba(0,0,0,0.1)',
+                              fontSize: 10,
+                              fontWeight: 800,
+                              textTransform: 'uppercase'
+                            }}>
+                              {entry.rankLabel}
+                            </span>
+
+                            {entry.certificateData && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPdfModal({
+                                    dataUri: entry.certificateData,
+                                    fileName: entry.certificateFileName || `${name}_Certificate.pdf`,
+                                    title: `${name} Certificate`
+                                  });
+                                }}
+                                style={{
+                                  height: 30,
+                                  padding: '0 10px',
+                                  borderRadius: 6,
+                                  border: 'none',
+                                  background: '#194e42',
+                                  color: '#ffffff',
+                                  fontSize: 10,
+                                  fontWeight: 800,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 4
+                                }}
+                              >
+                                <Eye size={12} /> Certificate
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* If entry has a team roster */}
+                        {entry.roster && entry.roster.length > 0 && (
+                          <div style={{ marginTop: 6, paddingTop: 8, borderTop: '1px solid #f0f4f0' }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: '#194e42', marginBottom: 6 }}>
+                              Team Roster ({entry.roster.length} Players):
+                            </div>
+                            <div style={{ overflowX: 'auto', border: '1px solid #e2eee4', borderRadius: 8 }}>
+                              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                                <thead>
+                                  <tr style={{ background: '#f8faf7', textAlign: 'left', color: '#697c7c' }}>
+                                    <th style={{ padding: '6px 10px' }}>#</th>
+                                    <th style={{ padding: '6px 10px' }}>Player Name</th>
+                                    <th style={{ padding: '6px 10px' }}>Type</th>
+                                    <th style={{ padding: '6px 10px' }}>Role</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {entry.roster.map((player, pIdx) => (
+                                    <tr key={pIdx} style={{ borderTop: '1px solid #f0f4f0' }}>
+                                      <td style={{ padding: '6px 10px', color: '#697c7c' }}>{pIdx + 1}</td>
+                                      <td style={{ padding: '6px 10px', fontWeight: 700, color: '#173235' }}>{player.name}</td>
+                                      <td style={{ padding: '6px 10px' }}>
+                                        <span style={{
+                                          padding: '2px 5px',
+                                          borderRadius: 4,
+                                          fontSize: 9,
+                                          fontWeight: 800,
+                                          background: player.participantType === 'registered' ? '#e2eee4' : '#f4f8f3',
+                                          color: player.participantType === 'registered' ? '#194e42' : '#697c7c'
+                                        }}>
+                                          {player.participantType === 'registered' ? 'Registered' : 'Manual'}
+                                        </span>
+                                      </td>
+                                      <td style={{ padding: '6px 10px', color: '#526668' }}>{player.isCaptain ? 'Captain' : 'Player'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Team Roster (If Top-level Organizer Team Sport) */}
+              {selectedResultModal.roster && selectedResultModal.roster.length > 0 && !selectedResultModal.entries?.some(e => e.roster?.length) && (
                 <div>
                   <h4 style={{ fontSize: 12, fontWeight: 800, color: '#173235', margin: '0 0 10px', textTransform: 'uppercase' }}>
                     Team Roster ({selectedResultModal.roster.length} Players)

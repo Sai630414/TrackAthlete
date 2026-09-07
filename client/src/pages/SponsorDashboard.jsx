@@ -21,7 +21,6 @@ import {
   ProgressChart,
 } from '../components/ui';
 import { HeartHandshake, ShieldCheck, DollarSign, Award, Send, CheckCircle2 } from 'lucide-react';
-import OfficialTournamentsSection from '../components/OfficialTournamentsSection';
 
 export default function SponsorDashboard() {
   const { user } = useAuth();

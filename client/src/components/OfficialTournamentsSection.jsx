@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 
 const normalize = (val) => String(val || '').trim().toLowerCase();
 
-export default function OfficialTournamentsSection({ athleteSport }) {
+export default function OfficialTournamentsSection({ athleteSport, eligibleOnly = false }) {
   const { user } = useAuth() || {};
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [completedResults, setCompletedResults] = useState([]);
@@ -188,6 +188,202 @@ export default function OfficialTournamentsSection({ athleteSport }) {
     return (
       <div className="bg-[#fcfcf8] border border-[#d8ded5] rounded-2xl p-6 text-center text-xs text-[#697c7c]">
         Loading official federation tournaments…
+      </div>
+    );
+  }
+
+  if (eligibleOnly) {
+    return (
+      <div className="space-y-6">
+        {notice && (
+          <div className="p-3 bg-[#e2eee4] border border-[#2f6d5a] rounded-xl text-xs font-bold text-[#194e42] flex justify-between items-center">
+            <span>{notice}</span>
+            <button type="button" onClick={() => setNotice('')} className="cursor-pointer text-[#194e42] font-extrabold">✕</button>
+          </div>
+        )}
+
+        <div className="bg-[#f4f8f5] border border-[#2f6d5a]/40 rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-[#e2eee4] border border-[#2f6d5a] flex items-center justify-center text-[#194e42]">
+                <Award className="w-4 h-4 text-[#cc694e]" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-[#173235] text-sm uppercase tracking-wider">
+                  ELIGIBLE FOR YOU — MATCHING YOUR REGISTERED SPORT ({String(athleteSport || '').toUpperCase()})
+                </h4>
+                <p className="text-xs text-[#526668] mt-0.5">
+                  Published upcoming competitions matching your registered sporting discipline
+                </p>
+              </div>
+            </div>
+            {eligibleEvents.length > 0 && (
+              <RailControls onPrevious={() => scrollRail(eligibleRail, -1)} onNext={() => scrollRail(eligibleRail, 1)} />
+            )}
+          </div>
+
+          {eligibleEvents.length === 0 ? (
+            <div className="p-8 text-center text-xs text-[#697c7c] bg-white rounded-xl border border-dashed border-[#d8ded5]">
+              No upcoming tournaments currently matching your registered sport ({athleteSport}).
+            </div>
+          ) : (
+            <div ref={eligibleRail} className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-2 pr-1">
+              {eligibleEvents.map((evt) => {
+                const isOrg = evt.isOrganizerEvent || evt.source === 'organizer';
+                const isClosed = evt.submissionDeadline && new Date(evt.submissionDeadline) < new Date();
+                return (
+                  <div
+                    key={`elig-${evt._id}`}
+                    className="min-w-[280px] sm:min-w-[320px] max-w-[320px] snap-start p-4 rounded-xl border-2 border-[#2f6d5a] bg-white shadow-sm flex flex-col justify-between space-y-3"
+                  >
+                    <div>
+                      <div className="flex justify-between items-start gap-2">
+                        <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
+                          {isOrg ? '[ ORGANIZER EVENT ]' : '[ FEDERATION ]'}
+                        </span>
+                        <span className="text-[10px] font-mono font-bold text-[#173235] bg-[#f4f8f5] px-2 py-0.5 rounded border border-[#d2dad2]">
+                          {isOrg ? 'Organizer Verified' : 'Federation Recognized'}
+                        </span>
+                      </div>
+
+                      <h4 className="font-extrabold text-[#173235] text-sm mt-2">{evt.eventName}</h4>
+                      <p className="text-xs font-bold text-[#194e42] mt-0.5">
+                        {isOrg
+                          ? (evt.organizer?.organizationName || evt.organizer?.name || 'Event Organizer')
+                          : (evt.federation?.name || 'Recognized Federation')}
+                      </p>
+
+                      <div className="mt-2.5">
+                        <div className="text-[11px] font-bold text-[#526668] mb-1">Eligible Sport:</div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {isOrg ? (
+                            evt.matchedSports?.map(s => (
+                              <span
+                                key={s._id || s.sportName}
+                                className="px-2 py-0.5 rounded bg-[#e2eee4] border border-[#2f6d5a] text-[10px] font-extrabold text-[#194e42] uppercase"
+                              >
+                                [{s.sportName.toUpperCase()}]
+                              </span>
+                            ))
+                          ) : (
+                            <span className="px-2 py-0.5 rounded bg-[#e2eee4] border border-[#2f6d5a] text-[10px] font-extrabold text-[#194e42] uppercase">
+                              [{evt.sport?.toUpperCase()}]
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1 mt-3 text-xs text-[#526668]">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-[#194e42]" />
+                          <span>Tournament Date: <strong>{evt.tournamentDate ? new Date(evt.tournamentDate).toLocaleDateString('en-IN') : 'TBA'}</strong></span>
+                        </div>
+                        {evt.location && (
+                          <div className="flex items-center gap-1.5">
+                            <MapPin className="w-3.5 h-3.5 text-[#526668]" />
+                            <span>Venue: {evt.location}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {isOrg && (
+                      <div className="pt-3 border-t border-[#e2eee4] space-y-2">
+                        {evt.matchedSports?.map(sport => {
+                          const isTeam = sport.competitionType === 'team';
+                          const feeLabel = sport.feeType === 'free' ? 'Free' : `₹${sport.feeAmount || 0} (${sport.feeType.replaceAll('_', ' ')})`;
+                          return (
+                            <div key={sport._id} className="flex items-center justify-between gap-2 bg-[#fcfcf8] p-2 rounded-lg border border-[#e2eee4]">
+                              <div className="text-[11px]">
+                                <div className="font-bold text-[#173235]">{isTeam ? 'Team Sport' : 'Individual'}</div>
+                                <div className="text-[#526668]">{feeLabel}</div>
+                              </div>
+                              {(() => {
+                                const btn = getButtonProps(evt, sport);
+                                return (
+                                  <button
+                                    type="button"
+                                    disabled={btn.disabled}
+                                    onClick={btn.action}
+                                    className={btn.className}
+                                  >
+                                    {btn.label}
+                                  </button>
+                                );
+                              })()}
+                            </div>
+                          );
+                        })}
+                        <div className="text-[10px] text-[#697c7c]">
+                          Registration deadline: {evt.submissionDeadline ? new Date(evt.submissionDeadline).toLocaleDateString('en-IN') : 'Open'}
+                        </div>
+                      </div>
+                    )}
+
+                    {!isOrg && (
+                      <div className="pt-2 border-t border-[#e2eee4] text-[11px] text-[#697c7c]">
+                        Official Submission Deadline: {evt.submissionDeadline ? new Date(evt.submissionDeadline).toLocaleDateString('en-IN') : 'Open'}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {teamModal && (
+          <TeamRegistrationModal
+            event={teamModal.event}
+            sport={teamModal.sport}
+            onClose={() => setTeamModal(null)}
+            onSuccess={(msg) => {
+              setTeamModal(null);
+              setNotice(msg);
+              loadData();
+            }}
+          />
+        )}
+
+        {viewPdfModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-xl border border-[#2f6d5a]">
+              <div className="flex justify-between items-center border-b pb-3">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-[#194e42]" />
+                  <h3 className="font-bold text-base text-[#173235]">Official Certificate Preview</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setViewPdfModal(null)}
+                  className="p-1 rounded-lg text-[#697c7c] hover:text-[#173235] hover:bg-[#f4f8f5] transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-4 bg-[#f8faf7] rounded-xl border text-center space-y-3">
+                <p className="text-xs text-[#526668]">File: <b>{viewPdfModal.name || 'Certificate.pdf'}</b></p>
+                <div className="flex justify-center gap-3">
+                  <a
+                    href={viewPdfModal.data}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2 rounded-lg bg-[#194e42] text-white text-xs font-bold hover:bg-[#143d34] transition"
+                  >
+                    Open Certificate in New Tab
+                  </a>
+                  <a
+                    href={viewPdfModal.data}
+                    download={viewPdfModal.name || 'Certificate.pdf'}
+                    className="px-4 py-2 rounded-lg border border-[#2f6d5a] text-[#194e42] text-xs font-bold hover:bg-[#e2eee4] transition"
+                  >
+                    Download Certificate
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

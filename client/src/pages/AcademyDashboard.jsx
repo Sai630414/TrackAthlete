@@ -14,7 +14,6 @@ import {
   useToast,
 } from '../components/ui';
 import { Building2, ShieldCheck, MapPin, Award, CheckCircle2, Save, Check } from 'lucide-react';
-import OfficialTournamentsSection from '../components/OfficialTournamentsSection';
 
 export default function AcademyDashboard() {
   const { user } = useAuth();
@@ -123,8 +122,6 @@ export default function AcademyDashboard() {
           </div>
         </CardContent>
       </Card>
-
-      <OfficialTournamentsSection />
     </div>
   );
 }

@@ -9,7 +9,6 @@ import {
 } from '../components/ui';
 import ChatPanel from '../components/ChatPanel';
 import AthleteProfileModal from '../components/AthleteProfileModal';
-import OfficialTournamentsSection from '../components/OfficialTournamentsSection';
 import FederationListsSection from '../components/FederationListsSection';
 import {
   UserCheck, Check, X, Plus, Award, Users, BookOpen,
