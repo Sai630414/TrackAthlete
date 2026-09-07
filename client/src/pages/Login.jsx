@@ -649,7 +649,7 @@ export default function Login({ initialMode }) {
                       <div className="form-row">
                         <input
                           type="text"
-                          placeholder="Coach TrackAthlete ID (Optional: COA-XXXX)"
+                          placeholder="Coach TrackAthlete ID (Optional)"
                           value={sp.coachTrackAthleteId}
                           onChange={e => updateSportRow(idx, 'coachTrackAthleteId', e.target.value)}
                         />

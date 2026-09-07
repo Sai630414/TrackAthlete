@@ -135,13 +135,13 @@ export default function AthleteProfileModal({
             </span>
             <span style={{
               fontSize: 11,
-              fontFamily: 'monospace',
-              color: '#c5d3ce',
+              fontFamily: data.athleteId ? 'monospace' : 'inherit',
+              color: data.athleteId ? '#c5d3ce' : '#8ea69d',
               border: '1px solid rgba(255,255,255,0.2)',
               borderRadius: 6,
               padding: '2px 8px'
             }}>
-              ID: ATH-{data._id?.slice(-6)?.toUpperCase() || 'PROFILE'}
+              ID: {data.athleteId || 'Not Linked'}
             </span>
             {isAlreadyConnected && (
               <span style={{

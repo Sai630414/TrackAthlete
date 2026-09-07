@@ -234,10 +234,13 @@ router.post('/my/sports', verifyToken, requireRoles('academy'), async (req, res)
       });
     }
 
+    const sanitizedCoach = createdCoach ? createdCoach.toObject() : null;
+    if (sanitizedCoach) delete sanitizedCoach.aadhaarHash;
+
     res.status(201).json({
       message: 'Sport added successfully.',
       sport: { sportName: normalizedSport },
-      coach: createdCoach
+      coach: sanitizedCoach
     });
   } catch (err) {
     console.error('Error adding sport:', err);
@@ -344,6 +347,43 @@ router.post('/my/sports/:sportName/coaches', verifyToken, requireRoles('academy'
       await academy.save();
     }
 
+    // Prevent duplicate coach assignment
+    let existingAssignment = null;
+    if (coachUserId) {
+      existingAssignment = await AcademyCoachAssignment.findOne({
+        academyId: academy._id,
+        sportName,
+        coachUserId
+      });
+    } else if (coachId) {
+      existingAssignment = await AcademyCoachAssignment.findOne({
+        academyId: academy._id,
+        sportName,
+        coachId
+      });
+    } else {
+      existingAssignment = await AcademyCoachAssignment.findOne({
+        academyId: academy._id,
+        sportName,
+        isOffline: true,
+        name: String(name).trim()
+      });
+    }
+
+    if (existingAssignment) {
+      existingAssignment.status = 'ACTIVE';
+      if (nisId) existingAssignment.nisId = String(nisId).trim();
+      if (certificateData) existingAssignment.certificateData = certificateData;
+      if (certificateFileName) existingAssignment.certificateFileName = certificateFileName;
+      if (role) existingAssignment.role = String(role).trim();
+      if (aadhaarHash) existingAssignment.aadhaarHash = aadhaarHash;
+      await existingAssignment.save();
+
+      const resObj = existingAssignment.toObject();
+      delete resObj.aadhaarHash;
+      return res.status(200).json(resObj);
+    }
+
     const assignment = await AcademyCoachAssignment.create({
       academyId: academy._id,
       sportName,
@@ -359,7 +399,9 @@ router.post('/my/sports/:sportName/coaches', verifyToken, requireRoles('academy'
       status: 'ACTIVE'
     });
 
-    res.status(201).json(assignment);
+    const resObj = assignment.toObject();
+    delete resObj.aadhaarHash;
+    res.status(201).json(resObj);
   } catch (err) {
     console.error('Error adding coach:', err);
     res.status(500).json({ error: 'Failed to add coach: ' + err.message });
@@ -425,6 +467,41 @@ router.post('/my/sports/:sportName/athletes', verifyToken, requireRoles('academy
       await academy.save();
     }
 
+    // Prevent duplicate athlete membership
+    let existingMembership = null;
+    if (athleteUserId) {
+      existingMembership = await AcademyAthleteMembership.findOne({
+        academyId: academy._id,
+        sportName,
+        athleteUserId
+      });
+    } else if (athleteId) {
+      existingMembership = await AcademyAthleteMembership.findOne({
+        academyId: academy._id,
+        sportName,
+        athleteId
+      });
+    } else {
+      existingMembership = await AcademyAthleteMembership.findOne({
+        academyId: academy._id,
+        sportName,
+        membershipSource: 'OFFLINE',
+        name: String(name).trim(),
+        mobile: String(mobile).trim()
+      });
+    }
+
+    if (existingMembership) {
+      existingMembership.status = 'ACTIVE';
+      if (negotiatedPayment) existingMembership.negotiatedPayment = String(negotiatedPayment).trim();
+      if (aadhaarHash) existingMembership.aadhaarHash = aadhaarHash;
+      await existingMembership.save();
+
+      const resObj = existingMembership.toObject();
+      delete resObj.aadhaarHash;
+      return res.status(200).json(resObj);
+    }
+
     const membership = await AcademyAthleteMembership.create({
       academyId: academy._id,
       sportName,
@@ -433,13 +510,15 @@ router.post('/my/sports/:sportName/athletes', verifyToken, requireRoles('academy
       name: String(name).trim(),
       mobile: String(mobile).trim(),
       aadhaarHash,
-      membershipSource: 'OFFLINE',
+      membershipSource: athleteUserId ? 'ONLINE' : 'OFFLINE',
       status: 'ACTIVE',
       joinedAt: new Date(),
       negotiatedPayment: negotiatedPayment ? String(negotiatedPayment).trim() : 'Negotiated During Joining'
     });
 
-    res.status(201).json(membership);
+    const resObj = membership.toObject();
+    delete resObj.aadhaarHash;
+    res.status(201).json(resObj);
   } catch (err) {
     console.error('Error adding athlete:', err);
     res.status(500).json({ error: 'Failed to add athlete: ' + err.message });
@@ -608,12 +687,17 @@ router.post('/my/athlete-requests/:id/accept', verifyToken, requireRoles('academ
       await academy.save();
     }
 
-    // Create or update membership
-    let membership = await AcademyAthleteMembership.findOne({
+    // Create or update membership without duplicate
+    const matchQuery = {
       academyId: academy._id,
       sportName: request.sportName,
-      athleteUserId: request.athleteUserId
-    });
+      $or: [
+        ...(request.athleteUserId ? [{ athleteUserId: request.athleteUserId }] : []),
+        ...(request.athleteId ? [{ athleteId: request.athleteId }] : []),
+        { name: request.name, mobile: request.mobile }
+      ]
+    };
+    let membership = await AcademyAthleteMembership.findOne(matchQuery);
 
     if (membership) {
       membership.status = 'ACTIVE';
@@ -621,6 +705,8 @@ router.post('/my/athlete-requests/:id/accept', verifyToken, requireRoles('academ
       membership.joinedAt = new Date();
       membership.negotiatedPayment = request.joiningPayment || 'Negotiated During Joining';
       membership.requestId = request._id;
+      if (request.athleteUserId && !membership.athleteUserId) membership.athleteUserId = request.athleteUserId;
+      if (request.athleteId && !membership.athleteId) membership.athleteId = request.athleteId;
       await membership.save();
     } else {
       membership = await AcademyAthleteMembership.create({
@@ -638,10 +724,13 @@ router.post('/my/athlete-requests/:id/accept', verifyToken, requireRoles('academ
       });
     }
 
+    const resMembership = membership.toObject();
+    delete resMembership.aadhaarHash;
+
     res.json({
       success: true,
       message: 'Athlete join request accepted.',
-      membership
+      membership: resMembership
     });
   } catch (err) {
     console.error('Error accepting athlete request:', err);
@@ -712,25 +801,49 @@ router.post('/my/coach-requests/:id/accept', verifyToken, requireRoles('academy'
       await academy.save();
     }
 
-    // Create coach assignment
-    const assignment = await AcademyCoachAssignment.create({
+    // Create or update coach assignment without duplicate
+    const coachMatchQuery = {
       academyId: academy._id,
       sportName: request.sportName,
-      coachUserId: request.coachUserId,
-      coachId: request.coachId || null,
-      name: request.name,
-      nisId: request.nisId || null,
-      certificateData: request.certificateData || null,
-      certificateFileName: request.certificateFileName || `${request.name}_Certificate.pdf`,
-      isOffline: false,
-      role: 'Coach',
-      status: 'ACTIVE'
-    });
+      $or: [
+        ...(request.coachUserId ? [{ coachUserId: request.coachUserId }] : []),
+        ...(request.coachId ? [{ coachId: request.coachId }] : []),
+        { name: request.name }
+      ]
+    };
+    let assignment = await AcademyCoachAssignment.findOne(coachMatchQuery);
+
+    if (assignment) {
+      assignment.status = 'ACTIVE';
+      if (request.nisId) assignment.nisId = request.nisId;
+      if (request.certificateData) assignment.certificateData = request.certificateData;
+      if (request.certificateFileName) assignment.certificateFileName = request.certificateFileName;
+      if (request.coachUserId && !assignment.coachUserId) assignment.coachUserId = request.coachUserId;
+      if (request.coachId && !assignment.coachId) assignment.coachId = request.coachId;
+      await assignment.save();
+    } else {
+      assignment = await AcademyCoachAssignment.create({
+        academyId: academy._id,
+        sportName: request.sportName,
+        coachUserId: request.coachUserId,
+        coachId: request.coachId || null,
+        name: request.name,
+        nisId: request.nisId || null,
+        certificateData: request.certificateData || null,
+        certificateFileName: request.certificateFileName || `${request.name}_Certificate.pdf`,
+        isOffline: !request.coachUserId,
+        role: 'Coach',
+        status: 'ACTIVE'
+      });
+    }
+
+    const resAssignment = assignment.toObject();
+    delete resAssignment.aadhaarHash;
 
     res.json({
       success: true,
       message: 'Coach application accepted.',
-      assignment
+      assignment: resAssignment
     });
   } catch (err) {
     console.error('Error accepting coach request:', err);
@@ -774,9 +887,33 @@ router.post('/my/coach-requests/:id/reject', verifyToken, requireRoles('academy'
  */
 router.get('/athletes/:athleteUserId/full-portfolio', verifyToken, requireRoles('academy'), async (req, res) => {
   try {
+    const academy = await getAcademyForUser(req.user._id);
+    if (!academy) {
+      return res.status(404).json({ error: 'Academy profile not found.' });
+    }
+
     const athleteUser = await User.findById(req.params.athleteUserId).select('-passwordHash -resetPasswordOTP -aadhaarHash');
     if (!athleteUser) {
       return res.status(404).json({ error: 'Athlete profile not found.' });
+    }
+
+    // Verify relationship: Athlete must have a request or active membership with this academy
+    const hasRelationship = await AcademyAthleteRequest.exists({
+      academyId: academy._id,
+      $or: [
+        { athleteUserId: athleteUser._id },
+        ...(athleteUser.athleteId ? [{ athleteId: athleteUser.athleteId }] : [])
+      ]
+    }) || await AcademyAthleteMembership.exists({
+      academyId: academy._id,
+      $or: [
+        { athleteUserId: athleteUser._id },
+        ...(athleteUser.athleteId ? [{ athleteId: athleteUser.athleteId }] : [])
+      ]
+    });
+
+    if (!hasRelationship) {
+      return res.status(403).json({ error: 'Unauthorized: Athlete has no active request or membership with this academy.' });
     }
 
     const matchCriteria = [{ athleteUserId: athleteUser._id }];
@@ -810,9 +947,33 @@ router.get('/athletes/:athleteUserId/full-portfolio', verifyToken, requireRoles(
  */
 router.get('/coaches/:coachUserId/full-profile', verifyToken, requireRoles('academy'), async (req, res) => {
   try {
+    const academy = await getAcademyForUser(req.user._id);
+    if (!academy) {
+      return res.status(404).json({ error: 'Academy profile not found.' });
+    }
+
     const coachUser = await User.findById(req.params.coachUserId).select('-passwordHash -resetPasswordOTP -aadhaarHash');
     if (!coachUser) {
       return res.status(404).json({ error: 'Coach profile not found.' });
+    }
+
+    // Verify relationship: Coach must have an application or assignment with this academy
+    const hasRelationship = await AcademyCoachRequest.exists({
+      academyId: academy._id,
+      $or: [
+        { coachUserId: coachUser._id },
+        ...(coachUser.coachId ? [{ coachId: coachUser.coachId }] : [])
+      ]
+    }) || await AcademyCoachAssignment.exists({
+      academyId: academy._id,
+      $or: [
+        { coachUserId: coachUser._id },
+        ...(coachUser.coachId ? [{ coachId: coachUser.coachId }] : [])
+      ]
+    });
+
+    if (!hasRelationship) {
+      return res.status(403).json({ error: 'Unauthorized: Coach has no application or assignment with this academy.' });
     }
 
     res.json({
@@ -851,7 +1012,7 @@ router.get('/discovery', async (req, res) => {
         { name: new RegExp(cleanSearch, 'i') },
         { city: new RegExp(cleanSearch, 'i') },
         { 'address.city': new RegExp(cleanSearch, 'i') },
-        { 'sports.sportName': new RegExp(cleanSearch, 'i') }
+        ...(sport ? [] : [{ 'sports.sportName': new RegExp(cleanSearch, 'i') }])
       ];
     }
 

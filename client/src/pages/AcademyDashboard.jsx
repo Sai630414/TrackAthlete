@@ -867,12 +867,12 @@ export default function AcademyDashboard() {
                             <td className="py-3 px-3">
                               <span
                                 className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                  a.membershipSource === 'ONLINE'
-                                    ? 'bg-blue-100 text-blue-800'
+                                  a.athleteUserId || a.athleteId
+                                    ? 'bg-emerald-100 text-emerald-800'
                                     : 'bg-gray-100 text-gray-700'
                                 }`}
                               >
-                                {a.membershipSource === 'ONLINE' ? 'Online Request' : 'Offline Entry'}
+                                {a.athleteUserId || a.athleteId ? 'Linked' : 'Offline'}
                               </span>
                             </td>
                             <td className="py-3 px-3 text-gray-600">{a.negotiatedPayment || 'Negotiated'}</td>
@@ -1574,7 +1574,7 @@ export default function AcademyDashboard() {
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. COA-XXXX"
+                      placeholder="Optional (leave blank if offline)"
                       value={addSportForm.coachTrackAthleteId}
                       onChange={(e) => setAddSportForm({ ...addSportForm, coachTrackAthleteId: e.target.value })}
                       className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:border-[#2f6d5a]"
@@ -1700,7 +1700,7 @@ export default function AcademyDashboard() {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. COA-XXXX"
+                  placeholder="Optional (leave blank if offline)"
                   value={addCoachForm.coachTrackAthleteId}
                   onChange={(e) => setAddCoachForm({ ...addCoachForm, coachTrackAthleteId: e.target.value })}
                   className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:border-[#2f6d5a]"
@@ -1783,7 +1783,7 @@ export default function AcademyDashboard() {
                 <input
                   type="text"
                   required
-                  placeholder="+91 9876543210"
+                  placeholder="Enter 10-digit mobile number"
                   value={addAthleteForm.mobile}
                   onChange={(e) => setAddAthleteForm({ ...addAthleteForm, mobile: e.target.value })}
                   className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:border-[#2f6d5a]"
@@ -1811,7 +1811,7 @@ export default function AcademyDashboard() {
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. ATH-XXXX"
+                    placeholder="Optional (leave blank if offline)"
                     value={addAthleteForm.athleteTrackAthleteId}
                     onChange={(e) => setAddAthleteForm({ ...addAthleteForm, athleteTrackAthleteId: e.target.value })}
                     className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:border-[#2f6d5a]"
