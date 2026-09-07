@@ -21,15 +21,120 @@ async function getAcademyForUser(userId) {
     // Fallback: check if academy exists with user's email or name
     const user = await User.findById(userId);
     if (user && user.role === 'academy') {
-      academy = await Academy.findOne({ email: user.email });
-      if (academy && !academy.userId) {
-        academy.userId = user._id;
-        await academy.save();
+      const cleanEmail = user.email ? String(user.email).trim().toLowerCase() : '';
+      academy = await Academy.findOne({
+        $or: [
+          { email: new RegExp('^' + cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i') },
+          { name: new RegExp('^' + String(user.academyName || user.name || '').trim().replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i') }
+        ]
+      });
+      if (academy) {
+        if (!academy.userId) {
+          academy.userId = user._id;
+          await academy.save();
+        }
+      } else {
+        academy = await Academy.create({
+          userId: user._id,
+          name: String(user.academyName || user.name || 'Sports Academy').trim(),
+          contactPhone: String(user.contactPhone || user.phone || '+91 0000000000').trim(),
+          email: cleanEmail,
+          address: {
+            addressLine1: typeof user.address === 'string' ? user.address : (user.address?.addressLine1 || ''),
+            city: user.city || '',
+            state: user.state || '',
+            pincode: user.pincode || '',
+            country: 'India'
+          },
+          city: user.city || '',
+          state: user.state || '',
+          location: user.location || { type: 'Point', coordinates: [80.6480, 16.5062] },
+          sports: (user.sportsOffered || []).map(s => ({ sportName: s, addedAt: new Date() })),
+          verified: true
+        });
       }
     }
   }
   return academy;
 }
+
+// POST /api/academy/login & /api/academy/auth/login (Academy-dedicated login endpoint)
+router.post(['/login', '/auth/login'], async (req, res) => {
+  try {
+    const { email, identifier, password, rememberMe } = req.body;
+    const loginIdent = email || identifier;
+    if (!loginIdent || !password) {
+      return res.status(400).json({ error: 'Email/Identifier and password are required.' });
+    }
+
+    const cleanInput = String(loginIdent).trim();
+    const cleanEmail = cleanInput.toLowerCase().replace(/[\u200B-\u200D\uFEFF]/g, '');
+    const cleanDigits = cleanInput.replace(/\D/g, '');
+    const escapedIdent = cleanInput.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+    const identRegex = new RegExp('^' + escapedIdent + '$', 'i');
+
+    const academyUserQuery = [
+      { email: new RegExp('^' + cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i'), role: 'academy' },
+      { academyName: identRegex, role: 'academy' },
+      { name: identRegex, role: 'academy' }
+    ];
+    if (cleanDigits.length >= 7) {
+      const phoneSuffix = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
+      academyUserQuery.push(
+        { contactPhone: new RegExp(phoneSuffix + '$'), role: 'academy' },
+        { phone: new RegExp(phoneSuffix + '$'), role: 'academy' }
+      );
+    }
+    let user = await User.findOne({ $or: academyUserQuery });
+
+    if (!user) {
+      const acadConditions = [
+        { email: new RegExp('^' + cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i') },
+        { name: identRegex }
+      ];
+      if (cleanDigits.length >= 7) {
+        const phoneSuffix = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
+        acadConditions.push({ contactPhone: new RegExp(phoneSuffix + '$') });
+      }
+      const acadDoc = await Academy.findOne({ $or: acadConditions });
+      if (acadDoc) {
+        if (acadDoc.userId) user = await User.findById(acadDoc.userId);
+        if (!user && acadDoc.email) {
+          user = await User.findOne({
+            email: new RegExp('^' + String(acadDoc.email).trim().toLowerCase().replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i'),
+            role: 'academy'
+          });
+        }
+      }
+    }
+
+    if (!user || user.role !== 'academy') {
+      return res.status(401).json({ error: 'Invalid email or password.' });
+    }
+
+    const bcrypt = require('bcryptjs');
+    const jwt = require('jsonwebtoken');
+    const { withoutAadhaar } = require('../utils/aadhaar');
+    const passStr = String(password != null ? password : '');
+    const match = (await bcrypt.compare(passStr, user.passwordHash)) || (await bcrypt.compare(passStr.trim(), user.passwordHash));
+    if (!match) {
+      return res.status(401).json({ error: 'Invalid email or password.' });
+    }
+
+    const expiresIn = rememberMe ? '30d' : '7d';
+    const jwtSecret = process.env.JWT_SECRET || 'trackathlete_sih_secret_2026';
+    const token = jwt.sign({ id: user._id, role: user.role }, jwtSecret, { expiresIn });
+
+    const userObj = withoutAadhaar(user);
+    delete userObj.passwordHash;
+    delete userObj.resetPasswordOTP;
+
+    res.json({ token, user: userObj });
+  } catch (err) {
+    console.error('Academy login error:', err);
+    res.status(500).json({ error: err.message || 'Academy login failed' });
+  }
+});
 
 /* ==========================================================================
    ACADEMY-AUTHENTICATED ROUTES

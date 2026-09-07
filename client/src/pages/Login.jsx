@@ -683,8 +683,15 @@ export default function Login({ initialMode }) {
             )}
 
             {/* Email & Password (Common for both Sign In and Sign Up) */}
-            <label>Email address
-              <input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="you@example.com" required autoComplete="email" />
+            <label>{role === 'academy' && mode === 'signin' ? 'Academy Email, Phone, or Name' : 'Email address'}
+              <input
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                type={mode === 'signin' ? 'text' : 'email'}
+                placeholder={role === 'academy' && mode === 'signin' ? 'Registered email, contact phone, or academy name' : 'you@example.com'}
+                required
+                autoComplete={mode === 'signin' ? 'username' : 'email'}
+              />
             </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

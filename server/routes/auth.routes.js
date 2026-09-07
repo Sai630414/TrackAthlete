@@ -205,6 +205,59 @@ router.post('/signup', async (req, res) => {
   }
 });
 
+// Helper: Resolve Academy user account using email, phone, academy name, or Academy document linkage
+async function resolveAcademyUser(identifier) {
+  if (!identifier) return null;
+  const cleanInput = String(identifier).trim();
+  const cleanEmail = cleanInput.toLowerCase().replace(/[\u200B-\u200D\uFEFF]/g, '');
+  const cleanDigits = cleanInput.replace(/\D/g, '');
+  const escapedIdent = cleanInput.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+  const identRegex = new RegExp('^' + escapedIdent + '$', 'i');
+
+  // 1. Direct search on User collection for academy role
+  const academyUserQuery = [
+    { email: new RegExp('^' + cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i'), role: 'academy' },
+    { academyName: identRegex, role: 'academy' },
+    { name: identRegex, role: 'academy' }
+  ];
+  if (cleanDigits.length >= 7) {
+    const phoneSuffix = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
+    academyUserQuery.push(
+      { contactPhone: new RegExp(phoneSuffix + '$'), role: 'academy' },
+      { phone: new RegExp(phoneSuffix + '$'), role: 'academy' }
+    );
+  }
+  let user = await User.findOne({ $or: academyUserQuery });
+  if (user) return user;
+
+  // 2. Check Academy collection
+  const Academy = require('../models/Academy');
+  const acadConditions = [
+    { email: new RegExp('^' + cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i') },
+    { name: identRegex }
+  ];
+  if (cleanDigits.length >= 7) {
+    const phoneSuffix = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
+    acadConditions.push({ contactPhone: new RegExp(phoneSuffix + '$') });
+  }
+  const acadDoc = await Academy.findOne({ $or: acadConditions });
+  if (acadDoc) {
+    if (acadDoc.userId) {
+      user = await User.findById(acadDoc.userId);
+      if (user) return user;
+    }
+    if (acadDoc.email) {
+      user = await User.findOne({
+        email: new RegExp('^' + String(acadDoc.email).trim().toLowerCase().replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i'),
+        role: 'academy'
+      });
+      if (user) return user;
+    }
+  }
+
+  return null;
+}
+
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
   try {
@@ -213,21 +266,73 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required.' });
     }
 
-    const cleanEmail = String(email).trim().toLowerCase();
-    const user = await User.findOne({
+    const cleanInput = String(email).trim();
+    const cleanEmail = cleanInput.toLowerCase().replace(/[\u200B-\u200D\uFEFF]/g, '');
+    const passStr = String(password != null ? password : '');
+
+    // Standard lookup by email
+    let user = await User.findOne({
       email: new RegExp('^' + cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i')
     });
+    
+    // Dedicated Academy Account Fallback Resolution (Isolated for Academy accounts)
+    if (!user || (role === 'academy' && user.role !== 'academy')) {
+      const acadUser = await resolveAcademyUser(cleanInput);
+      if (acadUser) {
+        user = acadUser;
+      }
+    }
     
     if (!user) {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
     
-    const match = await bcrypt.compare(password, user.passwordHash);
+    let match = false;
+    if (user.passwordHash) {
+      match = await bcrypt.compare(passStr, user.passwordHash);
+      if (!match && user.role === 'academy') {
+        // Tolerant check for academy in case of leading/trailing whitespace
+        match = await bcrypt.compare(passStr.trim(), user.passwordHash);
+      }
+    }
     if (!match) {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
     
-    if (role && user.role !== role && user.role !== 'admin') {
+    // Role handling: smoothly direct Academy users to academy workspace
+    if (user.role === 'academy') {
+      try {
+        const Academy = require('../models/Academy');
+        let acad = await Academy.findOne({ userId: user._id });
+        if (!acad) {
+          acad = await Academy.findOne({ email: user.email });
+          if (acad && !acad.userId) {
+            acad.userId = user._id;
+            await acad.save();
+          } else if (!acad) {
+            await Academy.create({
+              userId: user._id,
+              name: String(user.academyName || user.name || 'Sports Academy').trim(),
+              email: user.email,
+              contactPhone: String(user.contactPhone || user.phone || '+91 0000000000').trim(),
+              address: {
+                addressLine1: typeof user.address === 'string' ? user.address : (user.address?.addressLine1 || ''),
+                city: user.city || '',
+                state: user.state || '',
+                country: 'India'
+              },
+              city: user.city || '',
+              state: user.state || '',
+              location: user.location || { type: 'Point', coordinates: [80.6480, 16.5062] },
+              sports: (user.sportsOffered || []).map(s => ({ sportName: s, addedAt: new Date() })),
+              verified: true
+            });
+          }
+        }
+      } catch (syncErr) {
+        console.error('[Academy Sync Warning]', syncErr.message);
+      }
+    } else if (role && user.role !== role && user.role !== 'admin') {
       return res.status(403).json({
         error: `This account is registered as ${user.role.toUpperCase()}. Please select the ${user.role.toUpperCase()} tab to sign in.`
       });
@@ -245,6 +350,44 @@ router.post('/login', async (req, res) => {
   } catch (err) {
     console.error('Login Error:', err);
     res.status(500).json({ error: err.message || 'Login failed' });
+  }
+});
+
+// Dedicated POST /api/auth/academy-login
+router.post('/academy-login', async (req, res) => {
+  try {
+    const { email, identifier, password, rememberMe } = req.body;
+    const loginIdent = email || identifier;
+    if (!loginIdent || !password) {
+      return res.status(400).json({ error: 'Academy email, phone, or name, and password are required.' });
+    }
+
+    const user = await resolveAcademyUser(loginIdent);
+    if (!user || user.role !== 'academy') {
+      return res.status(401).json({ error: 'Invalid email or password.' });
+    }
+
+    const passStr = String(password != null ? password : '');
+    let match = false;
+    if (user.passwordHash) {
+      match = (await bcrypt.compare(passStr, user.passwordHash)) || (await bcrypt.compare(passStr.trim(), user.passwordHash));
+    }
+    if (!match) {
+      return res.status(401).json({ error: 'Invalid email or password.' });
+    }
+
+    const expiresIn = rememberMe ? '30d' : '7d';
+    const jwtSecret = process.env.JWT_SECRET || 'trackathlete_sih_secret_2026';
+    const token = jwt.sign({ id: user._id, role: user.role }, jwtSecret, { expiresIn });
+
+    const userObj = withoutAadhaar(user);
+    delete userObj.passwordHash;
+    delete userObj.resetPasswordOTP;
+
+    res.json({ token, user: userObj });
+  } catch (err) {
+    console.error('Academy Login Error:', err);
+    res.status(500).json({ error: err.message || 'Academy login failed' });
   }
 });
 
