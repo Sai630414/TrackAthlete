@@ -46,18 +46,6 @@ router.get('/upcoming', async (req, res) => {
   }
 });
 
-// GET /api/tournaments/:id — Single tournament public details
-router.get('/:id', async (req, res) => {
-  try {
-    const event = await OfficialEvent.findById(req.params.id)
-      .populate('federation', 'name federationId sport state website');
-    if (!event) return res.status(404).json({ error: 'Tournament not found.' });
-    res.json({ event, source: 'federation' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // GET /api/tournaments/completed — Public endpoint for Completed Official Results
 router.get('/completed', async (req, res) => {
   try {
@@ -73,6 +61,22 @@ router.get('/completed', async (req, res) => {
     .sort({ createdAt: -1 });
 
     res.json(completedAchievements);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/tournaments/:id — Single tournament public details
+router.get('/:id', async (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid tournament ID.' });
+    }
+    const event = await OfficialEvent.findById(req.params.id)
+      .populate('federation', 'name federationId sport state website');
+    if (!event) return res.status(404).json({ error: 'Tournament not found.' });
+    res.json({ event, source: 'federation' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
