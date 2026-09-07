@@ -276,8 +276,11 @@ export default function AcademySignup({ onSwitchRole, onSwitchToSignIn }) {
       </section>
 
       {/* ── RIGHT SIDE: ACADEMY REGISTRATION PANEL ── */}
-      <section className="login-panel min-h-screen py-8 sm:py-12 px-6 sm:px-10 lg:px-12 xl:px-16 flex justify-start items-start overflow-y-auto">
-        <div className="w-full max-w-3xl">
+      <section
+        className="login-panel min-h-screen py-8 sm:py-10 flex justify-start items-start overflow-y-auto w-full"
+        style={{ padding: '32px 36px' }}
+      >
+        <div className="w-full max-w-5xl">
           {/* Top Help Header / Quick Sign In Link */}
           <div className="flex items-center justify-between pb-3 mb-5 border-b border-[#d8ded5]">
             <p className="login-help !m-0 !text-left text-xs text-[#526668]">
