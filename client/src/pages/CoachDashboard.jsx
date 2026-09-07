@@ -10,10 +10,11 @@ import {
 import ChatPanel from '../components/ChatPanel';
 import AthleteProfileModal from '../components/AthleteProfileModal';
 import FederationListsSection from '../components/FederationListsSection';
+import CoachAcademyOpeningsSection from '../components/CoachAcademyOpeningsSection';
 import {
   UserCheck, Check, X, Plus, Award, Users, BookOpen,
   Clock, ExternalLink, Trophy, MapPin, MessageCircle, FileText,
-  ChevronDown, Inbox, User, Eye
+  ChevronDown, Inbox, User, Eye, Briefcase
 } from 'lucide-react';
 
 export default function CoachDashboard() {
@@ -168,6 +169,9 @@ export default function CoachDashboard() {
           </TabsTrigger>
           <TabsTrigger value="notes">
             <BookOpen className="w-4 h-4 mr-1.5" /> Session Notes
+          </TabsTrigger>
+          <TabsTrigger value="openings">
+            <Briefcase className="w-4 h-4 mr-1.5" /> Academy Openings
           </TabsTrigger>
           <TabsTrigger value="federation-lists">
             <FileText className="w-4 h-4 mr-1.5" /> Federation Lists
@@ -454,6 +458,10 @@ export default function CoachDashboard() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="openings" className="space-y-4">
+          <CoachAcademyOpeningsSection coachSport={user?.sport} />
         </TabsContent>
 
         <TabsContent value="federation-lists" className="space-y-4">

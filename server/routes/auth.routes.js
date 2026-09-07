@@ -73,7 +73,9 @@ router.post('/signup', async (req, res) => {
 
     const user = await User.create(userPayload);
     const athleteIdStr = `ATH-${user._id.toString().slice(-8).toUpperCase()}`;
-    user.athleteId = athleteIdStr;
+    const coachIdStr = `COA-${user._id.toString().slice(-8).toUpperCase()}`;
+    if (role === 'athlete') user.athleteId = athleteIdStr;
+    if (role === 'coach') user.coachId = coachIdStr;
     if (user.sport) user.sport = String(user.sport).trim();
     await user.save();
 
@@ -86,6 +88,98 @@ router.post('/signup', async (req, res) => {
           { $or: matchCriteria },
           { $set: { athleteUserId: user._id, athleteId: athleteIdStr } }
         ).catch(e => console.error('Historical achievement auto-link error:', e));
+      }
+    }
+
+    // Auto-create Academy record and initial sport assignments if signing up as academy
+    if (role === 'academy') {
+      try {
+        const Academy = require('../models/Academy');
+        const AcademyCoachAssignment = require('../models/AcademyCoachAssignment');
+
+        const coords = req.body.location?.coordinates && Array.isArray(req.body.location.coordinates)
+          ? req.body.location.coordinates
+          : (location?.coordinates || [80.6480, 16.5062]);
+
+        const rawSports = Array.isArray(req.body.sports)
+          ? req.body.sports
+          : (Array.isArray(req.body.sportsOffered) ? req.body.sportsOffered.map(s => ({ sportName: s })) : []);
+
+        const normalizedSports = [];
+        const seen = new Set();
+        for (const sp of rawSports) {
+          const sName = String(sp.sportName || sp.name || sp).trim().toUpperCase();
+          if (sName && !seen.has(sName)) {
+            seen.add(sName);
+            normalizedSports.push({ sportName: sName, addedAt: new Date() });
+          }
+        }
+
+        const academyDoc = await Academy.create({
+          userId: user._id,
+          name: String(req.body.academyName || user.name).trim(),
+          contactPhone: String(req.body.contactPhone || req.body.phone || '+91 0000000000').trim(),
+          email: cleanEmail,
+          address: {
+            addressLine1: req.body.address?.addressLine1 || req.body.addressLine1 || req.body.address || '',
+            addressLine2: req.body.address?.addressLine2 || req.body.addressLine2 || '',
+            city: city || req.body.address?.city || '',
+            state: state || req.body.address?.state || '',
+            pincode: req.body.pincode || req.body.address?.pincode || '',
+            country: req.body.country || req.body.address?.country || 'India'
+          },
+          city: city || req.body.address?.city || '',
+          state: state || req.body.address?.state || '',
+          location: {
+            type: 'Point',
+            coordinates: [Number(coords[0]) || 80.6480, Number(coords[1]) || 16.5062]
+          },
+          sports: normalizedSports,
+          rankingStats: {
+            districtPlayers: Number(req.body.rankingStats?.districtPlayers ?? req.body.districtPlayers ?? 0),
+            statePlayers: Number(req.body.rankingStats?.statePlayers ?? req.body.statePlayers ?? 0),
+            nationalPlayers: Number(req.body.rankingStats?.nationalPlayers ?? req.body.nationalPlayers ?? 0),
+            internationalPlayers: Number(req.body.rankingStats?.internationalPlayers ?? req.body.internationalPlayers ?? 0)
+          },
+          verified: true
+        });
+
+        // If sports included coach details, create coach assignments
+        for (const sp of rawSports) {
+          const sName = String(sp.sportName || sp.name || sp).trim().toUpperCase();
+          if (sp.coachName) {
+            let coachUserId = null;
+            let coachId = null;
+            if (sp.coachTrackAthleteId) {
+              const matchedCoach = await User.findOne({
+                role: 'coach',
+                $or: [{ athleteId: sp.coachTrackAthleteId }, { coachId: sp.coachTrackAthleteId }]
+              });
+              if (matchedCoach) {
+                coachUserId = matchedCoach._id;
+                coachId = matchedCoach.coachId || sp.coachTrackAthleteId;
+              }
+            }
+
+            const cAadhaarHash = sp.coachAadhaar ? hashAadhaar(sp.coachAadhaar) : null;
+
+            await AcademyCoachAssignment.create({
+              academyId: academyDoc._id,
+              sportName: sName,
+              coachUserId,
+              coachId,
+              name: String(sp.coachName).trim(),
+              aadhaarHash: cAadhaarHash,
+              nisId: sp.coachNisId ? String(sp.coachNisId).trim() : null,
+              certificateData: sp.coachCertificateData || null,
+              certificateFileName: sp.coachCertificateFileName || `${sp.coachName}_Certificate.pdf`,
+              isOffline: !coachUserId,
+              role: 'Head Coach'
+            });
+          }
+        }
+      } catch (acadErr) {
+        console.error('[Academy Creation Error on Signup]', acadErr);
       }
     }
     

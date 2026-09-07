@@ -26,10 +26,12 @@ import ChatPanel from '../components/ChatPanel';
 import FederationVerifiedSection from '../components/FederationVerifiedSection';
 import OfficialTournamentsSection, { TeamRegistrationModal } from '../components/OfficialTournamentsSection';
 import FederationListsSection from '../components/FederationListsSection';
+import AthleteAcademiesSection from '../components/AthleteAcademiesSection';
 import ErrorBoundary from '../components/ErrorBoundary';
 import {
   Shield,
   User,
+  Building2,
   MapPin,
   Award,
   CheckCircle2,
@@ -701,6 +703,9 @@ export default function AthleteDashboard() {
           <TabsTrigger value="federation-lists">
             <Shield className="w-4 h-4 mr-1.5" /> Federation Lists
           </TabsTrigger>
+          <TabsTrigger value="academies">
+            <Building2 className="w-4 h-4 mr-1.5" /> Academies & Centers
+          </TabsTrigger>
           <TabsTrigger value="profile">
             <User className="w-4 h-4 mr-1.5" /> Profile & Preferences
           </TabsTrigger>
@@ -944,6 +949,9 @@ export default function AthleteDashboard() {
         </TabsContent>
         <TabsContent value="event-registrations" className="space-y-6">
           <MyEventRegistrations />
+        </TabsContent>
+        <TabsContent value="academies" className="space-y-6">
+          <AthleteAcademiesSection athleteSport={profile.sport || user?.sport} />
         </TabsContent>
 
         {/* ── COACHES & MENTORSHIP TAB ──────────────────────────────── */}

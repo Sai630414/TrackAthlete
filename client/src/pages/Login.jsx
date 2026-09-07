@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Building2, CalendarPlus, CheckCircle2, HeartHandshake, KeyRound, LoaderCircle, LockKeyhole, Mail, UserRound, UsersRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Building2, CalendarPlus, CheckCircle2, HeartHandshake, KeyRound, LoaderCircle, LockKeyhole, Mail, UserRound, UsersRound, MapPin, Plus, Trash2, Trophy, Compass } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const routeForRole = {
@@ -46,7 +46,90 @@ export default function Login({ initialMode }) {
   const [athleteFields, setAthleteFields] = useState({ sport: '', beltRank: '', age: '', federationState: 'Andhra Pradesh', aadhaarNumber: '', seekingSponsorship: false, sponsorshipReason: '' });
   const [coachFields, setCoachFields] = useState({ sport: 'Taekwondo', yearsExperience: '', certifications: '', acceptingAthletes: true });
   const [sponsorFields, setSponsorFields] = useState({ organizationName: '', budgetRange: '₹50,000 - ₹2,000,000', targetSports: 'Taekwondo' });
-  const [academyFields, setAcademyFields] = useState({ academyName: '', sportsOffered: 'Taekwondo', contactPhone: '', address: '' });
+  const [academyFields, setAcademyFields] = useState({
+    academyName: '',
+    contactPhone: '',
+    addressLine1: '',
+    addressLine2: '',
+    pincode: '',
+    country: 'India',
+    longitude: 80.6480,
+    latitude: 16.5062,
+    districtPlayers: 0,
+    statePlayers: 0,
+    nationalPlayers: 0,
+    internationalPlayers: 0
+  });
+
+  const [academySports, setAcademySports] = useState([
+    {
+      sportName: '',
+      coachName: '',
+      coachAadhaar: '',
+      coachNisId: '',
+      coachCertificateData: null,
+      coachCertificateFileName: '',
+      coachTrackAthleteId: ''
+    }
+  ]);
+
+  const handleAddSportRow = () => {
+    setAcademySports(prev => [
+      ...prev,
+      {
+        sportName: '',
+        coachName: '',
+        coachAadhaar: '',
+        coachNisId: '',
+        coachCertificateData: null,
+        coachCertificateFileName: '',
+        coachTrackAthleteId: ''
+      }
+    ]);
+  };
+
+  const handleRemoveSportRow = (index) => {
+    if (academySports.length <= 1) return;
+    setAcademySports(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateSportRow = (index, field, value) => {
+    setAcademySports(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const handleSportCertUpload = (e, index) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      updateSportRow(index, 'coachCertificateData', reader.result);
+      updateSportRow(index, 'coachCertificateFileName', file.name);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUseCurrentLocationInSignup = () => {
+    if (!navigator.geolocation) {
+      setError('Geolocation is not supported by your browser.');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setAcademyFields(prev => ({
+          ...prev,
+          longitude: Number(pos.coords.longitude.toFixed(6)),
+          latitude: Number(pos.coords.latitude.toFixed(6))
+        }));
+      },
+      (err) => {
+        setError('Could not retrieve coordinates: ' + err.message);
+      }
+    );
+  };
 
   // Forgot Password Flow State
   const [forgotStep, setForgotStep] = useState('request'); // 'request' | 'verify'
@@ -84,7 +167,29 @@ export default function Login({ initialMode }) {
         else if (role === 'athlete') rolePayload = { sport: String(athleteFields.sport || '').trim(), age: Number(athleteFields.age) || 0, beltRank: athleteFields.beltRank, federationState: athleteFields.federationState, aadhaarNumber: athleteFields.aadhaarNumber, seekingSponsorship: athleteFields.seekingSponsorship, sponsorshipReason: athleteFields.sponsorshipReason };
         else if (role === 'coach') rolePayload = { sport: coachFields.sport, yearsExperience: Number(coachFields.yearsExperience) || 0, certifications: coachFields.certifications.split(',').map(s => s.trim()).filter(Boolean), acceptingAthletes: coachFields.acceptingAthletes };
         else if (role === 'sponsor') rolePayload = { organizationName: sponsorFields.organizationName, budgetRange: sponsorFields.budgetRange, targetSports: sponsorFields.targetSports.split(',').map(s => s.trim()).filter(Boolean) };
-        else if (role === 'academy') rolePayload = { academyName: academyFields.academyName, sportsOffered: academyFields.sportsOffered.split(',').map(s => s.trim()).filter(Boolean), contactPhone: academyFields.contactPhone, address: academyFields.address };
+        else if (role === 'academy') rolePayload = {
+          academyName: academyFields.academyName || name,
+          contactPhone: academyFields.contactPhone,
+          address: {
+            addressLine1: academyFields.addressLine1,
+            addressLine2: academyFields.addressLine2,
+            city: city,
+            state: state,
+            pincode: academyFields.pincode,
+            country: academyFields.country || 'India'
+          },
+          location: {
+            type: 'Point',
+            coordinates: [Number(academyFields.longitude) || 80.6480, Number(academyFields.latitude) || 16.5062]
+          },
+          rankingStats: {
+            districtPlayers: Number(academyFields.districtPlayers) || 0,
+            statePlayers: Number(academyFields.statePlayers) || 0,
+            nationalPlayers: Number(academyFields.nationalPlayers) || 0,
+            internationalPlayers: Number(academyFields.internationalPlayers) || 0
+          },
+          sports: academySports.filter(s => s.sportName && s.sportName.trim())
+        };
 
         await signup({
           name,
@@ -389,22 +494,177 @@ export default function Login({ initialMode }) {
             )}
 
             {mode === 'signup' && role === 'academy' && (
-              <>
-                <label>Academy / Center Name
-                  <input value={academyFields.academyName} onChange={e => setAcademyFields({ ...academyFields, academyName: e.target.value })} type="text" placeholder="e.g. Victory Sports Academy" required />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', margin: '4px 0' }}>
+                <label>Academy / Center Name *
+                  <input value={academyFields.academyName} onChange={e => setAcademyFields({ ...academyFields, academyName: e.target.value })} type="text" placeholder="e.g. Apex National Sports Academy" required />
                 </label>
-                <div className="form-row">
-                  <label>Sports Offered (comma separated)
-                    <input value={academyFields.sportsOffered} onChange={e => setAcademyFields({ ...academyFields, sportsOffered: e.target.value })} type="text" placeholder="e.g. Taekwondo, Badminton" required />
-                  </label>
-                  <label>Contact Phone
-                    <input value={academyFields.contactPhone} onChange={e => setAcademyFields({ ...academyFields, contactPhone: e.target.value })} type="tel" placeholder="e.g. +91 98765 43210" required />
-                  </label>
+
+                <label>Contact Phone *
+                  <input value={academyFields.contactPhone} onChange={e => setAcademyFields({ ...academyFields, contactPhone: e.target.value })} type="tel" placeholder="e.g. +91 98765 43210" required />
+                </label>
+
+                <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '10px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#173235', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Physical Address Details
+                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+                    <input value={academyFields.addressLine1} onChange={e => setAcademyFields({ ...academyFields, addressLine1: e.target.value })} type="text" placeholder="Address Line 1 (Plot, Street, Area)" />
+                    <input value={academyFields.addressLine2} onChange={e => setAcademyFields({ ...academyFields, addressLine2: e.target.value })} type="text" placeholder="Address Line 2 (Landmark, Sector)" />
+                    <input value={academyFields.pincode} onChange={e => setAcademyFields({ ...academyFields, pincode: e.target.value })} type="text" placeholder="Pincode (e.g. 520010)" />
+                  </div>
                 </div>
-                <label>Physical Address
-                  <input value={academyFields.address} onChange={e => setAcademyFields({ ...academyFields, address: e.target.value })} type="text" placeholder="e.g. MG Road, Vijayawada" required />
-                </label>
-              </>
+
+                <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '800', color: '#173235', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      GeoJSON Location Coordinates
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleUseCurrentLocationInSignup}
+                      style={{
+                        background: '#eef6f2',
+                        border: '1px solid #2f6d5a',
+                        color: '#2f6d5a',
+                        borderRadius: '6px',
+                        padding: '3px 8px',
+                        fontSize: '10px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <MapPin size={11} /> Use My Current Location
+                    </button>
+                  </div>
+                  <div className="form-row">
+                    <label>Longitude (lng)
+                      <input type="number" step="any" value={academyFields.longitude} onChange={e => setAcademyFields({ ...academyFields, longitude: e.target.value })} />
+                    </label>
+                    <label>Latitude (lat)
+                      <input type="number" step="any" value={academyFields.latitude} onChange={e => setAcademyFields({ ...academyFields, latitude: e.target.value })} />
+                    </label>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '10px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#173235', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Ranking Statistics (Player Representation)
+                  </span>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginTop: '6px' }}>
+                    <label style={{ fontSize: '10px' }}>District
+                      <input type="number" min="0" value={academyFields.districtPlayers} onChange={e => setAcademyFields({ ...academyFields, districtPlayers: e.target.value })} />
+                    </label>
+                    <label style={{ fontSize: '10px' }}>State
+                      <input type="number" min="0" value={academyFields.statePlayers} onChange={e => setAcademyFields({ ...academyFields, statePlayers: e.target.value })} />
+                    </label>
+                    <label style={{ fontSize: '10px' }}>National
+                      <input type="number" min="0" value={academyFields.nationalPlayers} onChange={e => setAcademyFields({ ...academyFields, nationalPlayers: e.target.value })} />
+                    </label>
+                    <label style={{ fontSize: '10px' }}>Internat'l
+                      <input type="number" min="0" value={academyFields.internationalPlayers} onChange={e => setAcademyFields({ ...academyFields, internationalPlayers: e.target.value })} />
+                    </label>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '800', color: '#173235', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Sport Disciplines & Coaches
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleAddSportRow}
+                      style={{
+                        background: '#e07050',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '3px 8px',
+                        fontSize: '10px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <Plus size={12} /> Add Sport
+                    </button>
+                  </div>
+
+                  {academySports.map((sp, idx) => (
+                    <div key={idx} style={{ background: '#f8faf8', border: '1px solid #dce4de', borderRadius: '10px', padding: '10px', marginBottom: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '10px', fontWeight: '700', color: '#2f6d5a', textTransform: 'uppercase' }}>
+                          Sport #{idx + 1}
+                        </span>
+                        {academySports.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSportRow(idx)}
+                            style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: 0 }}
+                            title="Remove Sport"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="form-row">
+                        <input
+                          type="text"
+                          required={idx === 0}
+                          placeholder="Sport Discipline (e.g. CRICKET) *"
+                          value={sp.sportName}
+                          onChange={e => updateSportRow(idx, 'sportName', e.target.value)}
+                          style={{ fontWeight: '600' }}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Coach Name"
+                          value={sp.coachName}
+                          onChange={e => updateSportRow(idx, 'coachName', e.target.value)}
+                        />
+                      </div>
+
+                      <div className="form-row">
+                        <input
+                          type="text"
+                          maxLength="12"
+                          placeholder="Coach Aadhaar (12 digits)"
+                          value={sp.coachAadhaar}
+                          onChange={e => updateSportRow(idx, 'coachAadhaar', e.target.value)}
+                        />
+                        <input
+                          type="text"
+                          placeholder="NIS ID (Optional)"
+                          value={sp.coachNisId}
+                          onChange={e => updateSportRow(idx, 'coachNisId', e.target.value)}
+                        />
+                      </div>
+
+                      <div className="form-row">
+                        <input
+                          type="text"
+                          placeholder="Coach TrackAthlete ID (Optional: COA-XXXX)"
+                          value={sp.coachTrackAthleteId}
+                          onChange={e => updateSportRow(idx, 'coachTrackAthleteId', e.target.value)}
+                        />
+                        <input
+                          type="file"
+                          accept=".pdf,image/*"
+                          onChange={e => handleSportCertUpload(e, idx)}
+                          style={{ fontSize: '10px' }}
+                          title="Upload Coach Certificate"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
 
             {/* Email & Password (Common for both Sign In and Sign Up) */}
