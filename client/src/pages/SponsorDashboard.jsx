@@ -141,8 +141,6 @@ export default function SponsorDashboard() {
         </Card>
       </div>
 
-      <OfficialTournamentsSection />
-
       {/* PLEDGE DIALOG */}
       <Dialog isOpen={!!selectedAthlete} onClose={() => setSelectedAthlete(null)}>
         <DialogHeader>

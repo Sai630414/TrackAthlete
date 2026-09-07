@@ -147,8 +147,6 @@ export default function CoachDashboard() {
         </div>
       </div>
 
-      <OfficialTournamentsSection />
-
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
           <TabsTrigger value="inbox">

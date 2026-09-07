@@ -38,24 +38,42 @@ function formatDate(dateStr) {
 }
 
 function getRankPriority(item) {
-  const m = String(item.medal || '').toLowerCase();
-  const p = String(item.position || item.outcome || '').toLowerCase();
-  const d = String(item.description || '').toLowerCase();
-  const combined = `${m} ${p} ${d}`;
-  if (combined.includes('gold') || combined.includes('1st') || combined.includes('first') || combined.includes('winner') || combined.includes('champion') || p === '1') return 1;
-  if (combined.includes('silver') || combined.includes('2nd') || combined.includes('second') || combined.includes('runner') || p === '2') return 2;
-  if (combined.includes('bronze') || combined.includes('3rd') || combined.includes('third') || p === '3') return 3;
-  if (combined.includes('4th') || combined.includes('fourth') || p === '4') return 4;
+  if (!item) return 99;
+  const p = String(item.position !== undefined && item.position !== null ? item.position : (item.rank !== undefined && item.rank !== null ? item.rank : (item.outcome || ''))).trim().toLowerCase();
+  if (p === '1' || p === '1st' || p.includes('1st') || p.includes('winner') || p.includes('champion')) return 1;
+  if (p === '2' || p === '2nd' || p.includes('2nd') || p.includes('runner')) return 2;
+  if (p === '3' || p === '3rd' || p.includes('3rd')) return 3;
+  if (p === '4' || p === '4th' || p.includes('4th')) return 4;
+
+  const m = String(item.medal || '').trim().toLowerCase();
+  if (m === 'gold' || m.includes('gold')) return 1;
+  if (m === 'silver' || m.includes('silver')) return 2;
+  if (m === 'bronze' || m.includes('bronze')) return 3;
+
+  const d = String(item.description || '').trim().toLowerCase();
+  if (d.includes('gold') || d.includes('1st') || d.includes('first') || d.includes('winner') || d.includes('champion')) return 1;
+  if (d.includes('silver') || d.includes('2nd') || d.includes('second') || d.includes('runner')) return 2;
+  if (d.includes('bronze') || d.includes('3rd') || d.includes('third')) return 3;
+
   return 99;
 }
 
 function getRankLabel(item, fallbackRank) {
+  if (!item) return 'Participant';
   const m = String(item.medal || '').trim();
-  const p = String(item.position || item.outcome || '').trim();
+  if (m && m.toLowerCase() !== 'undefined' && m.toLowerCase() !== 'null') return m.toLowerCase().includes('medal') ? m : `${m} Medal`;
+
+  const p = String(item.position !== undefined && item.position !== null ? item.position : (item.rank !== undefined && item.rank !== null ? item.rank : (item.outcome || ''))).trim();
+  if (p && p.toLowerCase() !== 'undefined' && p.toLowerCase() !== 'null') {
+    const lPos = p.toLowerCase();
+    if (lPos === '1' || lPos === '1st' || lPos.includes('1st') || lPos.includes('winner')) return 'Winner (1st Place / Gold)';
+    if (lPos === '2' || lPos === '2nd' || lPos.includes('2nd') || lPos.includes('runner')) return 'Runner-up (2nd Place / Silver)';
+    if (lPos === '3' || lPos === '3rd' || lPos.includes('3rd')) return '3rd Place / Bronze';
+    return (lPos.includes('place') || lPos.includes('rank') || lPos.includes('winner')) ? p : `Rank ${p}`;
+  }
   const d = String(item.description || '').trim();
-  if (m) return `${m} Medal`;
-  if (d && (d.toLowerCase().includes('prize') || d.toLowerCase().includes('place') || d.toLowerCase().includes('medalist'))) return d;
-  if (p) return (p.toLowerCase().includes('place') || p.toLowerCase().includes('rank') || p.toLowerCase().includes('winner')) ? p : `Rank ${p}`;
+  if (d && (d.toLowerCase().includes('prize') || d.toLowerCase().includes('place') || d.toLowerCase().includes('medalist') || d.toLowerCase().includes('winner'))) return d;
+
   if (fallbackRank === 1) return 'Winner (1st Place / Gold)';
   if (fallbackRank === 2) return 'Runner-up (2nd Place / Silver)';
   if (fallbackRank === 3) return '3rd Place / Bronze';
@@ -157,13 +175,16 @@ export default function HomePage() {
     ])
       .then(([fedRes, orgRes]) => {
         if (!isMounted) return;
+        // Group Federation achievements by unique database event _id
         const fedGroupMap = new Map();
         (fedRes.data || []).forEach(ach => {
-          const tName = (ach.tournamentName || ach.event?.eventName || 'Official Championship').trim();
-          const key = normalize(tName);
+          const eventId = String(ach.event?._id || ach.event?.eventId || ach.event || ach.officialRecordId || ach._id);
+          const key = `fed_${eventId}`;
+          const tName = (ach.event?.eventName || ach.tournamentName || 'Official Championship').trim();
+
           if (!fedGroupMap.has(key)) {
             fedGroupMap.set(key, {
-              _id: `fed-${ach.event?._id || ach._id}`,
+              _id: `fed-${eventId}`,
               source: 'federation',
               tournamentName: tName,
               sport: ach.sport || ach.event?.sport || 'Sport',
@@ -196,7 +217,8 @@ export default function HomePage() {
             priority,
             rankLabel,
             medal: ach.medal,
-            position: ach.position,
+            position: ach.position || ach.rank,
+            rank: ach.rank,
             description: ach.description,
             category: ach.category || ach.event?.category,
             certificateData: ach.certificateData,
@@ -204,23 +226,27 @@ export default function HomePage() {
           });
         });
 
+        // Group Organizer results by unique database event _id
         const orgGroupMap = new Map();
         (orgRes.data?.results || []).forEach(r => {
           const event = r.event || {};
+          const eventId = String(event._id || r.event || r._id);
+          const key = `org_${eventId}`;
           const matchedSport = event.sports?.find(s => String(s._id) === String(r.sportConfigId));
           const sportName = matchedSport?.sportName || 'Sport';
           const tName = (event.eventName || 'Organizer Tournament').trim();
-          const key = `${r.event?._id || normalize(tName)}_${String(r.sportConfigId || '')}`;
 
           const entriesList = (r.entries || []).map((entry, idx) => {
-            const entityName = entry.teamName || entry.name || entry.team?.name || 'Participant';
+            const teamName = entry.teamName || entry.team?.name || '';
+            const individualName = entry.name || entry.athleteName || '';
+            const entityName = teamName || individualName || 'Participant';
             const priority = getRankPriority(entry);
             const rankLabel = getRankLabel(entry, priority);
             return {
               _id: entry._id || `${r._id}-${idx}`,
               entityName,
-              athleteName: entityName,
-              teamName: entityName,
+              athleteName: individualName,
+              teamName,
               priority,
               rankLabel,
               medal: entry.medal,
@@ -232,34 +258,56 @@ export default function HomePage() {
             };
           });
 
-          orgGroupMap.set(key, {
-            _id: `org-${r._id}`,
-            source: 'organizer',
-            tournamentName: tName,
-            sport: sportName,
-            eventDate: event.eventDate || r.frozenAt || r.createdAt,
-            location: event.venue || event.venueAddress?.city || 'Venue TBA',
-            category: 'Organizer Championship',
-            organizer: r.organizer || event.organizer || null,
-            isFrozen: r.isFrozen,
-            frozenAt: r.frozenAt || r.createdAt,
-            certificateData: r.certificateData || null,
-            certificateFileName: r.certificateFileName || 'Organizer_Certificate.pdf',
-            entries: entriesList
-          });
+          if (!orgGroupMap.has(key)) {
+            orgGroupMap.set(key, {
+              _id: `org-${eventId}`,
+              source: 'organizer',
+              tournamentName: tName,
+              sport: sportName,
+              sportsList: sportName ? [sportName] : [],
+              eventDate: event.eventDate || r.frozenAt || r.createdAt,
+              location: event.venue || event.venueAddress?.city || 'Venue TBA',
+              category: 'Organizer Championship',
+              organizer: r.organizer || event.organizer || null,
+              isFrozen: r.isFrozen,
+              frozenAt: r.frozenAt || r.createdAt,
+              certificateData: r.certificateData || null,
+              certificateFileName: r.certificateFileName || 'Organizer_Certificate.pdf',
+              entries: [...entriesList]
+            });
+          } else {
+            const existing = orgGroupMap.get(key);
+            if (sportName && !existing.sportsList.includes(sportName)) {
+              existing.sportsList.push(sportName);
+              existing.sport = existing.sportsList.join(', ');
+            }
+            if (!existing.certificateData && r.certificateData) {
+              existing.certificateData = r.certificateData;
+              existing.certificateFileName = r.certificateFileName || 'Organizer_Certificate.pdf';
+            }
+            existing.entries.push(...entriesList);
+          }
         });
 
-        const processGroup = (group) => {
-          group.entries.sort((a, b) => a.priority - b.priority);
-          const first = group.entries.find(e => e.priority === 1) || group.entries[0];
-          const second = group.entries.find(e => e.priority === 2) || (group.entries.length > 1 && group.entries[1] !== first ? group.entries[1] : null);
+        const getEntryTitle = (e) => {
+          if (!e) return '';
+          return (e.teamName || e.entityName || e.athleteName || '').trim();
+        };
 
-          const winnerName = first ? (first.athleteName || first.entityName || first.teamName) : 'TBD';
-          const distinctSecond = group.entries.find(e => {
-            const name = e.athleteName || e.entityName || e.teamName;
-            return name && name.toLowerCase() !== winnerName.toLowerCase();
+        const processGroup = (group) => {
+          // Sort entries by position / medal rank priority
+          group.entries.sort((a, b) => a.priority - b.priority);
+
+          // 1st place / Gold is the Winner (team name prioritized for team events)
+          const first = group.entries.find(e => e.priority === 1) || group.entries[0];
+          const winnerName = getEntryTitle(first) || 'TBD';
+
+          // 2nd place / Silver is the Runner-up
+          const second = group.entries.find(e => {
+            const name = getEntryTitle(e);
+            return name && name.toLowerCase() !== winnerName.toLowerCase() && (e.priority === 2 || e !== first);
           });
-          const runnerUpName = distinctSecond ? (distinctSecond.athleteName || distinctSecond.entityName || distinctSecond.teamName) : '—';
+          const runnerUpName = second ? getEntryTitle(second) : '—';
 
           return {
             ...group,
