@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Building2, CalendarPlus, CheckCircle2, HeartHandshake, KeyRound, LoaderCircle, LockKeyhole, Mail, UserRound, UsersRound, MapPin, Plus, Trash2, Trophy, Compass } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -23,13 +23,45 @@ const roles = [
 ];
 
 export default function Login({ initialMode }) {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const requestedMode = initialMode || searchParams.get('mode') || 'signin';
   const { user, login, signup, forgotPassword, resetPassword } = useAuth();
   const navigate = useNavigate();
 
+  const validRoles = ['parent', 'athlete', 'coach', 'sponsor', 'academy'];
+  const paramRole = searchParams.get('role');
+  const storedRole = typeof window !== 'undefined' ? localStorage.getItem('trackathlete_selected_role') : null;
+  const initialRole = (paramRole && validRoles.includes(paramRole))
+    ? paramRole
+    : (storedRole && validRoles.includes(storedRole) ? storedRole : 'parent');
+
   const [mode, setMode] = useState(requestedMode === 'signup' ? 'signup' : (requestedMode === 'forgot' ? 'forgot' : 'signin'));
-  const [role, setRole] = useState(searchParams.get('role') || 'parent');
+  const [role, setRole] = useState(initialRole);
+
+  useEffect(() => {
+    const qRole = searchParams.get('role');
+    if (qRole && validRoles.includes(qRole) && qRole !== role) {
+      setRole(qRole);
+    }
+    const qMode = searchParams.get('mode');
+    if (qMode && ['signin', 'signup', 'forgot'].includes(qMode) && qMode !== mode) {
+      setMode(qMode);
+    }
+  }, [searchParams]);
+
+  const handleSelectRole = (newRole) => {
+    if (newRole === 'organizer') {
+      navigate('/organizer/login');
+      return;
+    }
+    setRole(newRole);
+    try {
+      localStorage.setItem('trackathlete_selected_role', newRole);
+    } catch {}
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('role', newRole);
+    setSearchParams(nextParams, { replace: true });
+  };
 
   // Common Form Fields
   const [email, setEmail] = useState('');
@@ -149,8 +181,15 @@ export default function Login({ initialMode }) {
   if (mode === 'signup' && role === 'academy') {
     return (
       <AcademySignup
-        onSwitchRole={(newRole) => setRole(newRole)}
-        onSwitchToSignIn={() => setMode('signin')}
+        onSwitchRole={(newRole) => handleSelectRole(newRole)}
+        onSwitchToSignIn={() => {
+          handleSelectRole('academy');
+          setMode('signin');
+          const nextParams = new URLSearchParams(searchParams);
+          nextParams.set('mode', 'signin');
+          nextParams.set('role', 'academy');
+          setSearchParams(nextParams, { replace: true });
+        }}
       />
     );
   }
@@ -163,7 +202,7 @@ export default function Login({ initialMode }) {
 
     try {
       if (mode === 'signin') {
-        await login({ email, password, role, rememberMe });
+        await login({ email: email.trim(), password, role, rememberMe });
       } else if (mode === 'signup') {
         if (!agreeTerms) {
           setError('You must accept the Terms of Service & Privacy Policy to sign up.');
@@ -295,8 +334,36 @@ export default function Login({ initialMode }) {
         {/* Auth Mode Tabs */}
         {mode !== 'forgot' && (
           <div className="auth-tabs">
-            <button type="button" onClick={() => { setMode('signin'); setError(''); setSuccessMsg(''); }} className={mode === 'signin' ? 'auth-tab active' : 'auth-tab'}>Sign In</button>
-            <button type="button" onClick={() => { setMode('signup'); setError(''); setSuccessMsg(''); }} className={mode === 'signup' ? 'auth-tab active' : 'auth-tab'}>Create Account (Sign Up)</button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode('signin');
+                setError('');
+                setSuccessMsg('');
+                const nextParams = new URLSearchParams(searchParams);
+                nextParams.set('mode', 'signin');
+                if (role) nextParams.set('role', role);
+                setSearchParams(nextParams, { replace: true });
+              }}
+              className={mode === 'signin' ? 'auth-tab active' : 'auth-tab'}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode('signup');
+                setError('');
+                setSuccessMsg('');
+                const nextParams = new URLSearchParams(searchParams);
+                nextParams.set('mode', 'signup');
+                if (role) nextParams.set('role', role);
+                setSearchParams(nextParams, { replace: true });
+              }}
+              className={mode === 'signup' ? 'auth-tab active' : 'auth-tab'}
+            >
+              Create Account (Sign Up)
+            </button>
           </div>
         )}
 
@@ -318,7 +385,16 @@ export default function Login({ initialMode }) {
         {mode !== 'forgot' && (
           <div className="role-picker" role="radiogroup" aria-label="Select account role">
             {roles.map(({ id, label, copy, icon: Icon }) => (
-              <button type="button" role="radio" aria-checked={role === id} key={id} onClick={() => id === 'organizer' ? navigate('/organizer/login') : setRole(id)} className={role === id ? 'role-option selected' : 'role-option'}>
+              <button
+                type="button"
+                role="radio"
+                id={`role-btn-${id}`}
+                data-role={id}
+                aria-checked={role === id}
+                key={id}
+                onClick={() => handleSelectRole(id)}
+                className={role === id ? 'role-option selected' : 'role-option'}
+              >
                 <Icon size={17} />
                 <span><b>{label}</b><small>{copy}</small></span>
               </button>
@@ -732,9 +808,9 @@ export default function Login({ initialMode }) {
         {mode !== 'forgot' && (
           <p className="login-help">
             {mode === 'signin' ? (
-              <>New to TrackAthlete? <button type="button" onClick={() => { setMode('signup'); setError(''); setSuccessMsg(''); }} style={{ background: 'none', border: 'none', color: '#e07050', fontWeight: 'bold', cursor: 'pointer', textDecoration: 'underline' }}>Click here to Sign Up</button></>
+              <>New to TrackAthlete? <button type="button" onClick={() => { setMode('signup'); setError(''); setSuccessMsg(''); const nextParams = new URLSearchParams(searchParams); nextParams.set('mode', 'signup'); if (role) nextParams.set('role', role); setSearchParams(nextParams, { replace: true }); }} style={{ background: 'none', border: 'none', color: '#e07050', fontWeight: 'bold', cursor: 'pointer', textDecoration: 'underline' }}>Click here to Sign Up</button></>
             ) : (
-              <>Already have an account? <button type="button" onClick={() => { setMode('signin'); setError(''); setSuccessMsg(''); }} style={{ background: 'none', border: 'none', color: '#e07050', fontWeight: 'bold', cursor: 'pointer', textDecoration: 'underline' }}>Click here to Sign In</button></>
+              <>Already have an account? <button type="button" onClick={() => { setMode('signin'); setError(''); setSuccessMsg(''); const nextParams = new URLSearchParams(searchParams); nextParams.set('mode', 'signin'); if (role) nextParams.set('role', role); setSearchParams(nextParams, { replace: true }); }} style={{ background: 'none', border: 'none', color: '#e07050', fontWeight: 'bold', cursor: 'pointer', textDecoration: 'underline' }}>Click here to Sign In</button></>
             )}
           </p>
         )}

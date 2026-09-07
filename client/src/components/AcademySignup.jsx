@@ -24,6 +24,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 
 const roleOptions = [
+  { id: 'academy-signin', label: 'Academy (Sign In)', icon: Building2 },
   { id: 'athlete', label: 'Athlete', icon: UserRound },
   { id: 'parent', label: 'Parent', icon: UsersRound },
   { id: 'coach', label: 'Coach', icon: UsersRound },
@@ -344,6 +345,7 @@ export default function AcademySignup({ onSwitchRole, onSwitchToSignIn }) {
                         onClick={() => {
                           setShowRoleMenu(false);
                           if (opt.id === 'organizer') navigate('/organizer/login');
+                          else if (opt.id === 'academy-signin') onSwitchToSignIn();
                           else onSwitchRole(opt.id);
                         }}
                         className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-[#f1f5f9] hover:text-[#173235] rounded-lg transition text-left cursor-pointer"
