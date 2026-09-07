@@ -26,6 +26,7 @@ import ChatPanel from '../components/ChatPanel';
 import FederationVerifiedSection from '../components/FederationVerifiedSection';
 import OfficialTournamentsSection, { TeamRegistrationModal } from '../components/OfficialTournamentsSection';
 import FederationListsSection from '../components/FederationListsSection';
+import ErrorBoundary from '../components/ErrorBoundary';
 import {
   Shield,
   User,
@@ -47,7 +48,11 @@ import {
   PlayCircle,
   ExternalLink,
   Calendar,
-  X
+  X,
+  Eye,
+  FileText,
+  RefreshCw,
+  Download
 } from 'lucide-react';
 
 function getYouTubeEmbedUrl(url) {
@@ -206,23 +211,87 @@ function MyEventRegistrations() {
 function OrganizerAchievementsSection({ athleteUserId }) {
   const [achievements, setAchievements] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [pdfModal, setPdfModal] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
     setLoading(true);
+    setError(null);
     api.get('/organizer-events/my/achievements')
       .then(({ data }) => {
-        if (isMounted) setAchievements(data.achievements || []);
+        if (isMounted) setAchievements(data?.achievements || []);
       })
-      .catch(() => {})
+      .catch((err) => {
+        if (isMounted) {
+          setError(err?.response?.data?.error || err.message || 'Failed to load organizer achievements');
+          setAchievements([]);
+        }
+      })
       .finally(() => {
         if (isMounted) setLoading(false);
       });
     return () => { isMounted = false; };
   }, [athleteUserId]);
 
-  if (loading || achievements.length === 0) return null;
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Award className="w-5 h-5 text-[#cc694e]" /> Organizer Verified Achievements
+          </CardTitle>
+          <CardDescription>Official verified results and podium awards from organizer competitions</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="py-8 text-center text-xs text-[#697c7c] flex flex-col items-center justify-center gap-2">
+            <RefreshCw className="w-5 h-5 animate-spin text-[#194e42]" />
+            <span>Loading organizer-verified achievements...</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Award className="w-5 h-5 text-[#cc694e]" /> Organizer Verified Achievements
+          </CardTitle>
+          <CardDescription>Official verified results and podium awards from organizer competitions</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-xs text-[#a34028] p-4 bg-[#fff3f0] rounded-lg border border-[#efcbc3] text-center">
+            {error}
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!achievements || achievements.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Award className="w-5 h-5 text-[#cc694e]" /> Organizer Verified Achievements (0)
+          </CardTitle>
+          <CardDescription>Official verified results and podium awards from organizer competitions</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="p-6 bg-[#f9faf8] rounded-xl border border-[#d8ded5] text-center space-y-1">
+            <Award className="w-8 h-8 text-[#a5c5bd] mx-auto mb-2" />
+            <p className="text-sm font-bold text-[#173235]">No Organizer Achievements Yet</p>
+            <p className="text-xs text-[#697c7c] max-w-md mx-auto">
+              Verified competition results, certificates, and podium honors published by tournament organizers will appear here automatically.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -234,38 +303,47 @@ function OrganizerAchievementsSection({ athleteUserId }) {
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {achievements.map((ach) => (
-            <div key={ach._id} className="p-4 bg-white rounded-xl border border-[#d8ded5] shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
-                    [ ORGANIZER EVENT ]
-                  </span>
-                  <span className="text-[10px] font-bold text-[#526668]">
-                    Organizer Verified
-                  </span>
+          {achievements.map((ach) => {
+            const rawCert = ach.certificateData;
+            const pdfSrc = rawCert
+              ? (rawCert.startsWith('data:') || rawCert.startsWith('http://') || rawCert.startsWith('https://') || rawCert.startsWith('blob:')
+                  ? rawCert
+                  : `data:application/pdf;base64,${rawCert}`)
+              : null;
+
+            return (
+              <div key={ach._id} className="p-4 bg-white rounded-xl border border-[#d8ded5] shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
+                      [ ORGANIZER EVENT ]
+                    </span>
+                    <span className="text-[10px] font-bold text-[#526668]">
+                      Organizer Verified
+                    </span>
+                  </div>
+                  <h4 className="font-extrabold text-sm text-[#173235] mt-1.5">{ach.event?.eventName || 'Organizer Tournament'}</h4>
+                  <p className="text-xs text-[#526668] mt-0.5">
+                    {ach.sportName ? `[${ach.sportName.toUpperCase()}] ` : ''}{ach.teamName ? `Team: ${ach.teamName} · ` : ''}{ach.organizer?.organizationName || ach.organizer?.name || 'Tournament Organizer'} · {ach.event?.eventDate ? new Date(ach.event.eventDate).toLocaleDateString('en-IN') : 'Completed'}
+                  </p>
                 </div>
-                <h4 className="font-extrabold text-sm text-[#173235] mt-1.5">{ach.event?.eventName || 'Organizer Tournament'}</h4>
-                <p className="text-xs text-[#526668] mt-0.5">
-                  {ach.sportName ? `[${ach.sportName.toUpperCase()}] ` : ''}{ach.teamName ? `Team: ${ach.teamName} · ` : ''}{ach.organizer?.organizationName || ach.organizer?.name} · {ach.event?.eventDate ? new Date(ach.event.eventDate).toLocaleDateString('en-IN') : 'Completed'}
-                </p>
+                <div className="flex items-center gap-3 self-end sm:self-center">
+                  <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
+                    {ach.outcome || (ach.position ? `Rank #${ach.position}` : (ach.medal ? `${ach.medal} Medal` : 'Verified Result'))}
+                  </span>
+                  {pdfSrc && (
+                    <button
+                      type="button"
+                      onClick={() => setPdfModal({ data: pdfSrc, name: ach.certificateFileName || 'Certificate.pdf' })}
+                      className="px-3 py-1.5 rounded-lg bg-[#194e42] text-white text-xs font-bold hover:bg-[#143d34] transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    >
+                      <Eye size={12} /> Certificate
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-3 self-end sm:self-center">
-                <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
-                  {ach.outcome}
-                </span>
-                {ach.certificateData && (
-                  <button
-                    type="button"
-                    onClick={() => setPdfModal({ data: ach.certificateData, name: ach.certificateFileName || 'Certificate.pdf' })}
-                    className="px-3 py-1.5 rounded-lg bg-[#194e42] text-white text-xs font-bold hover:bg-[#143d34] transition flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Eye size={12} /> Certificate
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {pdfModal && (
@@ -279,28 +357,35 @@ function OrganizerAchievementsSection({ athleteUserId }) {
                 <button
                   type="button"
                   onClick={() => setPdfModal(null)}
-                  className="p-1 rounded-lg text-[#697c7c] hover:text-[#173235] hover:bg-[#f4f8f5] transition"
+                  className="p-1 rounded-lg text-[#697c7c] hover:text-[#173235] hover:bg-[#f4f8f5] transition cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
               <div className="p-4 bg-[#f8faf7] rounded-xl border text-center space-y-3">
                 <p className="text-xs text-[#526668]">File: <b>{pdfModal.name}</b></p>
-                <div className="flex justify-center gap-3">
+                <div className="overflow-hidden rounded-lg border border-[#d8ded5] bg-white">
+                  <iframe
+                    src={pdfModal.data}
+                    style={{ width: '100%', height: '50vh', border: 'none' }}
+                    title="Certificate Preview"
+                  />
+                </div>
+                <div className="flex justify-center gap-3 pt-2">
                   <a
                     href={pdfModal.data}
                     target="_blank"
                     rel="noreferrer"
-                    className="px-4 py-2 rounded-lg bg-[#194e42] text-white text-xs font-bold hover:bg-[#143d34] transition"
+                    className="px-4 py-2 rounded-lg bg-[#194e42] text-white text-xs font-bold hover:bg-[#143d34] transition flex items-center gap-1.5"
                   >
-                    Open Certificate in New Tab
+                    <ExternalLink size={14} /> Open in New Tab
                   </a>
                   <a
                     href={pdfModal.data}
                     download={pdfModal.name}
-                    className="px-4 py-2 rounded-lg border border-[#2f6d5a] text-[#194e42] text-xs font-bold hover:bg-[#e2eee4] transition"
+                    className="px-4 py-2 rounded-lg border border-[#2f6d5a] text-[#194e42] text-xs font-bold hover:bg-[#e2eee4] transition flex items-center gap-1.5"
                   >
-                    Download Certificate
+                    <Download size={14} /> Download Certificate
                   </a>
                 </div>
               </div>
@@ -685,8 +770,12 @@ export default function AthleteDashboard() {
 
         {/* ── PERSONAL ACHIEVEMENTS TAB ─────────────────────────── */}
         <TabsContent value="achievements" className="space-y-6">
-          <FederationVerifiedSection athleteUserId={user?._id} />
-          <OrganizerAchievementsSection athleteUserId={user?._id} />
+          <ErrorBoundary title="Failed to load Federation Verified Achievements">
+            <FederationVerifiedSection athleteUserId={user?._id} />
+          </ErrorBoundary>
+          <ErrorBoundary title="Failed to load Organizer Verified Achievements">
+            <OrganizerAchievementsSection athleteUserId={user?._id} />
+          </ErrorBoundary>
 
           <Card>
             <CardHeader>
