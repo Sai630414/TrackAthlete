@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Building2, CalendarPlus, CheckCircle2, HeartHandshake, KeyRound, LoaderCircle, LockKeyhole, Mail, UserRound, UsersRound, MapPin, Plus, Trash2, Trophy, Compass } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import AcademySignup from '../components/AcademySignup';
 
 const routeForRole = {
   parent: '/parent',
@@ -143,6 +144,15 @@ export default function Login({ initialMode }) {
 
   if (user) {
     return <Navigate to={routeForRole[user.role] || '/parent'} replace />;
+  }
+
+  if (mode === 'signup' && role === 'academy') {
+    return (
+      <AcademySignup
+        onSwitchRole={(newRole) => setRole(newRole)}
+        onSwitchToSignIn={() => setMode('signin')}
+      />
+    );
   }
 
   async function submit(event) {

@@ -16,7 +16,7 @@ const {
 // POST /api/auth/signup
 router.post('/signup', async (req, res) => {
   try {
-    const { name, email, password, role, rememberMe, city, state, aadhaarNumber, aadhaar, aadhaarHash: ignoredAadhaarHash, ...rest } = req.body;
+    const { name, email, password, role, rememberMe, city, state, address, aadhaarNumber, aadhaar, aadhaarHash: ignoredAadhaarHash, ...rest } = req.body;
     if (rest.sport) rest.sport = String(rest.sport).trim();
     if (!name || !email || !password || !role) {
       return res.status(400).json({ error: 'Name, email, password, and role are required.' });
@@ -65,6 +65,7 @@ router.post('/signup', async (req, res) => {
       role,
       city,
       state,
+      address: typeof address === 'string' ? address : (address?.addressLine1 ? [address.addressLine1, address.city, address.state].filter(Boolean).join(', ') : ''),
       aadhaarHash,
       ...rest,
       sport: rest.sport ? String(rest.sport).trim() : (req.body.sport ? String(req.body.sport).trim() : undefined)
