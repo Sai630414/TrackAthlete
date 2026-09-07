@@ -226,23 +226,58 @@ export default function AcademySignup({ onSwitchRole, onSwitchToSignIn }) {
   };
 
   return (
-    <div className="login-page lg:!grid-cols-[clamp(290px,28vw,360px)_1fr] !grid-cols-1 min-h-screen">
+    <div className="login-page lg:!grid-cols-[minmax(360px,30%)_1fr] !grid-cols-1 min-h-screen">
       {/* ── LEFT SIDE: ORIGINAL TRACKATHLETE BRANDING / STORY PANEL ── */}
-      <section className="login-story">
+      <section
+        className="login-story lg:sticky lg:top-0 lg:h-screen lg:min-h-screen"
+        style={{
+          padding: '48px 36px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          overflow: 'hidden'
+        }}
+      >
         <div className="login-logo">
           <span>ta</span> trackathlete
         </div>
-        <div className="story-copy">
-          <p className="eyebrow">ONE PLATFORM · FIVE VIEWPOINTS</p>
-          <h1>Every athlete needs a <em>way forward.</em></h1>
-          <p>From the first academy search to a verified opportunity, TrackAthlete helps the people around an athlete make the next decision with confidence.</p>
+        <div className="story-copy" style={{ margin: 'auto 0', maxWidth: '100%' }}>
+          <p className="eyebrow" style={{ letterSpacing: '0.15em', marginBottom: '14px' }}>
+            ONE PLATFORM · FIVE VIEWPOINTS
+          </p>
+          <h1
+            style={{
+              fontSize: 'clamp(32px, 2.7vw, 44px)',
+              lineHeight: 1.06,
+              letterSpacing: '-0.04em',
+              maxWidth: '100%',
+              wordBreak: 'normal',
+              overflowWrap: 'normal',
+              whiteSpace: 'normal'
+            }}
+          >
+            Every athlete needs a <em>way forward.</em>
+          </h1>
+          <p
+            style={{
+              fontSize: '14px',
+              lineHeight: 1.7,
+              maxWidth: '100%',
+              marginTop: '18px',
+              color: '#c5d3ce'
+            }}
+          >
+            From the first academy search to a verified opportunity, TrackAthlete helps the people around an athlete make the next decision with confidence.
+          </p>
         </div>
-        <div className="story-foot"><i /> Built for the Indian sports ecosystem</div>
+        <div className="story-foot">
+          <i /> Built for the Indian sports ecosystem
+        </div>
       </section>
 
       {/* ── RIGHT SIDE: ACADEMY REGISTRATION PANEL ── */}
-      <section className="login-panel min-h-screen py-8 sm:py-10 px-4 sm:px-8 lg:px-12 flex justify-center items-start overflow-y-auto">
-        <div className="w-full max-w-2xl">
+      <section className="login-panel min-h-screen py-8 sm:py-12 px-6 sm:px-10 lg:px-12 xl:px-16 flex justify-start items-start overflow-y-auto">
+        <div className="w-full max-w-3xl">
           {/* Top Help Header / Quick Sign In Link */}
           <div className="flex items-center justify-between pb-3 mb-5 border-b border-[#d8ded5]">
             <p className="login-help !m-0 !text-left text-xs text-[#526668]">
