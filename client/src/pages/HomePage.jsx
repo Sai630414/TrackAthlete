@@ -256,8 +256,8 @@ export default function HomePage() {
               position: entry.position,
               outcome: entry.outcome,
               roster: entry.roster || [],
-              certificateData: r.certificateData,
-              certificateFileName: r.certificateFileName || 'Organizer_Certificate.pdf'
+              certificateData: entry.certificateData || r.certificateData,
+              certificateFileName: entry.certificateFileName || r.certificateFileName || 'Organizer_Certificate.pdf'
             };
           });
 
@@ -1909,6 +1909,31 @@ export default function HomePage() {
                           </div>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {entry.certificateData && (
+                              <button
+                                type="button"
+                                onClick={() => setPdfModal({
+                                  dataUri: entry.certificateData,
+                                  fileName: entry.certificateFileName || `${name}_Certificate.pdf`,
+                                  title: `${name} — Official Certificate`
+                                })}
+                                style={{
+                                  padding: '3px 8px',
+                                  borderRadius: 6,
+                                  background: '#194e42',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4
+                                }}
+                              >
+                                <FileText size={12} /> Certificate
+                              </button>
+                            )}
                             <span style={{
                               padding: '3px 8px',
                               borderRadius: 6,
@@ -1938,28 +1963,58 @@ export default function HomePage() {
                                     <th style={{ padding: '6px 10px' }}>Player Name</th>
                                     <th style={{ padding: '6px 10px' }}>Type</th>
                                     <th style={{ padding: '6px 10px' }}>Role</th>
+                                    <th style={{ padding: '6px 10px' }}>Certificate</th>
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {entry.roster.map((player, pIdx) => (
-                                    <tr key={pIdx} style={{ borderTop: '1px solid #f0f4f0' }}>
-                                      <td style={{ padding: '6px 10px', color: '#697c7c' }}>{pIdx + 1}</td>
-                                      <td style={{ padding: '6px 10px', fontWeight: 700, color: '#173235' }}>{player.name}</td>
-                                      <td style={{ padding: '6px 10px' }}>
-                                        <span style={{
-                                          padding: '2px 5px',
-                                          borderRadius: 4,
-                                          fontSize: 9,
-                                          fontWeight: 800,
-                                          background: player.participantType === 'registered' ? '#e2eee4' : '#f4f8f3',
-                                          color: player.participantType === 'registered' ? '#194e42' : '#697c7c'
-                                        }}>
-                                          {player.participantType === 'registered' ? 'Registered' : 'Manual'}
-                                        </span>
-                                      </td>
-                                      <td style={{ padding: '6px 10px', color: '#526668' }}>{player.isCaptain ? 'Captain' : 'Player'}</td>
-                                    </tr>
-                                  ))}
+                                  {entry.roster.map((player, pIdx) => {
+                                    const pCert = player.certificateData || entry.certificateData || selectedResultModal.certificateData;
+                                    return (
+                                      <tr key={pIdx} style={{ borderTop: '1px solid #f0f4f0' }}>
+                                        <td style={{ padding: '6px 10px', color: '#697c7c' }}>{pIdx + 1}</td>
+                                        <td style={{ padding: '6px 10px', fontWeight: 700, color: '#173235' }}>{player.name}</td>
+                                        <td style={{ padding: '6px 10px' }}>
+                                          <span style={{
+                                            padding: '2px 5px',
+                                            borderRadius: 4,
+                                            fontSize: 9,
+                                            fontWeight: 800,
+                                            background: player.participantType === 'registered' ? '#e2eee4' : '#f4f8f3',
+                                            color: player.participantType === 'registered' ? '#194e42' : '#697c7c'
+                                          }}>
+                                            {player.participantType === 'registered' ? 'Registered' : 'Manual'}
+                                          </span>
+                                        </td>
+                                        <td style={{ padding: '6px 10px', color: '#526668' }}>{player.isCaptain ? 'Captain' : 'Player'}</td>
+                                        <td style={{ padding: '6px 10px' }}>
+                                          {pCert ? (
+                                            <button
+                                              type="button"
+                                              onClick={() => setPdfModal({
+                                                dataUri: pCert,
+                                                fileName: player.certificateFileName || entry.certificateFileName || `${player.name}_Certificate.pdf`,
+                                                title: `${player.name} — Official Certificate`
+                                              })}
+                                              style={{
+                                                padding: '2px 8px',
+                                                borderRadius: 5,
+                                                background: '#194e42',
+                                                color: '#ffffff',
+                                                border: 'none',
+                                                fontSize: 10,
+                                                fontWeight: 700,
+                                                cursor: 'pointer'
+                                              }}
+                                            >
+                                              View PDF
+                                            </button>
+                                          ) : (
+                                            <span style={{ color: '#8fa09d', fontSize: 10 }}>—</span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
                                 </tbody>
                               </table>
                             </div>
@@ -1990,30 +2045,60 @@ export default function HomePage() {
                           <th style={{ padding: '8px 12px' }}>Player</th>
                           <th style={{ padding: '8px 12px' }}>Participant Type</th>
                           <th style={{ padding: '8px 12px' }}>Role</th>
+                          <th style={{ padding: '8px 12px' }}>Certificate</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {selectedResultModal.roster.map((player, idx) => (
-                          <tr key={idx} style={{ borderBottom: '1px solid #f0f4f0' }}>
-                            <td style={{ padding: '8px 12px', color: '#697c7c', fontWeight: 700 }}>{idx + 1}</td>
-                            <td style={{ padding: '8px 12px', fontWeight: 700, color: '#173235' }}>{player.name}</td>
-                            <td style={{ padding: '8px 12px' }}>
-                              <span style={{
-                                padding: '2px 6px',
-                                borderRadius: 4,
-                                fontSize: 10,
-                                fontWeight: 800,
-                                background: player.participantType === 'registered' ? '#e2eee4' : '#f4f8f3',
-                                color: player.participantType === 'registered' ? '#194e42' : '#697c7c'
-                              }}>
-                                {player.participantType === 'registered' ? 'Registered Athlete' : 'Manual Player'}
-                              </span>
-                            </td>
-                            <td style={{ padding: '8px 12px', color: '#526668', fontSize: 11 }}>
-                              {player.isCaptain ? 'Captain' : 'Player'}
-                            </td>
-                          </tr>
-                        ))}
+                        {selectedResultModal.roster.map((player, idx) => {
+                          const pCert = player.certificateData || selectedResultModal.certificateData;
+                          return (
+                            <tr key={idx} style={{ borderBottom: '1px solid #f0f4f0' }}>
+                              <td style={{ padding: '8px 12px', color: '#697c7c', fontWeight: 700 }}>{idx + 1}</td>
+                              <td style={{ padding: '8px 12px', fontWeight: 700, color: '#173235' }}>{player.name}</td>
+                              <td style={{ padding: '8px 12px' }}>
+                                <span style={{
+                                  padding: '2px 6px',
+                                  borderRadius: 4,
+                                  fontSize: 10,
+                                  fontWeight: 800,
+                                  background: player.participantType === 'registered' ? '#e2eee4' : '#f4f8f3',
+                                  color: player.participantType === 'registered' ? '#194e42' : '#697c7c'
+                                }}>
+                                  {player.participantType === 'registered' ? 'Registered Athlete' : 'Manual Player'}
+                                </span>
+                              </td>
+                              <td style={{ padding: '8px 12px', color: '#526668', fontSize: 11 }}>
+                                {player.isCaptain ? 'Captain' : 'Player'}
+                              </td>
+                              <td style={{ padding: '8px 12px' }}>
+                                {pCert ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setPdfModal({
+                                      dataUri: pCert,
+                                      fileName: player.certificateFileName || `${player.name}_Certificate.pdf`,
+                                      title: `${player.name} — Official Certificate`
+                                    })}
+                                    style={{
+                                      padding: '3px 10px',
+                                      borderRadius: 6,
+                                      background: '#194e42',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      fontSize: 11,
+                                      fontWeight: 700,
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    View PDF
+                                  </button>
+                                ) : (
+                                  <span style={{ color: '#8fa09d', fontSize: 11 }}>—</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

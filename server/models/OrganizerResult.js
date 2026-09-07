@@ -1,28 +1,36 @@
 const mongoose = require('mongoose');
 
-// An immutable roster snapshot for a team result. No Aadhaar value or hash is
-// retained here: registered athletes use their existing User id, while external
-// players remain external participants.
+// Individual team member roster item with their own certificate and optional private Aadhaar hash
 const rosterMemberSchema = new mongoose.Schema({
-  participantType: { type: String, enum: ['registered', 'manual'], required: true },
+  participantType: { type: String, enum: ['registered', 'offline', 'manual'], default: 'offline' },
   athlete: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  name: { type: String, required: true },
-  mobile: String,
-  email: String,
-  isCaptain: { type: Boolean, default: false }
-}, { _id: false });
-
-const resultEntrySchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  // Used only for individual athlete matching and omitted from normal reads.
+  athleteId: String,
+  name: { type: String, required: true, trim: true },
   aadhaarHash: { type: String, select: false },
   mobile: String,
-  outcome: { type: String, required: true },
+  email: String,
+  isCaptain: { type: Boolean, default: false },
+  certificateData: { type: String, default: null },
+  certificateFileName: { type: String, default: '' },
+  certificateFileSize: { type: Number, default: 0 }
+}, { _id: true });
+
+const resultEntrySchema = new mongoose.Schema({
+  name: { type: String, required: true, trim: true },
+  teamName: { type: String, trim: true },
+  team: { type: mongoose.Schema.Types.ObjectId, ref: 'EventTeam' },
   position: { type: Number, min: 1 },
   medal: { type: String, enum: ['Gold', 'Silver', 'Bronze'] },
+  outcome: { type: String, required: true },
+  participantType: { type: String, enum: ['registered', 'offline', 'manual'], default: 'offline' },
   athlete: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  team: { type: mongoose.Schema.Types.ObjectId, ref: 'EventTeam' },
-  teamName: String,
+  athleteId: String,
+  aadhaarHash: { type: String, select: false },
+  mobile: String,
+  email: String,
+  certificateData: { type: String, default: null },
+  certificateFileName: { type: String, default: '' },
+  certificateFileSize: { type: Number, default: 0 },
   roster: { type: [rosterMemberSchema], default: undefined }
 }, { _id: true });
 
@@ -30,9 +38,10 @@ const OrganizerResultSchema = new mongoose.Schema({
   organizer: { type: mongoose.Schema.Types.ObjectId, ref: 'Organizer', required: true },
   event: { type: mongoose.Schema.Types.ObjectId, ref: 'OrganizerEvent', required: true },
   sportConfigId: { type: mongoose.Schema.Types.ObjectId, required: true },
+  sportName: String,
+  competitionType: { type: String, enum: ['individual', 'team'], default: 'individual' },
   resultType: { type: String, enum: ['positions', 'medals'], required: true },
   entries: { type: [resultEntrySchema], default: [] },
-  // A real selected PDF, isolated from Federation certificate data.
   certificateData: { type: String, default: null },
   certificateFileName: { type: String, default: '' },
   certificateFileSize: { type: Number, default: 0 },

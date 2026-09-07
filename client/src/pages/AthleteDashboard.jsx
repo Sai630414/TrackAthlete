@@ -247,7 +247,7 @@ function OrganizerAchievementsSection({ athleteUserId }) {
                 </div>
                 <h4 className="font-extrabold text-sm text-[#173235] mt-1.5">{ach.event?.eventName || 'Organizer Tournament'}</h4>
                 <p className="text-xs text-[#526668] mt-0.5">
-                  {ach.organizer?.organizationName || ach.organizer?.name} · {ach.event?.eventDate ? new Date(ach.event.eventDate).toLocaleDateString('en-IN') : 'Completed'}
+                  {ach.sportName ? `[${ach.sportName.toUpperCase()}] ` : ''}{ach.teamName ? `Team: ${ach.teamName} · ` : ''}{ach.organizer?.organizationName || ach.organizer?.name} · {ach.event?.eventDate ? new Date(ach.event.eventDate).toLocaleDateString('en-IN') : 'Completed'}
                 </p>
               </div>
               <div className="flex items-center gap-3 self-end sm:self-center">

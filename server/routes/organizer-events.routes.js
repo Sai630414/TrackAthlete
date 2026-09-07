@@ -23,7 +23,7 @@ router.get('/completed', async (_req, res) => {
   try {
     const OrganizerResult = require('../models/OrganizerResult');
     const results = await OrganizerResult.find({ isFrozen: true })
-      .select('-entries.aadhaarHash -entries.mobile -entries.roster.mobile -entries.roster.email')
+      .select('-entries.aadhaarHash -entries.mobile -entries.roster.aadhaarHash -entries.roster.mobile -entries.roster.email')
       .populate('event', 'eventName eventDate venue sports')
       .populate('organizer', 'name organizationName organizerId mobile email designation officialAddress')
       .sort({ frozenAt: -1 });

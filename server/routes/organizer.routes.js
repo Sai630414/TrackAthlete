@@ -20,11 +20,12 @@ const otpHash = value => crypto.createHash('sha256').update(String(value)).diges
 const eventSport = (event, id) => event?.sports?.id ? event.sports.id(id) : null;
 const activeRegistration = event => new Date() <= new Date(event.registrationDeadline);
 const resultLabel = (resultType, entry) => resultType === 'medals' ? entry.medal : `${entry.position}${entry.position === 1 ? 'st' : entry.position === 2 ? 'nd' : entry.position === 3 ? 'rd' : 'th'} Place`;
-const certificateIsValid = ({ certificateData, certificateFileName, certificateFileSize }) => {
-  if (!certificateData || !certificateFileName || !String(certificateData).startsWith('data:application/pdf;base64,')) return false;
-  const base64 = String(certificateData).split(',')[1] || '';
+const certificateIsValid = (cert) => {
+  if (!cert || !cert.certificateData || !cert.certificateFileName) return false;
+  if (!String(cert.certificateData).startsWith('data:application/pdf;base64,')) return false;
+  const base64 = String(cert.certificateData).split(',')[1] || '';
   const actualBytes = Buffer.byteLength(base64, 'base64');
-  return Number(certificateFileSize) === actualBytes && actualBytes > 0 && actualBytes <= 1024 * 1024;
+  return actualBytes > 0 && actualBytes <= 1.5 * 1024 * 1024;
 };
 const teamRoster = team => [
   ...(team.members || []).filter(member => member.status === 'confirmed').map(member => ({
@@ -75,8 +76,17 @@ router.get('/events/:id/results/:sportId', async (req, res) => {
     const event = await OrganizerEvent.findOne({ _id: req.params.id, organizer: req.user._id });
     const sport = eventSport(event || {}, req.params.sportId);
     if (!event || !sport) return res.status(404).json({ error: 'Event sport not found.' });
-    const result = await OrganizerResult.findOne({ event: event._id, sportConfigId: sport._id }).select('-entries.aadhaarHash');
-    res.json({ result: result || null });
+    const result = await OrganizerResult.findOne({ event: event._id, sportConfigId: sport._id })
+      .select('-entries.aadhaarHash -entries.roster.aadhaarHash');
+    
+    // Also fetch online registered teams for this sport as optional preload convenience:
+    const registeredTeams = await EventTeam.find({
+      event: event._id,
+      sportConfigId: sport._id,
+      status: { $nin: ['terminated'] }
+    }).populate('captain', 'name email contactPhone athleteId').populate('members.athlete', 'name email contactPhone athleteId');
+
+    res.json({ result: result || null, sport, registeredTeams });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 router.get('/events/:id/registrations', async (req, res) => {
@@ -101,63 +111,330 @@ router.post('/events/:id/results/:sportId', async (req, res) => {
     const sport = eventSport(event || {}, req.params.sportId);
     if (!event || !sport) return res.status(404).json({ error: 'Event sport not found.' });
     if (sport.resultStatus === 'frozen') return res.status(400).json({ error: 'This sport has already been frozen.' });
+    
     const resultType = sport.resultType || 'positions';
-    if (req.body.resultType && req.body.resultType !== resultType) return res.status(400).json({ error: 'Result type must match the event sport configuration.' });
+    const competitionType = sport.competitionType || 'individual';
+    if (req.body.resultType && req.body.resultType !== resultType) {
+      return res.status(400).json({ error: 'Result type must match the event sport configuration.' });
+    }
+
     const supplied = Array.isArray(req.body.entries) ? req.body.entries : [];
     const entries = [];
-    const seenTeams = new Set();
+    const seenTeamNames = new Set();
+
     for (const raw of supplied) {
-      const entry = { position: Number(raw.position) || undefined, medal: raw.medal, mobile: String(raw.mobile || '').trim() };
-      if (resultType === 'positions' && !entry.position) return res.status(400).json({ error: 'Every result needs a valid finishing position.' });
-      if (resultType === 'medals' && !['Gold', 'Silver', 'Bronze'].includes(entry.medal)) return res.status(400).json({ error: 'Every result needs Gold, Silver, or Bronze.' });
-      if (sport.competitionType === 'team') {
-        if (!raw.team) return res.status(400).json({ error: 'Select a registered team for every team result.' });
-        if (seenTeams.has(String(raw.team))) return res.status(400).json({ error: 'A team can only appear once in a sport result.' });
-        const team = await EventTeam.findOne({ _id: raw.team, event: event._id, sportConfigId: sport._id, status: { $nin: ['terminated'] } })
-          .populate('captain', 'name email contactPhone').populate('members.athlete', 'name email contactPhone');
-        if (!team) return res.status(400).json({ error: 'Selected team does not belong to this event sport.' });
-        const roster = teamRoster(team);
-        if (!roster.length) return res.status(400).json({ error: `Team ${team.name} has no confirmed members.` });
-        entries.push({ name: team.name, team: team._id, teamName: team.name, roster, ...entry, outcome: resultLabel(resultType, entry) });
-        seenTeams.add(String(team._id));
+      const position = Number(raw.position) || undefined;
+      const medal = raw.medal || undefined;
+      const outcome = resultLabel(resultType, { position, medal });
+
+      if (competitionType === 'team') {
+        const teamName = String(raw.teamName || raw.name || '').trim();
+        if (!teamName) return res.status(400).json({ error: 'Every team result requires a team name.' });
+        if (seenTeamNames.has(teamName.toLowerCase())) {
+          return res.status(400).json({ error: `Team "${teamName}" can only appear once in this sport result.` });
+        }
+        seenTeamNames.add(teamName.toLowerCase());
+
+        const rawRoster = Array.isArray(raw.roster) ? raw.roster : [];
+        const roster = [];
+        for (const m of rawRoster) {
+          const playerName = String(m.name || '').trim();
+          if (!playerName) continue;
+
+          let memberAadhaarHash = m.aadhaarHash || undefined;
+          if (m.aadhaar && String(m.aadhaar).trim().length === 12) {
+            memberAadhaarHash = hashAadhaar(String(m.aadhaar).trim());
+          }
+
+          roster.push({
+            _id: m._id || new mongoose.Types.ObjectId(),
+            name: playerName,
+            participantType: m.participantType || 'offline',
+            athlete: m.athlete || undefined,
+            athleteId: m.athleteId || undefined,
+            mobile: String(m.mobile || '').trim(),
+            email: String(m.email || '').trim(),
+            isCaptain: Boolean(m.isCaptain),
+            certificateData: m.certificateData || null,
+            certificateFileName: m.certificateFileName || '',
+            certificateFileSize: Number(m.certificateFileSize) || 0,
+            ...(memberAadhaarHash ? { aadhaarHash: memberAadhaarHash } : {})
+          });
+        }
+
+        entries.push({
+          _id: raw._id || new mongoose.Types.ObjectId(),
+          name: teamName,
+          teamName,
+          team: raw.team || undefined,
+          position,
+          medal,
+          outcome,
+          roster,
+          certificateData: raw.certificateData || null,
+          certificateFileName: raw.certificateFileName || '',
+          certificateFileSize: Number(raw.certificateFileSize) || 0
+        });
       } else {
-        const aadhaar = String(raw.aadhaar || '').trim();
-        if (!String(raw.name || '').trim() || !aadhaar) return res.status(400).json({ error: 'Each individual result needs a participant name and Aadhaar for secure matching.' });
-        entries.push({ name: String(raw.name).trim(), aadhaarHash: hashAadhaar(aadhaar), ...entry, outcome: resultLabel(resultType, entry) });
+        // Individual sport
+        const participantName = String(raw.name || '').trim();
+        if (!participantName) return res.status(400).json({ error: 'Participant name is required.' });
+
+        let aadhaarHash = raw.aadhaarHash || undefined;
+        if (raw.aadhaar && String(raw.aadhaar).trim().length === 12) {
+          aadhaarHash = hashAadhaar(String(raw.aadhaar).trim());
+        }
+
+        entries.push({
+          _id: raw._id || new mongoose.Types.ObjectId(),
+          name: participantName,
+          position,
+          medal,
+          outcome,
+          mobile: String(raw.mobile || '').trim(),
+          email: String(raw.email || '').trim(),
+          participantType: raw.participantType || 'offline',
+          athlete: raw.athlete || undefined,
+          athleteId: raw.athleteId || undefined,
+          certificateData: raw.certificateData || null,
+          certificateFileName: raw.certificateFileName || '',
+          certificateFileSize: Number(raw.certificateFileSize) || 0,
+          ...(aadhaarHash ? { aadhaarHash } : {})
+        });
       }
     }
-    if (!entries.length) return res.status(400).json({ error: 'Add at least one complete result before saving a draft.' });
-    const certificate = { certificateData: req.body.certificateData || null, certificateFileName: req.body.certificateFileName || '', certificateFileSize: Number(req.body.certificateFileSize) || 0 };
-    if (certificate.certificateData && !certificateIsValid(certificate)) return res.status(400).json({ error: 'Certificate must be a valid PDF no larger than 1 MB.' });
-    const result = await OrganizerResult.findOneAndUpdate({ event: event._id, sportConfigId: sport._id }, { $set: { organizer: req.user._id, resultType, entries, ...certificate } }, { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true });
+
+    if (!entries.length) {
+      return res.status(400).json({ error: 'Add at least one result before saving draft.' });
+    }
+
+    const result = await OrganizerResult.findOneAndUpdate(
+      { event: event._id, sportConfigId: sport._id },
+      {
+        $set: {
+          organizer: req.user._id,
+          event: event._id,
+          sportConfigId: sport._id,
+          sportName: sport.sportName,
+          competitionType,
+          resultType,
+          entries,
+          certificateData: req.body.certificateData || null,
+          certificateFileName: req.body.certificateFileName || '',
+          certificateFileSize: Number(req.body.certificateFileSize) || 0,
+          isFrozen: false
+        }
+      },
+      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
+    );
+
     res.json({ result });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
 router.post('/events/:id/results/:sportId/freeze', async (req, res) => {
   try {
     const event = await OrganizerEvent.findOne({ _id: req.params.id, organizer: req.user._id });
     const sport = eventSport(event || {}, req.params.sportId);
     if (!event || !sport) return res.status(404).json({ error: 'Event sport not found.' });
-    const result = await OrganizerResult.findOne({ event: event._id, sportConfigId: sport._id }).select('+entries.aadhaarHash');
-    if (!result || result.isFrozen) return res.status(400).json({ error: 'A draft result is required and may only be frozen once.' });
+    if (sport.resultStatus === 'frozen') return res.status(400).json({ error: 'This sport has already been frozen.' });
+
+    const result = await OrganizerResult.findOne({ event: event._id, sportConfigId: sport._id })
+      .select('+entries.aadhaarHash +entries.roster.aadhaarHash');
+    if (!result || result.isFrozen) return res.status(400).json({ error: 'A saved draft result is required before publishing.' });
     if (!result.entries.length) return res.status(400).json({ error: 'At least one complete result is required before publishing.' });
-    if (!certificateIsValid(result)) return res.status(400).json({ error: 'Certificate PDF is required before publishing the result.' });
-    const hashes = result.entries.map(entry => entry.aadhaarHash).filter(Boolean);
-    const athletes = await User.find({ aadhaarHash: { $in: hashes }, role: 'athlete' }).select('_id aadhaarHash');
-    const matched = new Map(athletes.map(athlete => [athlete.aadhaarHash, athlete._id]));
-    const award = (athlete, entry) => OrganizerAchievement.updateOne(
-      { athlete, result: result._id, outcome: entry.outcome },
-      { $setOnInsert: { athlete, organizer: req.user._id, event: event._id, result: result._id, sportConfigId: sport._id, team: entry.team, outcome: entry.outcome, certificateData: result.certificateData, certificateFileName: result.certificateFileName, certificateFileSize: result.certificateFileSize } },
-      { upsert: true }
-    );
-    for (const entry of result.entries) {
-      const matchedAthlete = matched.get(entry.aadhaarHash);
-      if (matchedAthlete) { entry.athlete = matchedAthlete; await award(matchedAthlete, entry); }
-      for (const member of entry.roster || []) if (member.participantType === 'registered' && member.athlete) await award(member.athlete, entry);
+
+    const resultType = sport.resultType || 'positions';
+    const isTeam = sport.competitionType === 'team';
+    const minTeamSize = sport.minimumTeamSize || 1;
+    const maxTeamSize = sport.maximumTeamSize || 50;
+
+    // Validate all results according to sport configuration
+    for (let i = 0; i < result.entries.length; i++) {
+      const entry = result.entries[i];
+      if (resultType === 'positions' && (!entry.position || entry.position < 1)) {
+        return res.status(400).json({ error: `Result ${i + 1} requires a valid finishing position.` });
+      }
+      if (resultType === 'medals' && !['Gold', 'Silver', 'Bronze'].includes(entry.medal)) {
+        return res.status(400).json({ error: `Result ${i + 1} requires Gold, Silver, or Bronze.` });
+      }
+
+      if (isTeam) {
+        if (!entry.teamName?.trim()) {
+          return res.status(400).json({ error: `Team result ${i + 1} requires a team name.` });
+        }
+        const rosterCount = entry.roster?.length || 0;
+        if (rosterCount < minTeamSize) {
+          return res.status(400).json({
+            error: `Team "${entry.teamName}" has ${rosterCount} player(s). Minimum required team size is ${minTeamSize}.`
+          });
+        }
+        if (rosterCount > maxTeamSize) {
+          return res.status(400).json({
+            error: `Team "${entry.teamName}" has ${rosterCount} player(s). Maximum allowed team size is ${maxTeamSize}.`
+          });
+        }
+        for (let j = 0; j < entry.roster.length; j++) {
+          const m = entry.roster[j];
+          if (!m.name?.trim()) {
+            return res.status(400).json({ error: `Player ${j + 1} in team "${entry.teamName}" is missing a name.` });
+          }
+          if (!m.certificateData) {
+            if (entry.certificateData) {
+              m.certificateData = entry.certificateData;
+              m.certificateFileName = entry.certificateFileName;
+              m.certificateFileSize = entry.certificateFileSize;
+            } else if (result.certificateData) {
+              m.certificateData = result.certificateData;
+              m.certificateFileName = result.certificateFileName;
+              m.certificateFileSize = result.certificateFileSize;
+            }
+          }
+          if (!m.certificateData) {
+            return res.status(400).json({ error: `Player "${m.name}" in team "${entry.teamName}" requires a certificate PDF (upload individually, for the team, or for the sport).` });
+          }
+        }
+      } else {
+        if (!entry.name?.trim()) {
+          return res.status(400).json({ error: `Participant ${i + 1} is missing a name.` });
+        }
+        if (!entry.certificateData && result.certificateData) {
+          entry.certificateData = result.certificateData;
+          entry.certificateFileName = result.certificateFileName;
+          entry.certificateFileSize = result.certificateFileSize;
+        }
+        if (!entry.certificateData) {
+          return res.status(400).json({ error: `Participant "${entry.name}" requires a certificate PDF.` });
+        }
+      }
     }
-    result.isFrozen = true; result.frozenAt = new Date(); await result.save();
-    sport.resultStatus = 'frozen'; await event.save();
-    res.json({ result, matchedAthletes: athletes.length });
+
+    // Secure Athlete Matching & Achievement Awarding
+    const hashes = [];
+    const athleteIds = [];
+    const emails = [];
+
+    const gather = (p) => {
+      if (p.aadhaarHash) hashes.push(p.aadhaarHash);
+      if (p.athleteId) athleteIds.push(p.athleteId);
+      if (p.email) emails.push(p.email.toLowerCase());
+    };
+
+    for (const entry of result.entries) {
+      if (isTeam) {
+        for (const member of entry.roster || []) gather(member);
+      } else {
+        gather(entry);
+      }
+    }
+
+    const matchQueries = [];
+    if (hashes.length) matchQueries.push({ aadhaarHash: { $in: hashes } });
+    if (athleteIds.length) matchQueries.push({ athleteId: { $in: athleteIds } });
+    if (emails.length) matchQueries.push({ email: { $in: emails } });
+
+    let matchedAthletes = [];
+    if (matchQueries.length) {
+      matchedAthletes = await User.find({ role: 'athlete', $or: matchQueries }).select('_id name athleteId email aadhaarHash');
+    }
+
+    const athleteByHash = new Map(matchedAthletes.filter(a => a.aadhaarHash).map(a => [a.aadhaarHash, a]));
+    const athleteById = new Map(matchedAthletes.filter(a => a.athleteId).map(a => [a.athleteId, a]));
+    const athleteByEmail = new Map(matchedAthletes.filter(a => a.email).map(a => [a.email.toLowerCase(), a]));
+
+    const findMatch = (p) => {
+      if (p.aadhaarHash && athleteByHash.has(p.aadhaarHash)) return athleteByHash.get(p.aadhaarHash);
+      if (p.athleteId && athleteById.has(p.athleteId)) return athleteById.get(p.athleteId);
+      if (p.email && athleteByEmail.has(p.email.toLowerCase())) return athleteByEmail.get(p.email.toLowerCase());
+      return null;
+    };
+
+    let matchedCount = 0;
+
+    for (const entry of result.entries) {
+      if (isTeam) {
+        for (const member of entry.roster || []) {
+          const matched = findMatch(member);
+          if (matched) {
+            matchedCount++;
+            member.participantType = 'registered';
+            member.athlete = matched._id;
+            member.athleteId = matched.athleteId;
+
+            await OrganizerAchievement.findOneAndUpdate(
+              { athlete: matched._id, result: result._id, outcome: entry.outcome },
+              {
+                $set: {
+                  athlete: matched._id,
+                  organizer: req.user._id,
+                  event: event._id,
+                  result: result._id,
+                  sportConfigId: sport._id,
+                  sportName: sport.sportName,
+                  team: entry.team || undefined,
+                  teamName: entry.teamName,
+                  position: entry.position,
+                  medal: entry.medal,
+                  outcome: entry.outcome,
+                  achievementType: 'Organizer Verified',
+                  certificateData: member.certificateData,
+                  certificateFileName: member.certificateFileName || `${member.name}_Certificate.pdf`,
+                  certificateFileSize: member.certificateFileSize || 0
+                }
+              },
+              { upsert: true, new: true }
+            );
+          } else {
+            member.participantType = 'offline';
+            member.athlete = undefined;
+            member.athleteId = undefined;
+          }
+        }
+      } else {
+        const matched = findMatch(entry);
+        if (matched) {
+          matchedCount++;
+          entry.participantType = 'registered';
+          entry.athlete = matched._id;
+          entry.athleteId = matched.athleteId;
+
+          await OrganizerAchievement.findOneAndUpdate(
+            { athlete: matched._id, result: result._id, outcome: entry.outcome },
+            {
+              $set: {
+                athlete: matched._id,
+                organizer: req.user._id,
+                event: event._id,
+                result: result._id,
+                sportConfigId: sport._id,
+                sportName: sport.sportName,
+                position: entry.position,
+                medal: entry.medal,
+                outcome: entry.outcome,
+                achievementType: 'Organizer Verified',
+                certificateData: entry.certificateData,
+                certificateFileName: entry.certificateFileName || `${entry.name}_Certificate.pdf`,
+                certificateFileSize: entry.certificateFileSize || 0
+              }
+            },
+            { upsert: true, new: true }
+          );
+        } else {
+          entry.participantType = 'offline';
+          entry.athlete = undefined;
+          entry.athleteId = undefined;
+        }
+      }
+    }
+
+    result.isFrozen = true;
+    result.frozenAt = new Date();
+    await result.save();
+
+    sport.resultStatus = 'frozen';
+    await event.save();
+
+    res.json({ result, matchedAthletes: matchedCount });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 module.exports = router;
