@@ -233,6 +233,29 @@ router.post('/events/:id/results/:sportId', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+router.post('/events/:id/results/:sportId/unfreeze', async (req, res) => {
+  try {
+    const event = await OrganizerEvent.findOne({ _id: req.params.id, organizer: req.user._id });
+    const sport = eventSport(event || {}, req.params.sportId);
+    if (!event || !sport) return res.status(404).json({ error: 'Event sport not found.' });
+
+    sport.resultStatus = 'pending';
+    await event.save();
+
+    const result = await OrganizerResult.findOneAndUpdate(
+      { event: event._id, sportConfigId: sport._id },
+      { $set: { isFrozen: false, frozenAt: null } },
+      { new: true }
+    );
+
+    if (result) {
+      await OrganizerAchievement.deleteMany({ result: result._id });
+    }
+
+    res.json({ success: true, result, message: 'Sport result reopened for editing.' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 router.post('/events/:id/results/:sportId/freeze', async (req, res) => {
   try {
     const event = await OrganizerEvent.findOne({ _id: req.params.id, organizer: req.user._id });

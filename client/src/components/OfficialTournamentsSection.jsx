@@ -5,6 +5,49 @@ import { useAuth } from '../context/AuthContext';
 
 const normalize = (val) => String(val || '').trim().toLowerCase();
 
+function getRankPriority(item) {
+  if (!item) return 99;
+  const p = String(item.position !== undefined && item.position !== null ? item.position : (item.rank !== undefined && item.rank !== null ? item.rank : (item.outcome || ''))).trim().toLowerCase();
+  if (p === '1' || p === '1st' || p.includes('1st') || p.includes('winner') || p.includes('champion')) return 1;
+  if (p === '2' || p === '2nd' || p.includes('2nd') || p.includes('runner')) return 2;
+  if (p === '3' || p === '3rd' || p.includes('3rd')) return 3;
+  if (p === '4' || p === '4th' || p.includes('4th')) return 4;
+
+  const m = String(item.medal || '').trim().toLowerCase();
+  if (m === 'gold' || m.includes('gold')) return 1;
+  if (m === 'silver' || m.includes('silver')) return 2;
+  if (m === 'bronze' || m.includes('bronze')) return 3;
+
+  const d = String(item.description || '').trim().toLowerCase();
+  if (d.includes('gold') || d.includes('1st') || d.includes('first') || d.includes('winner') || d.includes('champion')) return 1;
+  if (d.includes('silver') || d.includes('2nd') || d.includes('second') || d.includes('runner')) return 2;
+  if (d.includes('bronze') || d.includes('3rd') || d.includes('third')) return 3;
+
+  return 99;
+}
+
+function getRankLabel(item, fallbackRank) {
+  if (!item) return 'Participant';
+  const m = String(item.medal || '').trim();
+  if (m && m.toLowerCase() !== 'undefined' && m.toLowerCase() !== 'null') return m.toLowerCase().includes('medal') ? m : `${m} Medal`;
+
+  const p = String(item.position !== undefined && item.position !== null ? item.position : (item.rank !== undefined && item.rank !== null ? item.rank : (item.outcome || ''))).trim();
+  if (p && p.toLowerCase() !== 'undefined' && p.toLowerCase() !== 'null') {
+    const lPos = p.toLowerCase();
+    if (lPos === '1' || lPos === '1st' || lPos.includes('1st') || lPos.includes('winner')) return 'Winner (1st Place / Gold)';
+    if (lPos === '2' || lPos === '2nd' || lPos.includes('2nd') || lPos.includes('runner')) return 'Runner-up (2nd Place / Silver)';
+    if (lPos === '3' || lPos === '3rd' || lPos.includes('3rd')) return '3rd Place / Bronze';
+    return (lPos.includes('place') || lPos.includes('rank') || lPos.includes('winner')) ? p : `Rank ${p}`;
+  }
+  const d = String(item.description || '').trim();
+  if (d && (d.toLowerCase().includes('prize') || d.toLowerCase().includes('place') || d.toLowerCase().includes('medalist') || d.toLowerCase().includes('winner'))) return d;
+
+  if (fallbackRank === 1) return 'Winner (1st Place / Gold)';
+  if (fallbackRank === 2) return 'Runner-up (2nd Place / Silver)';
+  if (fallbackRank === 3) return '3rd Place / Bronze';
+  return 'Participant';
+}
+
 export default function OfficialTournamentsSection({ athleteSport, eligibleOnly = false }) {
   const { user } = useAuth() || {};
   const [upcomingEvents, setUpcomingEvents] = useState([]);
@@ -52,22 +95,176 @@ export default function OfficialTournamentsSection({ athleteSport, eligibleOnly 
       }));
       setUpcomingEvents([...orgUpcoming, ...fedUpcoming].sort((a, b) => new Date(a.tournamentDate || a.eventDate || 0) - new Date(b.tournamentDate || b.eventDate || 0)));
 
-      const fedCompleted = (compRes.data || []).map(r => ({ ...r, source: 'federation' }));
-      const orgCompleted = (orgCompRes.data?.results || []).flatMap(r => (r.entries || []).map(entry => ({
-        ...entry,
-        _id: `${r._id}-${entry._id || entry.name}`,
-        resultId: r._id,
-        tournamentName: r.event?.eventName || 'Organizer Event',
-        eventDate: r.event?.eventDate,
-        organizer: r.organizer,
-        sportName: r.event?.sports?.find(s => String(s._id) === String(r.sportConfigId))?.sportName || 'Sport',
-        source: 'organizer',
-        isFrozen: r.isFrozen,
-        frozenAt: r.frozenAt,
-        certificateData: r.certificateData,
-        certificateFileName: r.certificateFileName
-      })));
-      setCompletedResults([...fedCompleted, ...orgCompleted].sort((a, b) => new Date(b.createdAt || b.frozenAt || 0) - new Date(a.createdAt || a.frozenAt || 0)));
+      // 1. Group Federation achievements by unique database event _id
+      const fedGroupMap = new Map();
+      (compRes.data || []).forEach(ach => {
+        const eventId = String(ach.event?._id || ach.event?.eventId || ach.event || ach.officialRecordId || ach._id);
+        const key = `fed_${eventId}`;
+        const tName = (ach.event?.eventName || ach.tournamentName || 'Official Championship').trim();
+
+        if (!fedGroupMap.has(key)) {
+          fedGroupMap.set(key, {
+            _id: `fed-${eventId}`,
+            source: 'federation',
+            tournamentName: tName,
+            sport: ach.sport || ach.event?.sport || 'Sport',
+            eventDate: ach.eventDate || ach.event?.tournamentDate || ach.createdAt,
+            location: ach.event?.location || 'Official Venue',
+            category: ach.category || ach.event?.category || 'State / National Level',
+            federation: ach.federation || ach.event?.federation || null,
+            officialRecordId: ach.officialRecordId || '',
+            isFrozen: ach.isFrozen,
+            frozenAt: ach.frozenAt || ach.createdAt,
+            certificateData: ach.certificateData || null,
+            certificateFileName: ach.certificateFileName || 'Federation_Certificate.pdf',
+            entries: []
+          });
+        }
+
+        const group = fedGroupMap.get(key);
+        if (!group.certificateData && ach.certificateData) {
+          group.certificateData = ach.certificateData;
+          group.certificateFileName = ach.certificateFileName || 'Federation_Certificate.pdf';
+        }
+        if (!group.officialRecordId && ach.officialRecordId) {
+          group.officialRecordId = ach.officialRecordId;
+        }
+
+        const athleteName = ach.athlete?.name || ach.athleteName || 'Verified Athlete';
+        const priority = getRankPriority(ach);
+        const rankLabel = getRankLabel(ach, priority);
+
+        const exists = group.entries.some(e => String(e._id) === String(ach._id));
+        if (!exists) {
+          group.entries.push({
+            _id: ach._id,
+            athleteName,
+            athleteId: ach.athlete?.athleteId || ach.athleteId || '',
+            priority,
+            rankLabel,
+            medal: ach.medal,
+            position: ach.position || ach.rank,
+            rank: ach.rank,
+            description: ach.description,
+            category: ach.category || ach.event?.category,
+            certificateData: ach.certificateData,
+            certificateFileName: ach.certificateFileName || 'Federation_Certificate.pdf'
+          });
+        }
+      });
+
+      // 2. Group Organizer results by unique database event _id
+      const orgGroupMap = new Map();
+      (orgCompRes.data?.results || []).forEach(r => {
+        const event = r.event || {};
+        const eventId = String(event._id || r.event || r._id);
+        const key = `org_${eventId}`;
+        const matchedSport = event.sports?.find(s => String(s._id) === String(r.sportConfigId));
+        const sportName = matchedSport?.sportName || r.sportName || 'Sport';
+        const tName = (event.eventName || 'Organizer Tournament').trim();
+
+        const entriesList = (r.entries || []).map((entry, idx) => {
+          const teamName = entry.teamName || entry.team?.name || '';
+          const individualName = entry.name || entry.athleteName || '';
+          const entityName = teamName || individualName || 'Participant';
+          const priority = getRankPriority(entry);
+          const rankLabel = getRankLabel(entry, priority);
+          return {
+            _id: entry._id || `${r._id}-${idx}`,
+            entityName,
+            athleteName: individualName,
+            teamName,
+            priority,
+            rankLabel,
+            medal: entry.medal,
+            position: entry.position,
+            outcome: entry.outcome,
+            roster: entry.roster || [],
+            certificateData: entry.certificateData || r.certificateData,
+            certificateFileName: entry.certificateFileName || r.certificateFileName || 'Organizer_Certificate.pdf'
+          };
+        });
+
+        if (!orgGroupMap.has(key)) {
+          orgGroupMap.set(key, {
+            _id: `org-${eventId}`,
+            source: 'organizer',
+            tournamentName: tName,
+            sport: sportName,
+            sportsList: sportName ? [sportName] : [],
+            eventDate: event.eventDate || r.frozenAt || r.createdAt,
+            location: event.venue || event.venueAddress?.city || 'Venue TBA',
+            category: 'Organizer Championship',
+            organizer: r.organizer || event.organizer || null,
+            isFrozen: r.isFrozen,
+            frozenAt: r.frozenAt || r.createdAt,
+            certificateData: r.certificateData || null,
+            certificateFileName: r.certificateFileName || 'Organizer_Certificate.pdf',
+            entries: [...entriesList]
+          });
+        } else {
+          const existing = orgGroupMap.get(key);
+          if (sportName && !existing.sportsList.includes(sportName)) {
+            existing.sportsList.push(sportName);
+            existing.sport = existing.sportsList.join(', ');
+          }
+          if (!existing.certificateData && r.certificateData) {
+            existing.certificateData = r.certificateData;
+            existing.certificateFileName = r.certificateFileName || 'Organizer_Certificate.pdf';
+          }
+          entriesList.forEach(entry => {
+            const exists = existing.entries.some(e => String(e._id) === String(entry._id));
+            if (!exists) {
+              existing.entries.push(entry);
+            }
+          });
+        }
+      });
+
+      const getEntryTitle = (e) => {
+        if (!e) return '';
+        return (e.teamName || e.entityName || e.athleteName || '').trim();
+      };
+
+      const processGroup = (group) => {
+        const uniqueEntries = [];
+        const seen = new Set();
+        for (const e of group.entries) {
+          const key = String(e._id || `${e.athleteName || e.entityName}-${e.rankLabel}-${e.priority}`);
+          if (!seen.has(key)) {
+            seen.add(key);
+            uniqueEntries.push(e);
+          }
+        }
+        group.entries = uniqueEntries;
+        group.entries.sort((a, b) => a.priority - b.priority);
+
+        const first = group.entries.find(e => e.priority === 1) || (group.entries.length > 0 ? group.entries[0] : null);
+        const winnerName = first ? getEntryTitle(first) : '';
+
+        const second = group.entries.find(e => {
+          const name = getEntryTitle(e);
+          return name && name.toLowerCase() !== winnerName.toLowerCase() && (e.priority === 2 || (e !== first && e.priority <= 2));
+        });
+        const runnerUpName = second ? getEntryTitle(second) : '';
+
+        return {
+          ...group,
+          winner: winnerName,
+          runnerUp: runnerUpName
+        };
+      };
+
+      const fedList = Array.from(fedGroupMap.values()).map(processGroup);
+      const orgList = Array.from(orgGroupMap.values()).map(processGroup);
+
+      const unified = [...fedList, ...orgList].sort((a, b) => {
+        const tA = new Date(a.eventDate || a.frozenAt || 0).getTime();
+        const tB = new Date(b.eventDate || b.frozenAt || 0).getTime();
+        return tB - tA;
+      });
+
+      setCompletedResults(unified);
     } catch (err) {
       console.error('Error fetching tournaments:', err);
     } finally {
@@ -695,21 +892,15 @@ export default function OfficialTournamentsSection({ athleteSport, eligibleOnly 
                           <Lock size={10} /> {isOrg ? '[ ORGANIZER EVENT ]' : '[ FEDERATION ]'}
                         </span>
                         <span className="text-[10px] font-mono font-bold text-[#173235] bg-[#f4f8f5] px-2 py-0.5 rounded border border-[#d2dad2]">
-                          {isOrg ? 'Organizer Verified' : resItem.officialRecordId}
+                          {isOrg ? 'Organizer Verified' : (resItem.officialRecordId || 'Federation Ledger')}
                         </span>
                       </div>
 
                       <h4 className="font-extrabold text-[#173235] text-sm mt-2">
-                        {isOrg
-                          ? `${resItem.outcome || 'Awarded'} — ${resItem.tournamentName}`
-                          : (resItem.achievementType === 'medal' ? `${resItem.medal} Medal` : `Rank #${resItem.rank}`) + ` — ${resItem.tournamentName}`}
+                        {resItem.tournamentName}
                       </h4>
 
-                      <p className="text-xs font-bold text-[#194e42] mt-0.5">
-                        Winner: <strong>{isOrg ? (resItem.teamName || resItem.name || 'Participant') : resItem.athleteName}</strong>
-                      </p>
-
-                      <p className="text-[11px] text-[#526668]">
+                      <p className="text-[11px] text-[#526668] mt-0.5">
                         {isOrg
                           ? (resItem.organizer?.organizationName || resItem.organizer?.name || 'Verified Organizer')
                           : (resItem.federation?.name || 'Recognized Federation')}
@@ -717,16 +908,34 @@ export default function OfficialTournamentsSection({ athleteSport, eligibleOnly 
 
                       <div className="mt-2.5">
                         <span className="px-2 py-0.5 rounded border border-[#2f6d5a] bg-[#e2eee4] text-[10px] font-extrabold text-[#194e42] uppercase">
-                          [{isOrg ? resItem.sportName?.toUpperCase() : resItem.sport?.toUpperCase()}]
+                          [{resItem.sport?.toUpperCase()}]
                         </span>
                       </div>
 
+                      {((resItem.winner && resItem.winner !== '—' && resItem.winner !== 'TBD') || (resItem.runnerUp && resItem.runnerUp !== '—' && resItem.runnerUp !== 'TBD')) && (
+                        <div className="mt-2.5 p-2.5 bg-[#f4f8f5] rounded-lg border border-[#d8ded5] space-y-1 text-xs">
+                          {resItem.winner && resItem.winner !== '—' && resItem.winner !== 'TBD' && (
+                            <div className="flex items-center gap-1.5 text-[#173235] overflow-hidden">
+                              <span className="shrink-0">🥇</span>
+                              <span className="truncate">
+                                <b>Winner:</b> <span className="font-extrabold text-[#194e42]">{resItem.winner}</span>
+                              </span>
+                            </div>
+                          )}
+                          {resItem.runnerUp && resItem.runnerUp !== '—' && resItem.runnerUp !== 'TBD' && (
+                            <div className="flex items-center gap-1.5 text-[#173235] overflow-hidden">
+                              <span className="shrink-0">🥈</span>
+                              <span className="truncate">
+                                <b>Runner-up:</b> <span className="font-bold text-[#526668]">{resItem.runnerUp}</span>
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       <div className="space-y-1 mt-2 text-xs text-[#526668]">
                         <div>
-                          Tournament Date:{' '}
-                          {isOrg
-                            ? (resItem.eventDate ? new Date(resItem.eventDate).toLocaleDateString('en-IN') : '—')
-                            : (resItem.event?.tournamentDate ? new Date(resItem.event.tournamentDate).toLocaleDateString('en-IN') : new Date(resItem.eventDate).toLocaleDateString('en-IN'))}
+                          Tournament Date: {resItem.eventDate ? new Date(resItem.eventDate).toLocaleDateString('en-IN') : '—'}
                         </div>
                       </div>
                     </div>

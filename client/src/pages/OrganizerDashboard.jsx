@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'; import { Navigate } from 'react-router-dom'; import { useAuth } from '../context/AuthContext'; import api from '../services/api';
-import { Award, Trophy, Shield, CheckCircle, AlertCircle, AlertTriangle, Trash2, Plus, FileText, Eye, Upload, Users, User, X, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { Award, Trophy, Shield, CheckCircle, AlertCircle, AlertTriangle, Trash2, Plus, FileText, Eye, Upload, Users, User, X, Check, ChevronDown, ChevronUp, Edit3 } from 'lucide-react';
 const blankSport={sportName:'',competitionType:'individual',resultType:'positions',feeType:'free',feeAmount:0,minimumTeamSize:'',maximumTeamSize:''};
 const tags=sports=><div className="flex flex-wrap gap-1">{sports.map(s=><span key={s._id||s.sportName} className="px-2 py-1 rounded bg-[#e2eee4] border border-[#2f6d5a] text-[10px] font-bold">{s.sportName.toUpperCase()}</span>)}</div>;
 export default function OrganizerDashboard(){const {user,logout}=useAuth();const [tab,setTab]=useState('add'),[events,setEvents]=useState([]),[ledger,setLedger]=useState([]),[message,setMessage]=useState('');const [form,setForm]=useState({eventName:'',description:'',eventDate:'',registrationDeadline:'',teamFormationDeadline:'',resultSubmissionDeadline:'',venue:'',venueAddress:{city:''},rules:'',sports:[{...blankSport}]});const load=async()=>{try{const [e,l]=await Promise.all([api.get('/organizer/events'),api.get('/organizer/ledger')]);setEvents(e.data.events||[]);setLedger(l.data.entries||[])}catch(e){setMessage(e.response?.data?.error||'Could not load organizer data.')}};useEffect(()=>{load()},[]);const sport=(i,k,v)=>setForm(f=>({...f,sports:f.sports.map((s,x)=>x===i?{...s,[k]:v}:s)}));async function create(e){e.preventDefault();try{await api.post('/organizer/events',{...form,sports:form.sports.map(s=>({...s,minimumTeamSize:Number(s.minimumTeamSize)||undefined,maximumTeamSize:Number(s.maximumTeamSize)||undefined,feeAmount:Number(s.feeAmount)||0}))});setMessage('Event published.');setForm({...form,eventName:'',sports:[{...blankSport}]});load()}catch(e){setMessage(e.response?.data?.error||'Unable to publish event.')}}if(!user||user.role!=='organizer')return <Navigate to="/organizer/login" replace/>;return <div className="min-h-screen bg-[#f7f8f4] p-5 md:p-10 text-[#173235]"><header className="flex justify-between mb-8"><div><p className="eyebrow">ORGANIZER DASHBOARD · {user.organizerId}</p><h1 className="text-3xl font-bold">Welcome, {user.name}</h1></div><button onClick={logout} className="px-4 py-2 rounded bg-white border">Sign out</button></header><nav className="flex flex-wrap gap-2 mb-6">{[['add','Add Event'],['registrations','Registrations Received'],['results','Upload Results'],['ledger','Ledger View']].map(([id,label])=><button key={id} onClick={()=>setTab(id)} className={'px-4 py-2 rounded font-bold '+(tab===id?'bg-[#194e42] text-white':'bg-white border')}>{label}</button>)}</nav>{message&&<p className="mb-4 p-3 rounded bg-[#e2eee4]">{message}</p>}{tab==='add'&&<form onSubmit={create} className="max-w-4xl bg-white rounded-xl p-6 space-y-4"><h2 className="text-xl font-bold">Create organizer event</h2><input required className="w-full border p-2 rounded" placeholder="Event name" value={form.eventName} onChange={e=>setForm({...form,eventName:e.target.value})}/><div className="grid md:grid-cols-3 gap-3">{[['eventDate','Event date'],['registrationDeadline','Registration deadline'],['resultSubmissionDeadline','Result submission deadline']].map(([k,l])=><label key={k}>{l}<input required className="block w-full border p-2 rounded" type="datetime-local" value={form[k]} onChange={e=>setForm({...form,[k]:e.target.value})}/></label>)}</div><input required className="w-full border p-2 rounded" placeholder="Event venue / conducting location" value={form.venue} onChange={e=>setForm({...form,venue:e.target.value})}/><h3 className="font-bold">Sports included</h3>{form.sports.map((s,i)=><div key={i} className="border rounded p-3 grid md:grid-cols-3 gap-2"><input required className="border p-2 rounded" placeholder="Sport name" value={s.sportName} onChange={e=>sport(i,'sportName',e.target.value)}/><select className="border p-2 rounded" value={s.competitionType} onChange={e=>sport(i,'competitionType',e.target.value)}><option value="individual">Individual</option><option value="team">Team</option></select><select className="border p-2 rounded" value={s.resultType} onChange={e=>sport(i,'resultType',e.target.value)}><option value="positions">Positions</option><option value="medals">Gold / Silver / Bronze</option></select><select className="border p-2 rounded" value={s.feeType} onChange={e=>sport(i,'feeType',e.target.value)}><option value="free">Free</option><option value="per_participant">Per Participant</option><option value="per_team">Per Team</option></select>{s.competitionType==='team'&&<><input required type="number" min="1" className="border p-2 rounded" placeholder="Minimum team size" value={s.minimumTeamSize} onChange={e=>sport(i,'minimumTeamSize',e.target.value)}/><input required type="number" min="1" className="border p-2 rounded" placeholder="Maximum team size" value={s.maximumTeamSize} onChange={e=>sport(i,'maximumTeamSize',e.target.value)}/></>}<input type="number" min="0" className="border p-2 rounded" placeholder="Fee amount" value={s.feeAmount} onChange={e=>sport(i,'feeAmount',e.target.value)}/><button type="button" onClick={()=>setForm({...form,sports:form.sports.filter((_,x)=>x!==i)})}>Remove</button></div>)}<button type="button" className="border p-2 rounded" onClick={()=>setForm({...form,sports:[...form.sports,{...blankSport}]})}>+ Add Sport</button><button className="block bg-[#e07050] text-white px-5 py-2 rounded font-bold">Publish Event</button></form>}{tab==='registrations'&&<RegistrationView events={events}/>} {tab==='results'&&<ResultsView events={events} onMessage={setMessage} onDone={load}/>} {tab==='ledger'&&<section className="space-y-3">{ledger.map(e=><article key={e._id} className="bg-white p-4 rounded"><b>{e.eventName}</b>{tags(e.sports)}<p>{e.registrationCount} registrations · {e.teamCount||0} teams · {e.frozenSports} frozen · {e.pendingSports} pending</p></article>)}</section>}</div>}
@@ -251,17 +251,6 @@ function ResultsView({ events, onMessage, onDone }) {
   const addTeamResult = () => {
     const nextPos = entries.length + 1;
     const nextMedal = entries.length === 0 ? 'Gold' : entries.length === 1 ? 'Silver' : 'Bronze';
-    const defaultRoster = Array.from({ length: minTeamSize }, (_, idx) => ({
-      name: '',
-      isCaptain: idx === 0,
-      mobile: '',
-      email: '',
-      aadhaar: '',
-      participantType: 'offline',
-      certificateData: null,
-      certificateFileName: '',
-      certificateFileSize: 0
-    }));
 
     setEntries(prev => [
       ...prev,
@@ -269,7 +258,7 @@ function ResultsView({ events, onMessage, onDone }) {
         teamName: '',
         position: nextPos,
         medal: nextMedal,
-        roster: defaultRoster,
+        roster: [],
         certificateData: null,
         certificateFileName: '',
         certificateFileSize: 0
@@ -369,26 +358,6 @@ function ResultsView({ events, onMessage, onDone }) {
           }
         ]
       };
-    }));
-  };
-
-  const autoFillMinRoster = (tIdx) => {
-    setEntries(prev => prev.map((t, idx) => {
-      if (idx !== tIdx) return t;
-      const needed = minTeamSize - t.roster.length;
-      if (needed <= 0) return t;
-      const extra = Array.from({ length: needed }, (_, i) => ({
-        name: '',
-        isCaptain: t.roster.length === 0 && i === 0,
-        mobile: '',
-        email: '',
-        aadhaar: '',
-        participantType: 'offline',
-        certificateData: null,
-        certificateFileName: '',
-        certificateFileSize: 0
-      }));
-      return { ...t, roster: [...t.roster, ...extra] };
     }));
   };
 
@@ -596,6 +565,35 @@ function ResultsView({ events, onMessage, onDone }) {
     }
   };
 
+  const handleUnfreeze = async () => {
+    if (!pick || busy) return;
+    const confirm = window.confirm(
+      `Reopen Result for Editing?\n\nThis will unfreeze "${sportConfig.sportName.toUpperCase()}" and return it to draft mode. You will be able to modify the roster, upload certificates, and re-freeze when ready.`
+    );
+    if (!confirm) return;
+
+    setBusy(true);
+    try {
+      await api.post(`/organizer/events/${pick.event._id}/results/${pick.sport._id}/unfreeze`);
+      onMessage(`✓ ${sportConfig.sportName.toUpperCase()} results reopened for editing.`);
+      await onDone();
+      const updatedSport = { ...pick.sport, resultStatus: 'pending' };
+      setSportConfig(updatedSport);
+      setPick(prev => ({
+        ...prev,
+        sport: updatedSport,
+        event: {
+          ...prev.event,
+          sports: (prev.event.sports || []).map(s => s._id === updatedSport._id ? updatedSport : s)
+        }
+      }));
+    } catch (err) {
+      onMessage(err.response?.data?.error || 'Failed to reopen results.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <section className="space-y-6">
       {/* Event Sports Navigation Grid */}
@@ -690,14 +688,24 @@ function ResultsView({ events, onMessage, onDone }) {
           <div className="p-6 space-y-6">
             {/* Frozen Notice */}
             {isFrozen ? (
-              <div className="p-4 rounded-xl bg-[#e2eee4] border border-[#2f6d5a] flex items-start gap-3">
-                <Shield className="w-5 h-5 text-[#194e42] shrink-0 mt-0.5" />
-                <div className="text-xs text-[#194e42]">
-                  <b className="text-sm font-extrabold block">ORGANIZER VERIFIED · IMMUTABLE &amp; FROZEN</b>
-                  <p className="mt-0.5">
-                    This sport result is verified and permanently sealed on the public blockchain/ledger. Matched registered athletes have received their verified credentials. Other sports in this event remain independently editable.
-                  </p>
+              <div className="p-4 rounded-xl bg-[#e2eee4] border border-[#2f6d5a] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <Shield className="w-5 h-5 text-[#194e42] shrink-0 mt-0.5" />
+                  <div className="text-xs text-[#194e42]">
+                    <b className="text-sm font-extrabold block">ORGANIZER VERIFIED · IMMUTABLE &amp; FROZEN</b>
+                    <p className="mt-0.5">
+                      This sport result is verified and permanently sealed on the public blockchain/ledger. Matched registered athletes have received their verified credentials.
+                    </p>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleUnfreeze}
+                  disabled={busy}
+                  className="px-4 py-2 rounded-xl bg-[#e07050] hover:bg-[#c95d3e] text-white text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-xs shrink-0 self-start sm:self-auto disabled:opacity-50"
+                >
+                  <Edit3 className="w-4 h-4" /> ✎ Reopen / Edit Result (Dev Mode)
+                </button>
               </div>
             ) : (
               <div className="p-4 rounded-xl bg-[#f8faf7] border border-[#d8ded5] flex items-start gap-3">
@@ -1020,27 +1028,30 @@ function ResultsView({ events, onMessage, onDone }) {
                                   </div>
 
                                   <div className="flex items-center gap-2">
-                                    {rLen < minTeamSize && (
-                                      <button
-                                        type="button"
-                                        onClick={() => autoFillMinRoster(tIdx)}
-                                        className="px-3 py-1 rounded-lg bg-[#e2eee4] text-[#194e42] hover:bg-[#d5e7d8] border border-[#2f6d5a] text-xs font-bold cursor-pointer transition"
-                                      >
-                                        + Auto-add {minTeamSize - rLen} Rows
-                                      </button>
-                                    )}
                                     <button
                                       type="button"
                                       onClick={() => addPlayerRow(tIdx)}
                                       disabled={rLen >= maxTeamSize}
-                                      className="px-3 py-1 rounded-lg bg-[#194e42] text-white hover:bg-[#143d34] text-xs font-bold cursor-pointer disabled:opacity-50 transition"
+                                      className="px-3.5 py-1.5 rounded-lg bg-[#194e42] text-white hover:bg-[#143d34] text-xs font-bold cursor-pointer disabled:opacity-50 transition flex items-center gap-1.5"
                                     >
-                                      + Add Player Row
+                                      <Plus className="w-3.5 h-3.5" /> + Add Team Member
                                     </button>
                                   </div>
                                 </div>
 
                                 {/* Dynamic Roster Table */}
+                                {rLen === 0 ? (
+                                  <div className="p-6 text-center border-2 border-dashed border-[#d8ded5] rounded-xl bg-[#fafbf9] space-y-2">
+                                    <p className="text-xs text-[#697c7c]">No team members added yet.</p>
+                                    <button
+                                      type="button"
+                                      onClick={() => addPlayerRow(tIdx)}
+                                      className="px-4 py-2 rounded-xl bg-[#194e42] text-white text-xs font-bold hover:bg-[#143d34] transition cursor-pointer inline-flex items-center gap-1.5"
+                                    >
+                                      <Plus className="w-3.5 h-3.5" /> + Add First Team Member
+                                    </button>
+                                  </div>
+                                ) : (
                                 <div className="overflow-x-auto border border-[#d8ded5] rounded-xl">
                                   <table className="w-full text-xs text-left">
                                     <thead className="bg-[#fafbf9] text-[#526668] border-b border-[#d8ded5]">
@@ -1162,6 +1173,7 @@ function ResultsView({ events, onMessage, onDone }) {
                                     </tbody>
                                   </table>
                                 </div>
+                                )}
                               </div>
                             </div>
                           );
