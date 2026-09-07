@@ -600,6 +600,7 @@ export default function AcademyDashboard() {
       {/* HORIZONTAL NAVIGATION BAR */}
       <div className="flex items-center gap-2 border-b border-[#cbd5e1] pb-1 overflow-x-auto">
         <button
+          id="tab-sports"
           type="button"
           onClick={() => setActiveNav('sports')}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
@@ -613,6 +614,7 @@ export default function AcademyDashboard() {
         </button>
 
         <button
+          id="tab-openings"
           type="button"
           onClick={() => setActiveNav('openings')}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
@@ -626,6 +628,7 @@ export default function AcademyDashboard() {
         </button>
 
         <button
+          id="tab-requests"
           type="button"
           onClick={() => setActiveNav('requests')}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap relative ${
@@ -644,6 +647,7 @@ export default function AcademyDashboard() {
         </button>
 
         <button
+          id="tab-profile"
           type="button"
           onClick={() => setActiveNav('profile')}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
