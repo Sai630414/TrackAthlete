@@ -210,20 +210,23 @@ export default function HomePage() {
           const priority = getRankPriority(ach);
           const rankLabel = getRankLabel(ach, priority);
 
-          group.entries.push({
-            _id: ach._id,
-            athleteName,
-            athleteId: ach.athlete?.athleteId || ach.athleteId || '',
-            priority,
-            rankLabel,
-            medal: ach.medal,
-            position: ach.position || ach.rank,
-            rank: ach.rank,
-            description: ach.description,
-            category: ach.category || ach.event?.category,
-            certificateData: ach.certificateData,
-            certificateFileName: ach.certificateFileName || 'Federation_Certificate.pdf'
-          });
+          const exists = group.entries.some(e => String(e._id) === String(ach._id));
+          if (!exists) {
+            group.entries.push({
+              _id: ach._id,
+              athleteName,
+              athleteId: ach.athlete?.athleteId || ach.athleteId || '',
+              priority,
+              rankLabel,
+              medal: ach.medal,
+              position: ach.position || ach.rank,
+              rank: ach.rank,
+              description: ach.description,
+              category: ach.category || ach.event?.category,
+              certificateData: ach.certificateData,
+              certificateFileName: ach.certificateFileName || 'Federation_Certificate.pdf'
+            });
+          }
         });
 
         // Group Organizer results by unique database event _id
@@ -285,7 +288,12 @@ export default function HomePage() {
               existing.certificateData = r.certificateData;
               existing.certificateFileName = r.certificateFileName || 'Organizer_Certificate.pdf';
             }
-            existing.entries.push(...entriesList);
+            entriesList.forEach(entry => {
+              const exists = existing.entries.some(e => String(e._id) === String(entry._id));
+              if (!exists) {
+                existing.entries.push(entry);
+              }
+            });
           }
         });
 
@@ -295,19 +303,31 @@ export default function HomePage() {
         };
 
         const processGroup = (group) => {
+          // Deduplicate entries by unique ID or name-rank
+          const uniqueEntries = [];
+          const seen = new Set();
+          for (const e of group.entries) {
+            const key = String(e._id || `${e.athleteName || e.entityName}-${e.rankLabel}-${e.priority}`);
+            if (!seen.has(key)) {
+              seen.add(key);
+              uniqueEntries.push(e);
+            }
+          }
+          group.entries = uniqueEntries;
+
           // Sort entries by position / medal rank priority
           group.entries.sort((a, b) => a.priority - b.priority);
 
           // 1st place / Gold is the Winner (team name prioritized for team events)
-          const first = group.entries.find(e => e.priority === 1) || group.entries[0];
-          const winnerName = getEntryTitle(first) || 'TBD';
+          const first = group.entries.find(e => e.priority === 1) || (group.entries.length > 0 ? group.entries[0] : null);
+          const winnerName = first ? getEntryTitle(first) : '';
 
           // 2nd place / Silver is the Runner-up
           const second = group.entries.find(e => {
             const name = getEntryTitle(e);
-            return name && name.toLowerCase() !== winnerName.toLowerCase() && (e.priority === 2 || e !== first);
+            return name && name.toLowerCase() !== winnerName.toLowerCase() && (e.priority === 2 || (e !== first && e.priority <= 2));
           });
-          const runnerUpName = second ? getEntryTitle(second) : '—';
+          const runnerUpName = second ? getEntryTitle(second) : '';
 
           return {
             ...group,
@@ -1239,30 +1259,36 @@ export default function HomePage() {
                       </div>
 
                       {/* Winner & Runner-up Podium Card Summary */}
-                      <div style={{
-                        background: '#f4f8f3',
-                        border: '1px solid #d8ded5',
-                        borderRadius: 10,
-                        padding: '10px 12px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 6,
-                        marginBottom: 14,
-                        fontSize: 12
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, overflow: 'hidden' }}>
-                          <span style={{ fontSize: 14, flexShrink: 0 }}>🥇</span>
-                          <span style={{ color: '#173235', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            <b>Winner:</b> <span style={{ color: '#194e42', fontWeight: 800 }}>{res.winner || 'TBD'}</span>
-                          </span>
+                      {((res.winner && res.winner !== '—' && res.winner !== 'TBD') || (res.runnerUp && res.runnerUp !== '—' && res.runnerUp !== 'TBD')) && (
+                        <div style={{
+                          background: '#f4f8f3',
+                          border: '1px solid #d8ded5',
+                          borderRadius: 10,
+                          padding: '10px 12px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 6,
+                          marginBottom: 14,
+                          fontSize: 12
+                        }}>
+                          {res.winner && res.winner !== '—' && res.winner !== 'TBD' && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 7, overflow: 'hidden' }}>
+                              <span style={{ fontSize: 14, flexShrink: 0 }}>🥇</span>
+                              <span style={{ color: '#173235', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <b>Winner:</b> <span style={{ color: '#194e42', fontWeight: 800 }}>{res.winner}</span>
+                              </span>
+                            </div>
+                          )}
+                          {res.runnerUp && res.runnerUp !== '—' && res.runnerUp !== 'TBD' && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 7, overflow: 'hidden' }}>
+                              <span style={{ fontSize: 14, flexShrink: 0 }}>🥈</span>
+                              <span style={{ color: '#173235', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <b>Runner-up:</b> <span style={{ color: '#526668', fontWeight: 700 }}>{res.runnerUp}</span>
+                              </span>
+                            </div>
+                          )}
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, overflow: 'hidden' }}>
-                          <span style={{ fontSize: 14, flexShrink: 0 }}>🥈</span>
-                          <span style={{ color: '#173235', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            <b>Runner-up:</b> <span style={{ color: '#526668', fontWeight: 700 }}>{res.runnerUp || 'TBD'}</span>
-                          </span>
-                        </div>
-                      </div>
+                      )}
                     </div>
 
                     {/* Card Action */}
@@ -1557,12 +1583,31 @@ export default function HomePage() {
                   </>
                 ) : (
                   <div>
-                    <span style={{ color: '#697c7c', display: 'block', fontSize: 11, fontWeight: 700 }}>CONTACT INFORMATION</span>
-                    <span style={{ color: '#173235', fontWeight: 700 }}>
-                      {selectedEventModal.organizer?.showContactDetailsPublicly
-                        ? `${selectedEventModal.organizer.phone || ''} ${selectedEventModal.organizer.email ? `(${selectedEventModal.organizer.email})` : ''}`
-                        : 'Official Communications via TrackAthlete Platform (Private)'}
-                    </span>
+                    <span style={{ color: '#697c7c', display: 'block', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>CONTACT INFORMATION</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, color: '#173235', fontWeight: 600 }}>
+                      <div>
+                        <span style={{ color: '#697c7c', fontWeight: 500 }}>Organizer: </span>
+                        {selectedEventModal.organizerContact?.name || selectedEventModal.organizer?.name || 'Official Organizer'}
+                      </div>
+                      {(selectedEventModal.organizer?.organizationName) && (
+                        <div>
+                          <span style={{ color: '#697c7c', fontWeight: 500 }}>Organization: </span>
+                          {selectedEventModal.organizer.organizationName}
+                        </div>
+                      )}
+                      {(selectedEventModal.organizerContact?.mobile || selectedEventModal.organizer?.mobile || selectedEventModal.organizer?.phone) && (
+                        <div>
+                          <span style={{ color: '#697c7c', fontWeight: 500 }}>Mobile: </span>
+                          {selectedEventModal.organizerContact?.mobile || selectedEventModal.organizer?.mobile || selectedEventModal.organizer?.phone}
+                        </div>
+                      )}
+                      {(selectedEventModal.organizerContact?.email || selectedEventModal.organizer?.email) && (
+                        <div>
+                          <span style={{ color: '#697c7c', fontWeight: 500 }}>Email: </span>
+                          {selectedEventModal.organizerContact?.email || selectedEventModal.organizer?.email}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1876,35 +1921,6 @@ export default function HomePage() {
                             }}>
                               {entry.rankLabel}
                             </span>
-
-                            {entry.certificateData && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setPdfModal({
-                                    dataUri: entry.certificateData,
-                                    fileName: entry.certificateFileName || `${name}_Certificate.pdf`,
-                                    title: `${name} Certificate`
-                                  });
-                                }}
-                                style={{
-                                  height: 30,
-                                  padding: '0 10px',
-                                  borderRadius: 6,
-                                  border: 'none',
-                                  background: '#194e42',
-                                  color: '#ffffff',
-                                  fontSize: 10,
-                                  fontWeight: 800,
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 4
-                                }}
-                              >
-                                <Eye size={12} /> Certificate
-                              </button>
-                            )}
                           </div>
                         </div>
 
@@ -2004,54 +2020,58 @@ export default function HomePage() {
                 </div>
               )}
 
-              {/* Certificate PDF Preview Button */}
-              {selectedResultModal.certificateData && (
-                <div style={{
-                  background: '#f4f8f3',
-                  padding: 16,
-                  borderRadius: 12,
-                  border: '1px solid #d8ded5',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 12
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <FileText size={20} style={{ color: '#e07050' }} />
-                    <div>
-                      <div style={{ fontWeight: 800, fontSize: 13, color: '#173235' }}>Official Certificate PDF</div>
-                      <div style={{ fontSize: 11, color: '#697c7c' }}>{selectedResultModal.certificateFileName}</div>
+              {/* Official Certificate PDF (Rendered Once at the Bottom) */}
+              {(selectedResultModal.certificateData || selectedResultModal.entries?.some(e => e.certificateData)) && (() => {
+                const certData = selectedResultModal.certificateData || selectedResultModal.entries?.find(e => e.certificateData)?.certificateData;
+                const certFileName = selectedResultModal.certificateFileName || selectedResultModal.entries?.find(e => e.certificateFileName)?.certificateFileName || 'Official_Certificate.pdf';
+                return (
+                  <div style={{
+                    background: '#f4f8f3',
+                    padding: 16,
+                    borderRadius: 12,
+                    border: '1px solid #d8ded5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <FileText size={20} style={{ color: '#e07050' }} />
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 13, color: '#173235' }}>Official Certificate PDF</div>
+                        <div style={{ fontSize: 11, color: '#697c7c' }}>{certFileName}</div>
+                      </div>
                     </div>
-                  </div>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPdfModal({
-                        dataUri: selectedResultModal.certificateData,
-                        fileName: selectedResultModal.certificateFileName,
-                        title: `${selectedResultModal.tournamentName} Certificate`
-                      });
-                    }}
-                    style={{
-                      height: 36,
-                      padding: '0 16px',
-                      borderRadius: 8,
-                      border: 'none',
-                      background: '#194e42',
-                      color: '#ffffff',
-                      fontSize: 11,
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6
-                    }}
-                  >
-                    <Eye size={13} /> View Certificate
-                  </button>
-                </div>
-              )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPdfModal({
+                          dataUri: certData,
+                          fileName: certFileName,
+                          title: `${selectedResultModal.tournamentName} Certificate`
+                        });
+                      }}
+                      style={{
+                        height: 36,
+                        padding: '0 16px',
+                        borderRadius: 8,
+                        border: 'none',
+                        background: '#194e42',
+                        color: '#ffffff',
+                        fontSize: 11,
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6
+                      }}
+                    >
+                      <Eye size={13} /> View Certificate
+                    </button>
+                  </div>
+                );
+              })()}
 
               {/* Modal Actions */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 10, borderTop: '1px solid #d8ded5' }}>

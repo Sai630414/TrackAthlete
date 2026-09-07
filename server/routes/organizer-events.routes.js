@@ -11,15 +11,10 @@ const sameSport = (left, right) => String(left || '').trim().toLocaleLowerCase()
 
 router.get('/upcoming', async (_req, res) => {
   const events = await OrganizerEvent.find({ status: 'published', eventDate: { $gte: new Date() } })
-    .populate('organizer', 'name organizationName organizerId')
+    .populate('organizer', 'name organizationName organizerId mobile email designation officialAddress')
     .sort({ eventDate: 1 });
   const sanitized = events.map(e => {
     const json = e.toJSON();
-    const showContact = json.showContactDetailsPublicly || json.organizerContact?.showContactDetailsPublicly;
-    if (!showContact && json.organizerContact) {
-      delete json.organizerContact.mobile;
-      delete json.organizerContact.email;
-    }
     return { ...json, sourceType: 'organizer' };
   });
   res.json({ events: sanitized });
@@ -30,7 +25,7 @@ router.get('/completed', async (_req, res) => {
     const results = await OrganizerResult.find({ isFrozen: true })
       .select('-entries.aadhaarHash -entries.mobile -entries.roster.mobile -entries.roster.email')
       .populate('event', 'eventName eventDate venue sports')
-      .populate('organizer', 'name organizationName organizerId')
+      .populate('organizer', 'name organizationName organizerId mobile email designation officialAddress')
       .sort({ frozenAt: -1 });
     res.json({ results });
   } catch (err) {
@@ -39,14 +34,9 @@ router.get('/completed', async (_req, res) => {
 });
 router.get('/:id', async (req, res) => {
   const event = await OrganizerEvent.findOne({ _id: req.params.id, status: 'published' })
-    .populate('organizer', 'name organizationName organizerId');
+    .populate('organizer', 'name organizationName organizerId mobile email designation officialAddress');
   if (!event) return res.status(404).json({ error: 'Event not found.' });
   const json = event.toJSON();
-  const showContact = json.showContactDetailsPublicly || json.organizerContact?.showContactDetailsPublicly;
-  if (!showContact && json.organizerContact) {
-    delete json.organizerContact.mobile;
-    delete json.organizerContact.email;
-  }
   res.json({ event: json });
 });
 

@@ -37,16 +37,11 @@ router.get('/upcoming', async (req, res) => {
 
     const OrganizerEvent = require('../models/OrganizerEvent');
     const organizerEvents = await OrganizerEvent.find({ status: 'published', eventDate: { $gt: now } })
-      .populate('organizer', 'name organizationName organizerId')
+      .populate('organizer', 'name organizationName organizerId mobile email designation officialAddress')
       .sort({ eventDate: 1 });
 
     const sanitizedOrg = organizerEvents.map(event => {
       const json = event.toJSON();
-      const showContact = json.showContactDetailsPublicly || json.organizerContact?.showContactDetailsPublicly;
-      if (!showContact && json.organizerContact) {
-        delete json.organizerContact.mobile;
-        delete json.organizerContact.email;
-      }
       return { ...json, sourceType: 'organizer' };
     });
 
