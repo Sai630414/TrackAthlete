@@ -32,12 +32,27 @@ router.get('/upcoming', async (req, res) => {
   try {
     const now = new Date();
     const upcomingEvents = await OfficialEvent.find({ tournamentDate: { $gt: now } })
-    .populate('federation', 'name federationId sport state website')
-    .sort({ tournamentDate: 1, createdAt: -1 });
+      .populate('federation', 'name federationId sport state website')
+      .sort({ tournamentDate: 1, createdAt: -1 });
 
     const OrganizerEvent = require('../models/OrganizerEvent');
-    const organizerEvents = await OrganizerEvent.find({ status: 'published', eventDate: { $gt: now } }).populate('organizer', 'name organizationName organizerId').sort({ eventDate: 1 });
+    const organizerEvents = await OrganizerEvent.find({ status: 'published', eventDate: { $gt: now } })
+      .populate('organizer', 'name organizationName organizerId')
+      .select('-organizerContact.mobile -organizerContact.email')
+      .sort({ eventDate: 1 });
     res.json({ federationEvents: upcomingEvents, organizerEvents: organizerEvents.map(event => ({ ...event.toJSON(), sourceType: 'organizer' })) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/tournaments/:id — Single tournament public details
+router.get('/:id', async (req, res) => {
+  try {
+    const event = await OfficialEvent.findById(req.params.id)
+      .populate('federation', 'name federationId sport state website');
+    if (!event) return res.status(404).json({ error: 'Tournament not found.' });
+    res.json({ event, source: 'federation' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

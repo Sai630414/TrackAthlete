@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Building2, CalendarPlus, CheckCircle2, HeartHandshake, KeyRound, LoaderCircle, LockKeyhole, Mail, UserRound, UsersRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -21,12 +21,14 @@ const roles = [
   ,{ id: 'organizer', label: 'Organize Event', copy: 'Create and manage sports events', icon: CalendarPlus }
 ];
 
-export default function Login() {
+export default function Login({ initialMode }) {
+  const [searchParams] = useSearchParams();
+  const requestedMode = initialMode || searchParams.get('mode') || 'signin';
   const { user, login, signup, forgotPassword, resetPassword } = useAuth();
   const navigate = useNavigate();
 
-  const [mode, setMode] = useState('signin'); // 'signin' | 'signup' | 'forgot'
-  const [role, setRole] = useState('parent');
+  const [mode, setMode] = useState(requestedMode === 'signup' ? 'signup' : (requestedMode === 'forgot' ? 'forgot' : 'signin'));
+  const [role, setRole] = useState(searchParams.get('role') || 'parent');
 
   // Common Form Fields
   const [email, setEmail] = useState('');

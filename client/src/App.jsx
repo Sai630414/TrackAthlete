@@ -16,6 +16,8 @@ import VerificationPortal from './pages/VerificationPortal';
 import OrganizerLogin from './pages/OrganizerLogin';
 import OrganizerDashboard from './pages/OrganizerDashboard';
 
+import HomePage from './pages/HomePage';
+
 const routeForRole = {
   parent: '/parent',
   athlete: '/athlete',
@@ -42,12 +44,12 @@ function ProtectedApp() {
       <Sidebar />
       <main className="app-main">
         <Routes>
-          <Route path="/" element={<Navigate to={destination} replace />} />
           <Route path="/parent" element={user.role === 'parent' ? <ParentDashboard /> : <Navigate to={destination} replace />} />
           <Route path="/athlete" element={user.role === 'athlete' ? <AthleteDashboard /> : <Navigate to={destination} replace />} />
           <Route path="/coach" element={user.role === 'coach' ? <CoachDashboard /> : <Navigate to={destination} replace />} />
           <Route path="/sponsor" element={user.role === 'sponsor' ? <SponsorDashboard /> : <Navigate to={destination} replace />} />
           <Route path="/academy" element={['academy', 'admin'].includes(user.role) ? <AcademyDashboard /> : <Navigate to={destination} replace />} />
+          <Route path="*" element={<Navigate to={destination} replace />} />
         </Routes>
       </main>
     </div>
@@ -60,7 +62,9 @@ export default function App() {
       <TooltipProvider delayDuration={120}>
         <BrowserRouter>
           <Routes>
+            <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Login initialMode="signup" />} />
             <Route path="/federation/login" element={<FederationLogin />} />
             <Route path="/federation/dashboard" element={<FederationDashboard />} />
             <Route path="/organizer/login" element={<OrganizerLogin />} />

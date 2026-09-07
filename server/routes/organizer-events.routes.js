@@ -10,14 +10,17 @@ const escaped = value => String(value).replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&
 const sameSport = (left, right) => String(left || '').trim().toLocaleLowerCase() === String(right || '').trim().toLocaleLowerCase();
 
 router.get('/upcoming', async (_req, res) => {
-  const events = await OrganizerEvent.find({ status: 'published', eventDate: { $gte: new Date() } }).populate('organizer', 'name organizationName organizerId').sort({ eventDate: 1 });
+  const events = await OrganizerEvent.find({ status: 'published', eventDate: { $gte: new Date() } })
+    .select('-organizerContact.mobile -organizerContact.email')
+    .populate('organizer', 'name organizationName organizerId')
+    .sort({ eventDate: 1 });
   res.json({ events: events.map(e => ({ ...e.toJSON(), sourceType: 'organizer' })) });
 });
 router.get('/completed', async (_req, res) => {
   try {
     const OrganizerResult = require('../models/OrganizerResult');
     const results = await OrganizerResult.find({ isFrozen: true })
-      .select('-entries.aadhaarHash')
+      .select('-entries.aadhaarHash -entries.mobile -entries.roster.mobile -entries.roster.email')
       .populate('event', 'eventName eventDate venue sports')
       .populate('organizer', 'name organizationName organizerId')
       .sort({ frozenAt: -1 });
@@ -26,7 +29,13 @@ router.get('/completed', async (_req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-router.get('/:id', async (req, res) => { const event = await OrganizerEvent.findOne({ _id: req.params.id, status: 'published' }).populate('organizer', 'name organizationName organizerId'); if (!event) return res.status(404).json({ error: 'Event not found.' }); res.json({ event }); });
+router.get('/:id', async (req, res) => {
+  const event = await OrganizerEvent.findOne({ _id: req.params.id, status: 'published' })
+    .select('-organizerContact.mobile -organizerContact.email')
+    .populate('organizer', 'name organizationName organizerId');
+  if (!event) return res.status(404).json({ error: 'Event not found.' });
+  res.json({ event });
+});
 
 router.use(verifyToken, requireRoles('athlete'));
 router.get('/:id/eligibility', async (req, res) => { const event = await OrganizerEvent.findById(req.params.id); if (!event) return res.status(404).json({ error: 'Event not found.' }); const sport = String(req.user.sport || ''); const eligibleSports = event.sports.filter(s => sameSport(s.sportName, sport)).map(s => s._id); res.json({ eligible: eligibleSports.length > 0, eligibleSports, athleteSport: sport }); });
