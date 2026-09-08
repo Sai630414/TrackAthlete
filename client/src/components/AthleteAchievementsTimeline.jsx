@@ -21,6 +21,24 @@ import {
 } from 'lucide-react';
 import api from '../services/api';
 
+function isMedalType(item, type) {
+  if (!item) return false;
+  const posStr = String(item.position !== undefined && item.position !== null ? item.position : '').toLowerCase();
+  const outcomeStr = String(item.outcome || '').toLowerCase();
+  const medalStr = String(item.medal || '').toLowerCase();
+
+  if (type === 'gold') {
+    return posStr.includes('gold') || posStr === '1' || outcomeStr.includes('1st') || outcomeStr.includes('gold') || medalStr.includes('gold') || item.position === 1;
+  }
+  if (type === 'silver') {
+    return posStr.includes('silver') || posStr === '2' || outcomeStr.includes('2nd') || outcomeStr.includes('silver') || medalStr.includes('silver') || item.position === 2;
+  }
+  if (type === 'bronze') {
+    return posStr.includes('bronze') || posStr === '3' || outcomeStr.includes('3rd') || outcomeStr.includes('bronze') || medalStr.includes('bronze') || item.position === 3;
+  }
+  return false;
+}
+
 export default function AthleteAchievementsTimeline({
   athleteUserId,
   athleteName = 'Athlete',
@@ -489,23 +507,23 @@ export default function AthleteAchievementsTimeline({
                       borderRadius: 20,
                       fontSize: 12,
                       fontWeight: 800,
-                      background: item.position?.includes('Gold') || item.outcome?.includes('1st')
+                      background: isMedalType(item, 'gold')
                         ? '#fef9c3'
-                        : item.position?.includes('Silver') || item.outcome?.includes('2nd')
+                        : isMedalType(item, 'silver')
                         ? '#f1f5f9'
-                        : item.position?.includes('Bronze') || item.outcome?.includes('3rd')
+                        : isMedalType(item, 'bronze')
                         ? '#ffedd5'
                         : '#e2eee4',
-                      color: item.position?.includes('Gold') || item.outcome?.includes('1st')
+                      color: isMedalType(item, 'gold')
                         ? '#854d0e'
-                        : item.position?.includes('Silver') || item.outcome?.includes('2nd')
+                        : isMedalType(item, 'silver')
                         ? '#334155'
-                        : item.position?.includes('Bronze') || item.outcome?.includes('3rd')
+                        : isMedalType(item, 'bronze')
                         ? '#9a3412'
                         : '#194e42',
                       border: '1px solid rgba(0,0,0,0.1)'
                     }}>
-                      {item.outcome || item.position || (item.medal ? `${item.medal} Medal` : 'Participant')}
+                      {item.outcome || (typeof item.position === 'number' ? `Rank #${item.position}` : item.position) || (item.medal ? `${item.medal} Medal` : 'Participant')}
                     </span>
                   </div>
                 </div>
@@ -549,7 +567,7 @@ export default function AthleteAchievementsTimeline({
                           name: item.certificateFileName || `${athleteName}_Certificate.pdf`,
                           title: certTitle,
                           sourceLabel: item.sourceLabel,
-                          outcome: item.outcome || item.position
+                          outcome: item.outcome || (typeof item.position === 'number' ? `Rank #${item.position}` : item.position) || 'Verified Record'
                         })}
                         style={{
                           display: 'inline-flex',
