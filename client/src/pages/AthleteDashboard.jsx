@@ -28,6 +28,7 @@ import OfficialTournamentsSection, { TeamRegistrationModal } from '../components
 import FederationListsSection from '../components/FederationListsSection';
 import AthleteAcademiesSection from '../components/AthleteAcademiesSection';
 import OrganizedEventsSection from '../components/OrganizedEventsSection';
+import AthleteAchievementsTimeline from '../components/AthleteAchievementsTimeline';
 import ErrorBoundary from '../components/ErrorBoundary';
 import {
   Shield,
@@ -1078,99 +1079,13 @@ export default function AthleteDashboard() {
 
         {/* ── PERSONAL ACHIEVEMENTS TAB ─────────────────────────── */}
         <TabsContent value="achievements" className="space-y-6">
-          <ErrorBoundary title="Failed to load Federation Verified Achievements">
-            <FederationVerifiedSection athleteUserId={user?._id} />
+          <ErrorBoundary title="Failed to load Achievements Timeline">
+            <AthleteAchievementsTimeline
+              athleteUserId={user?._id}
+              athleteName={profile.name || user?.name}
+              isOwner={true}
+            />
           </ErrorBoundary>
-          <ErrorBoundary title="Failed to load Organizer Verified Achievements">
-            <OrganizerAchievementsSection athleteUserId={user?._id} />
-          </ErrorBoundary>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Add Tournament Achievement Record</CardTitle>
-              <CardDescription>Record championship medals, categories, and competition results for coach review</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="sm:col-span-2">
-                  <Label required>Tournament / Championship Name</Label>
-                  <Input
-                    placeholder="e.g. State Championship"
-                    value={newTournament.tournamentName}
-                    onChange={e => setNewTournament({ ...newTournament, tournamentName: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label>Year</Label>
-                  <Input
-                    placeholder="2026"
-                    value={newTournament.year}
-                    onChange={e => setNewTournament({ ...newTournament, year: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label>Podium / Result</Label>
-                  <select
-                    value={newTournament.position}
-                    onChange={e => setNewTournament({ ...newTournament, position: e.target.value })}
-                    className="w-full h-10 bg-white border border-[#d2dad2] rounded-lg px-3 text-xs text-[#1d2c31] outline-none"
-                  >
-                    <option value="Gold Medal 🥇">Gold Medal 🥇</option>
-                    <option value="Silver Medal 🥈">Silver Medal 🥈</option>
-                    <option value="Bronze Medal 🥉">Bronze Medal 🥉</option>
-                    <option value="Quarter Finalist">Quarter Finalist</option>
-                    <option value="Participant">Participant</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleAddTournament}
-                  className="flex items-center gap-1.5 h-9 px-4 rounded-lg bg-[#194e42] hover:bg-[#123930] text-white font-extrabold text-xs uppercase tracking-wider cursor-pointer shadow-xs transition"
-                >
-                  <Plus size={14} /> Add Record
-                </button>
-              </div>
-
-              {/* Tournaments List */}
-              <div className="space-y-2 mt-4 pt-4 border-t border-[#d8ded5]">
-                <div className="text-xs font-extrabold text-[#194e42] uppercase tracking-wider mb-2">
-                  Logged Tournament Records ({profile.tournaments?.length || 0})
-                </div>
-                {(!profile.tournaments || profile.tournaments.length === 0) ? (
-                  <p className="text-xs text-[#697c7c] p-4 bg-[#f9faf8] rounded-lg border border-[#d8ded5] text-center">
-                    No tournament records added yet. Fill the fields above to add records.
-                  </p>
-                ) : (
-                  profile.tournaments.map((t, idx) => (
-                    <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-white rounded-xl border border-[#d8ded5] shadow-2xs gap-3">
-                      <div className="flex items-center gap-3">
-                        <Trophy size={16} className="text-[#cc694e] shrink-0" />
-                        <div>
-                          <div className="font-bold text-sm text-[#173235]">{t.tournamentName}</div>
-                          <div className="text-xs text-[#526668]">{t.category && `${t.category} · `}{t.year}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 self-end sm:self-center">
-                        <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]/40">
-                          {t.position}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveTournament(idx)}
-                          className="text-[#a44e3d] hover:bg-[#fff3f0] p-1.5 rounded-lg transition cursor-pointer"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Sparring / Video Showcase */}
           <Card>

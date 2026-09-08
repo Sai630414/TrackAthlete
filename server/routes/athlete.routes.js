@@ -3,7 +3,13 @@ const router = express.Router();
 const User = require('../models/User');
 const Connection = require('../models/Connection');
 const OfficialAchievement = require('../models/OfficialAchievement');
+const OrganizerAchievement = require('../models/OrganizerAchievement');
 const { hashAadhaar, withoutAadhaar } = require('../utils/aadhaar');
+const {
+  serializeAthleteProfile,
+  serializeCoachProfile,
+  serializeUnifiedAchievements
+} = require('../utils/serializers');
 
 async function linkHistoricalAchievements(user) {
   if (user.role !== 'athlete' || !user.aadhaarHash) return;
@@ -37,12 +43,7 @@ async function getCoachesList(req, res) {
       .select('-passwordHash -aadhaarHash -resetPasswordOTP -resetPasswordToken')
       .sort({ yearsExperience: -1 });
 
-    const coaches = rawCoaches.map(c => {
-      const obj = withoutAadhaar(c);
-      obj.hasCertificate = Boolean(c.certificateData);
-      delete obj.certificateData;
-      return obj;
-    });
+    const coaches = rawCoaches.map(c => serializeCoachProfile(c, 'athlete', false));
 
     res.json(coaches);
   } catch (err) {
@@ -58,9 +59,10 @@ router.get('/recommendations/coaches', getCoachesList);
 // GET /api/athlete/:id/profile
 router.get('/:id/profile', async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select('-passwordHash -aadhaarHash');
+    const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ error: 'Not found' });
-    res.json(user);
+    const serialized = serializeAthleteProfile(user, 'athlete');
+    res.json(serialized);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -164,6 +166,147 @@ router.get('/:id/official-achievements', async (req, res) => {
   }
 });
 
+// GET /api/athlete/:id/achievements — Unified timeline of Federation, Organizer, and Self-Uploaded achievements
+router.get('/:id/achievements', async (req, res) => {
+  try {
+    const athleteUser = await User.findById(req.params.id);
+    if (!athleteUser) return res.status(404).json({ error: 'Athlete not found.' });
+
+    await linkHistoricalAchievements(athleteUser);
+
+    const queryConditions = [{ athleteUserId: athleteUser._id }];
+    if (athleteUser.athleteId) {
+      queryConditions.push({ athleteId: athleteUser.athleteId });
+    }
+
+    // 1. Federation Recognized achievements
+    const officialAchievements = await OfficialAchievement.find({
+      $or: queryConditions,
+      verificationStatus: { $in: ['FROZEN', 'VERIFIED'] }
+    })
+      .select('-aadhaarHash -athleteIdentityReference')
+      .populate('federation', 'name federationId sport state officialEmail')
+      .populate('event', 'eventName eventId tournamentDate location submissionDeadline isFrozen')
+      .sort({ createdAt: -1 });
+
+    // 2. Organizer Verified achievements
+    const organizerAchievements = await OrganizerAchievement.find({
+      athlete: athleteUser._id
+    })
+      .populate('organizer', 'name organizationName organizerId mobile email officialAddress')
+      .populate('event', 'eventName eventDate venue sports')
+      .sort({ createdAt: -1 });
+
+    // 3. Self-uploaded tournaments & certificates from User profile
+    const tournaments = athleteUser.tournaments || [];
+
+    // Unified serialization
+    const unified = serializeUnifiedAchievements(
+      officialAchievements,
+      organizerAchievements,
+      tournaments,
+      athleteUser.name
+    );
+
+    // Optional source filter
+    const sourceFilter = req.query.source ? String(req.query.source).toUpperCase() : null;
+    const filtered = sourceFilter && sourceFilter !== 'ALL'
+      ? unified.filter(a => a.sourceType === sourceFilter)
+      : unified;
+
+    res.json({
+      athlete: {
+        _id: athleteUser._id,
+        athleteId: athleteUser.athleteId,
+        name: athleteUser.name,
+        sports: athleteUser.sports,
+        sport: athleteUser.sport
+      },
+      counts: {
+        total: unified.length,
+        federation: officialAchievements.length,
+        organizer: organizerAchievements.length,
+        selfUploaded: tournaments.length
+      },
+      achievements: filtered
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/athlete/:id/tournaments — Add self-uploaded tournament / certificate
+router.post('/:id/tournaments', async (req, res) => {
+  try {
+    const {
+      tournamentName,
+      sport,
+      year,
+      eventDate,
+      category,
+      position,
+      certificateData,
+      certificateFileName,
+      certificateFileSize
+    } = req.body;
+
+    if (!tournamentName || !String(tournamentName).trim()) {
+      return res.status(400).json({ error: 'Tournament name is required.' });
+    }
+
+    const athleteUser = await User.findById(req.params.id);
+    if (!athleteUser) return res.status(404).json({ error: 'Athlete not found.' });
+
+    const newRecord = {
+      tournamentName: String(tournamentName).trim(),
+      sport: sport ? String(sport).trim().toUpperCase() : (athleteUser.sport || 'SPORTS').toUpperCase(),
+      year: year ? String(year).trim() : (eventDate ? new Date(eventDate).getFullYear().toString() : new Date().getFullYear().toString()),
+      eventDate: eventDate ? new Date(eventDate) : undefined,
+      category: category ? String(category).trim() : '',
+      position: position ? String(position).trim() : 'Participant',
+      certificateData: certificateData || null,
+      certificateFileName: certificateFileName || '',
+      certificateFileSize: Number(certificateFileSize) || 0,
+      sourceType: 'SELF_UPLOADED',
+      uploadedAt: new Date()
+    };
+
+    athleteUser.tournaments = athleteUser.tournaments || [];
+    athleteUser.tournaments.push(newRecord);
+    await athleteUser.save();
+
+    res.status(201).json({
+      success: true,
+      message: 'Self-uploaded tournament record added.',
+      record: newRecord,
+      tournaments: athleteUser.tournaments
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/athlete/:id/tournaments/:tournamentId — Remove self-uploaded tournament
+router.delete('/:id/tournaments/:tournamentId', async (req, res) => {
+  try {
+    const athleteUser = await User.findById(req.params.id);
+    if (!athleteUser) return res.status(404).json({ error: 'Athlete not found.' });
+
+    athleteUser.tournaments = (athleteUser.tournaments || []).filter(
+      t => String(t._id) !== String(req.params.tournamentId)
+    );
+    await athleteUser.save();
+
+    res.json({
+      success: true,
+      message: 'Tournament record removed.',
+      tournaments: athleteUser.tournaments
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/athlete/:id/connect  { coachId, message }
 router.post('/:id/connect', async (req, res) => {
   try {
@@ -187,19 +330,10 @@ router.post('/:id/connect', async (req, res) => {
     // Notify the coach via Socket.IO
     const io = req.app.get('io');
     if (io) {
-      const athlete = await User.findById(req.params.id).select('-passwordHash');
+      const athlete = await User.findById(req.params.id);
       io.to(coachId).emit('connection-request', {
         connectionId: conn._id,
-        athlete: {
-          _id: athlete._id,
-          name: athlete.name,
-          sport: athlete.sport,
-          beltRank: athlete.beltRank,
-          achievements: athlete.achievements,
-          videoLink: athlete.videoLink,
-          city: athlete.city,
-          state: athlete.state
-        },
+        athlete: serializeAthleteProfile(athlete, 'coach', false),
         message,
         createdAt: conn.createdAt
       });

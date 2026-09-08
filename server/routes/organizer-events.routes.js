@@ -15,6 +15,14 @@ router.get('/upcoming', async (_req, res) => {
     .sort({ eventDate: 1 });
   const sanitized = events.map(e => {
     const json = e.toJSON();
+    if (e.organizer) {
+      json.organizerContact = {
+        name: e.organizer.name,
+        organizationName: e.organizer.organizationName,
+        mobile: e.organizer.mobile,
+        email: e.organizer.email
+      };
+    }
     return { ...json, sourceType: 'organizer' };
   });
   res.json({ events: sanitized });
@@ -123,6 +131,17 @@ router.get('/:id', async (req, res) => {
     .populate('organizer', 'name organizationName organizerId mobile email designation officialAddress');
   if (!event) return res.status(404).json({ error: 'Event not found.' });
   const json = event.toJSON();
+  if (json.organizer) {
+    json.organizerContact = {
+      name: json.organizer.name,
+      organizationName: json.organizer.organizationName,
+      organizerId: json.organizer.organizerId,
+      designation: json.organizer.designation,
+      mobile: json.organizer.mobile,
+      email: json.organizer.email,
+      officialAddress: json.organizer.officialAddress
+    };
+  }
   res.json({ event: json });
 });
 

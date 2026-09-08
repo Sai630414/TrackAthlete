@@ -224,7 +224,14 @@ export default function AthleteAcademiesSection({ athleteSport, athleteSports })
                     <div>
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <h3 className="font-bold text-base text-[#173235]">{acad.name}</h3>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-bold text-base text-[#173235]">{acad.name}</h3>
+                            {acad.academyId && (
+                              <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-[#526668] border border-gray-200">
+                                {acad.academyId}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
                             <MapPin className="w-3.5 h-3.5 text-[#e07050]" />
                             {acad.city || acad.address?.city || 'India'}, {acad.state || acad.address?.state || ''}
@@ -261,18 +268,22 @@ export default function AthleteAcademiesSection({ athleteSport, athleteSports })
                       {/* Sports badges */}
                       <div className="mt-3 flex items-center gap-1.5 flex-wrap">
                         <span className="text-[10px] font-bold text-gray-400 uppercase">Disciplines:</span>
-                        {acad.sports?.map((sp) => (
-                          <span
-                            key={sp.sportName}
-                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                              sp.sportName?.toUpperCase() === athleteSport?.toUpperCase()
-                                ? 'bg-[#2f6d5a] text-white'
-                                : 'bg-gray-100 text-gray-700'
-                            }`}
-                          >
-                            {sp.sportName}
-                          </span>
-                        ))}
+                        {acad.sports?.map((sp, idx) => {
+                          const sName = (typeof sp === 'string' ? sp : sp.sportName || '').toUpperCase();
+                          const isMatch = (Array.isArray(athleteSports) && athleteSports.some(as => as.toUpperCase() === sName)) || athleteSport?.toUpperCase() === sName;
+                          return (
+                            <span
+                              key={idx}
+                              className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase border ${
+                                isMatch
+                                  ? 'bg-[#e2eee4] text-[#194e42] border-[#2f6d5a]'
+                                  : 'bg-gray-50 text-gray-700 border-gray-200'
+                              }`}
+                            >
+                              [ {sName} ]
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
 

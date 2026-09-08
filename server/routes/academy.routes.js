@@ -11,6 +11,12 @@ const OfficialAchievement = require('../models/OfficialAchievement');
 const OrganizerAchievement = require('../models/OrganizerAchievement');
 const { verifyToken, requireRoles } = require('../middleware/auth.middleware');
 const { hashAadhaar } = require('../utils/aadhaar');
+const {
+  serializeAthleteProfile,
+  serializeCoachProfile,
+  serializeAcademyProfile,
+  serializeUnifiedAchievements
+} = require('../utils/serializers');
 
 /**
  * Helper: Retrieve Academy document for current user
@@ -811,14 +817,30 @@ router.get('/my/requests', verifyToken, requireRoles('academy'), async (req, res
       return res.status(404).json({ error: 'Academy profile not found.' });
     }
 
-    const athleteRequests = await AcademyAthleteRequest.find({ academyId: academy._id })
-      .populate('athleteUserId', 'name athleteId email phone sport profilePhoto city state')
+    const rawAthleteRequests = await AcademyAthleteRequest.find({ academyId: academy._id })
+      .populate('athleteUserId', '-passwordHash -aadhaarHash -resetPasswordOTP -resetPasswordToken')
       .sort({ createdAt: -1 });
 
-    const coachRequests = await AcademyCoachRequest.find({ academyId: academy._id })
-      .populate('coachUserId', 'name coachId email phone sport profilePhoto nisId certifications yearsExperience')
-      .populate('openingId', 'position sportName location')
+    const athleteRequests = rawAthleteRequests.map(r => {
+      const obj = r.toObject();
+      if (obj.athleteUserId) {
+        obj.athleteUserId = serializeAthleteProfile(obj.athleteUserId, 'academy', true);
+      }
+      return obj;
+    });
+
+    const rawCoachRequests = await AcademyCoachRequest.find({ academyId: academy._id })
+      .populate('coachUserId', '-passwordHash -aadhaarHash -resetPasswordOTP -resetPasswordToken')
+      .populate('openingId', 'position sportName location salary')
       .sort({ createdAt: -1 });
+
+    const coachRequests = rawCoachRequests.map(c => {
+      const obj = c.toObject();
+      if (obj.coachUserId) {
+        obj.coachUserId = serializeCoachProfile(obj.coachUserId, 'academy');
+      }
+      return obj;
+    });
 
     res.json({
       athleteRequests,
@@ -1097,19 +1119,36 @@ router.get('/athletes/:athleteUserId/full-portfolio', verifyToken, requireRoles(
       matchCriteria.push({ athleteId: athleteUser.athleteId });
     }
 
-    const federationAchievements = await OfficialAchievement.find({ $or: matchCriteria })
-      .select('-aadhaarHash')
-      .sort({ achievementDate: -1, createdAt: -1 });
+    const federationAchievements = await OfficialAchievement.find({
+      $or: matchCriteria,
+      verificationStatus: { $in: ['FROZEN', 'VERIFIED'] }
+    })
+      .select('-aadhaarHash -athleteIdentityReference')
+      .populate('federation', 'name federationId sport state officialEmail')
+      .populate('event', 'eventName eventId tournamentDate location submissionDeadline isFrozen')
+      .sort({ createdAt: -1 });
 
-    const organizerAchievements = await OrganizerAchievement.find({ $or: matchCriteria })
-      .select('-aadhaarHash')
-      .sort({ eventDate: -1, createdAt: -1 });
+    const organizerAchievements = await OrganizerAchievement.find({
+      $or: matchCriteria
+    })
+      .populate('organizer', 'name organizationName organizerId mobile email officialAddress')
+      .populate('event', 'eventName eventDate venue sports')
+      .sort({ createdAt: -1 });
 
-    res.json({
-      athlete: athleteUser,
+    const unifiedAchievements = serializeUnifiedAchievements(
       federationAchievements,
       organizerAchievements,
-      tournaments: athleteUser.tournaments || []
+      athleteUser.tournaments || [],
+      athleteUser.name
+    );
+
+    res.json({
+      athlete: serializeAthleteProfile(athleteUser, 'academy', true),
+      federationAchievements,
+      organizerAchievements,
+      selfUploadedAchievements: athleteUser.tournaments || [],
+      tournaments: athleteUser.tournaments || [],
+      unifiedAchievements
     });
   } catch (err) {
     console.error('Error fetching athlete full portfolio:', err);
@@ -1128,7 +1167,7 @@ router.get('/coaches/:coachUserId/full-profile', verifyToken, requireRoles('acad
       return res.status(404).json({ error: 'Academy profile not found.' });
     }
 
-    const coachUser = await User.findById(req.params.coachUserId).select('-passwordHash -resetPasswordOTP -aadhaarHash');
+    const coachUser = await User.findById(req.params.coachUserId);
     if (!coachUser) {
       return res.status(404).json({ error: 'Coach profile not found.' });
     }
@@ -1153,7 +1192,7 @@ router.get('/coaches/:coachUserId/full-profile', verifyToken, requireRoles('acad
     }
 
     res.json({
-      coach: coachUser
+      coach: serializeCoachProfile(coachUser, 'academy')
     });
   } catch (err) {
     console.error('Error fetching coach full profile:', err);
@@ -1199,7 +1238,7 @@ router.get('/discovery', async (req, res) => {
     }
 
     let academies = await Academy.find(filter)
-      .select('name contactPhone email address city state location sports rankingStats verified createdAt')
+      .select('academyId name contactPhone email address city state location sports rankingStats verified createdAt')
       .sort({ createdAt: -1 });
 
     // If client supplied user's coordinates, compute distance
@@ -1227,7 +1266,8 @@ router.get('/discovery', async (req, res) => {
       }).sort((a, b) => (a.distanceKm ?? 99999) - (b.distanceKm ?? 99999));
     }
 
-    res.json(academies);
+    const serialized = academies.map(a => serializeAcademyProfile(a, 'public'));
+    res.json(serialized);
   } catch (err) {
     console.error('Error discovering academies:', err);
     res.status(500).json({ error: 'Failed to discover academies: ' + err.message });

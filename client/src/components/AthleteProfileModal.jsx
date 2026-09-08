@@ -17,7 +17,7 @@ import {
   ChevronRight,
   Clock
 } from 'lucide-react';
-import FederationVerifiedSection from './FederationVerifiedSection';
+import AthleteAchievementsTimeline from './AthleteAchievementsTimeline';
 
 function getYouTubeEmbedUrl(url) {
   if (!url) return null;
@@ -181,9 +181,15 @@ export default function AthleteProfileModal({
                 {data.name} <em style={{ color: '#b9d9bf', fontStyle: 'italic' }}>Portfolio</em>
               </h2>
               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, marginTop: 6, fontSize: 13, color: '#c5d3ce' }}>
-                <span style={{ fontWeight: 600, color: '#b9d9bf' }}>{data.sport || 'Athlete'}</span>
+                <span style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {(Array.isArray(data.sports) && data.sports.length > 0 ? data.sports : (data.sport ? [data.sport] : [])).map((sp, i) => (
+                    <span key={i} style={{ fontWeight: 800, color: '#b9d9bf', background: 'rgba(255,255,255,0.1)', padding: '1px 6px', borderRadius: 4, textTransform: 'uppercase', fontSize: 11 }}>
+                      [ {String(sp).toUpperCase()} ]
+                    </span>
+                  ))}
+                </span>
                 <span>·</span>
-                <span>{data.beltRank || 'Rank / Level'}</span>
+                <span>{data.beltRank || data.athleteLevel || 'Rank / Level'}</span>
                 <span>·</span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <MapPin size={13} color="#cc694e" /> {data.city || 'City'}, {data.state || 'State'}
@@ -202,7 +208,7 @@ export default function AthleteProfileModal({
           <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
             {[
               { id: 'overview', label: 'Profile Overview' },
-              { id: 'tournaments', label: `Tournaments (${data.tournaments?.length || 0})` },
+              { id: 'tournaments', label: 'Achievements & Certificates' },
               { id: 'video', label: 'Sparring / Showcase Video' },
               ...(request?.message ? [{ id: 'message', label: 'Request Note' }] : [])
             ].map(tab => (
@@ -312,59 +318,14 @@ export default function AthleteProfileModal({
             </div>
           )}
 
-          {/* TAB 2: TOURNAMENTS */}
+          {/* TAB 2: ACHIEVEMENTS & CERTIFICATES */}
           {activeTab === 'tournaments' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <FederationVerifiedSection athleteUserId={data?._id} isCoachView={true} />
-
-              {(!data.tournaments || data.tournaments.length === 0) ? (
-                <div style={{ textAlign: 'center', padding: '36px 16px', background: '#f8faf7', borderRadius: 14, border: '1px dashed #d8ded5' }}>
-                  <Trophy size={32} color="#8a9d9a" style={{ margin: '0 auto 8px' }} />
-                  <div style={{ fontWeight: 700, fontSize: 14, color: '#173235' }}>No Tournament Records Logged</div>
-                  <div style={{ fontSize: 12, color: '#697c7c', marginTop: 4 }}>
-                    Athlete has not yet entered specific tournament result entries.
-                  </div>
-                </div>
-              ) : (
-                data.tournaments.map((t, idx) => (
-                  <div key={idx} style={{
-                    background: '#fff',
-                    border: '1px solid #d8ded5',
-                    borderRadius: 14,
-                    padding: '14px 18px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{
-                        width: 36, height: 36, borderRadius: 10, background: '#e2eee4',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                      }}>
-                        <Trophy size={18} color="#cc694e" />
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 14, color: '#173235' }}>{t.tournamentName}</div>
-                        <div style={{ fontSize: 12, color: '#526668', marginTop: 2 }}>
-                          {t.category && <span>Category: <strong>{t.category}</strong> · </span>}
-                          {t.year && <span>Year: {t.year}</span>}
-                        </div>
-                      </div>
-                    </div>
-                    {t.position && (
-                      <span style={{
-                        padding: '4px 12px', borderRadius: 20,
-                        background: '#e2eee4', color: '#194e42',
-                        border: '1px solid #2f6d5a', fontSize: 12, fontWeight: 800
-                      }}>
-                        {t.position}
-                      </span>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
+            <AthleteAchievementsTimeline
+              athleteUserId={data?._id}
+              athleteName={data?.name}
+              isCoachView={true}
+              isOwner={false}
+            />
           )}
 
           {/* TAB 3: VIDEO SHOWCASE */}

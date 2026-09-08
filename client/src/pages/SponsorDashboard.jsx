@@ -20,7 +20,7 @@ import {
   useToast,
   ProgressChart,
 } from '../components/ui';
-import { HeartHandshake, ShieldCheck, DollarSign, Award, Send, CheckCircle2 } from 'lucide-react';
+import { HeartHandshake, ShieldCheck, DollarSign, Award, Send, CheckCircle2, Users } from 'lucide-react';
 import OrganizedEventsSection from '../components/OrganizedEventsSection';
 
 export default function SponsorDashboard() {
@@ -34,24 +34,23 @@ export default function SponsorDashboard() {
   useEffect(() => {
     // Query real athletes seeking sponsorship from MongoDB Atlas
     api.get('/sponsor/athletes').then(res => {
-      if (res.data && res.data.length > 0) {
+      if (res.data && Array.isArray(res.data) && res.data.length > 0) {
         setAthletes(res.data.map(a => ({
           id: a._id,
           name: a.name,
-          sport: a.sport || 'Taekwondo',
-          level: a.beltRank || 'State Representative',
-          need: a.sponsorshipReason || 'Funding for National/International Championship Equipment & Travel',
-          verified: true
+          sport: Array.isArray(a.sports) && a.sports.length > 0 ? a.sports.join(', ') : (a.sport || 'Sports'),
+          sports: Array.isArray(a.sports) && a.sports.length > 0 ? a.sports : (a.sport ? [a.sport] : []),
+          level: a.beltRank || a.athleteLevel || 'Competitive Athlete',
+          athleteId: a.athleteId,
+          need: a.sponsorshipReason || (a.bio ? a.bio.slice(0, 140) : 'Funding for National/International Championship Equipment & Travel'),
+          verified: !!a.isVerified || !!a.federationVerified
         })));
       } else {
-        setAthletes([
-          { id: '1', name: 'Rahul Sharma', sport: 'Taekwondo', level: 'Black Belt 1st Dan', need: '₹50,000 for National Championship Equipment', verified: true }
-        ]);
+        setAthletes([]);
       }
-    }).catch(() => {
-      setAthletes([
-        { id: '1', name: 'Rahul Sharma', sport: 'Taekwondo', level: 'Black Belt 1st Dan', need: '₹50,000 for National Championship Equipment', verified: true }
-      ]);
+    }).catch(err => {
+      console.error('Error fetching athletes seeking sponsorship:', err);
+      setAthletes([]);
     });
 
     api.get('/organizer-events/my-organized-events')
@@ -100,32 +99,49 @@ export default function SponsorDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {athletes.map((ath) => (
-              <div key={ath.id} className="p-4 rounded-2xl border border-[#d8ded5] bg-white shadow-xs space-y-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="font-bold text-[#173235] text-sm">{ath.name}</h4>
-                    <p className="text-xs text-[#526668] mt-0.5">{ath.sport} · {ath.level}</p>
-                  </div>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
-                    <ShieldCheck className="w-3 h-3 text-[#cc694e]" /> Verified Ledger
-                  </span>
-                </div>
-                <div className="text-xs text-[#173235] bg-[#f4f8f3] p-3 rounded-xl border border-[#d8ded5]">
-                  <span className="text-[#526668] font-bold uppercase text-[10px] block mb-1">Target Support Requirement</span>
-                  <span className="font-semibold text-[#194e42]">{ath.need}</span>
-                </div>
-                <div className="flex justify-end pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedAthlete(ath)}
-                    className="flex items-center justify-center gap-1.5 h-9 px-4 rounded-lg bg-[#e2eee4] hover:bg-[#d4e6d7] text-[#194e42] font-bold text-xs border border-[#2f6d5a]/40 transition-all cursor-pointer"
-                  >
-                    <HeartHandshake className="w-4 h-4 mr-1 text-[#cc694e]" /> Submit Support Intent
-                  </button>
-                </div>
+            {athletes.length === 0 ? (
+              <div className="p-8 text-center bg-[#f8faf7] rounded-xl border border-dashed border-[#d8ded5]">
+                <Users className="w-8 h-8 text-[#8a9d9a] mx-auto mb-2" />
+                <div className="font-bold text-sm text-[#173235]">No Athletes Currently Seeking Sponsorship</div>
+                <p className="text-xs text-[#697c7c] mt-1 max-w-sm mx-auto">
+                  When verified athletes activate sponsorship requests on their profile, their verified credentials and funding requirements will appear here.
+                </p>
               </div>
-            ))}
+            ) : (
+              athletes.map((ath) => (
+                <div key={ath.id} className="p-4 rounded-2xl border border-[#d8ded5] bg-white shadow-xs space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-bold text-[#173235] text-sm">{ath.name}</h4>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                        {ath.sports?.map((sp, idx) => (
+                          <span key={idx} className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]/40">
+                            [ {String(sp).toUpperCase()} ]
+                          </span>
+                        ))}
+                        <span className="text-xs text-[#526668] ml-1">· {ath.level}</span>
+                      </div>
+                    </div>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
+                      <ShieldCheck className="w-3 h-3 text-[#cc694e]" /> Verified Ledger
+                    </span>
+                  </div>
+                  <div className="text-xs text-[#173235] bg-[#f4f8f3] p-3 rounded-xl border border-[#d8ded5]">
+                    <span className="text-[#526668] font-bold uppercase text-[10px] block mb-1">Target Support Requirement</span>
+                    <span className="font-semibold text-[#194e42]">{ath.need}</span>
+                  </div>
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAthlete(ath)}
+                      className="flex items-center justify-center gap-1.5 h-9 px-4 rounded-lg bg-[#e2eee4] hover:bg-[#d4e6d7] text-[#194e42] font-bold text-xs border border-[#2f6d5a]/40 transition-all cursor-pointer"
+                    >
+                      <HeartHandshake className="w-4 h-4 mr-1 text-[#cc694e]" /> Submit Support Intent
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
 

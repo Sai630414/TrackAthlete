@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const Connection = require('../models/Connection');
 const User = require('../models/User');
 const { withoutAadhaar } = require('../utils/aadhaar');
+const { serializeAthleteProfile, serializeCoachProfile } = require('../utils/serializers');
 
 let _io = null;
 router.use((req, _res, next) => { _io = req.app.get('io'); next(); });
@@ -11,9 +12,18 @@ router.use((req, _res, next) => { _io = req.app.get('io'); next(); });
 // GET /api/coach/:id/requests — pending mentorship requests
 router.get('/:id/requests', async (req, res) => {
   try {
-    const requests = await Connection.find({ coach: req.params.id, status: 'Pending' })
-      .populate('athlete', '-passwordHash')
+    const rawRequests = await Connection.find({ coach: req.params.id, status: 'Pending' })
+      .populate('athlete', '-passwordHash -aadhaarHash -resetPasswordOTP -resetPasswordToken')
       .sort({ createdAt: -1 });
+
+    const requests = rawRequests.map(r => {
+      const obj = r.toObject();
+      if (obj.athlete) {
+        obj.athlete = serializeAthleteProfile(obj.athlete, 'coach', false);
+      }
+      return obj;
+    });
+
     res.json(requests);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -23,9 +33,18 @@ router.get('/:id/requests', async (req, res) => {
 // GET /api/coach/:id/athletes — active connections (My Athletes)
 router.get('/:id/athletes', async (req, res) => {
   try {
-    const athletes = await Connection.find({ coach: req.params.id, status: 'Active' })
-      .populate('athlete', '-passwordHash')
+    const rawAthletes = await Connection.find({ coach: req.params.id, status: 'Active' })
+      .populate('athlete', '-passwordHash -aadhaarHash -resetPasswordOTP -resetPasswordToken')
       .sort({ createdAt: -1 });
+
+    const athletes = rawAthletes.map(a => {
+      const obj = a.toObject();
+      if (obj.athlete) {
+        obj.athlete = serializeAthleteProfile(obj.athlete, 'coach', true);
+      }
+      return obj;
+    });
+
     res.json(athletes);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -101,11 +120,11 @@ router.get('/:id/profile', async (req, res) => {
     const coach = await User.findOne({
       $or: orConditions,
       role: 'coach'
-    }).select('-passwordHash -aadhaarHash -resetPasswordOTP -resetPasswordToken');
+    });
 
     if (!coach) return res.status(404).json({ error: 'Coach not found' });
-    const sanitized = withoutAadhaar(coach);
-    res.json(sanitized);
+    const serialized = serializeCoachProfile(coach, 'coach');
+    res.json(serialized);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

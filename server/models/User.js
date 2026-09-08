@@ -33,10 +33,17 @@ const UserSchema = new mongoose.Schema({
   federationState: String, // preserved for backward-compatibility with existing records
   relocationFlexible: { type: Boolean, default: true },
   tournaments: [{
-    tournamentName: String,
+    tournamentName: { type: String, trim: true },
+    sport: { type: String, trim: true },
     year: String,
+    eventDate: Date,
     category: String,
-    position: String
+    position: String,
+    certificateData: { type: String, default: null },
+    certificateFileName: { type: String, default: '' },
+    certificateFileSize: { type: Number, default: 0 },
+    sourceType: { type: String, default: 'SELF_UPLOADED' },
+    uploadedAt: { type: Date, default: Date.now }
   }],
 
   // Parent-specific

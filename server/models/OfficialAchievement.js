@@ -28,6 +28,8 @@ const OfficialAchievementSchema = new mongoose.Schema({
   certificateFileSize: { type: Number, default: 0 },
   
   verificationStatus: { type: String, enum: ['VERIFIED', 'FROZEN', 'REVOKED'], default: 'VERIFIED' },
+  sourceType: { type: String, default: 'FEDERATION' },
+  sourceLabel: { type: String, default: 'FEDERATION RECOGNIZED' },
   isFrozen: { type: Boolean, default: false },
   frozenAt: { type: Date, default: null },
   
