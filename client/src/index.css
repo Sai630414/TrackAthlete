@@ -297,3 +297,7 @@ html, body {
 @media(max-width:850px){.login-page{grid-template-columns:1fr}.login-story{min-height:270px;padding:34px 30px}.story-copy{margin:33px 0 0}.story-copy h1{font-size:43px}.story-copy>p:last-child,.story-foot{display:none}.login-panel{padding:35px 18px}.login-card{padding:0}.login-story:after{right:-23vw;bottom:-33vw;width:100vw;height:100vw}}
 @media(max-width:430px){.role-picker{grid-template-columns:1fr}.login-story{min-height:230px}.story-copy h1{font-size:37px}.form-row{grid-template-columns:1fr}}
 .login-form label.flex{display:flex;align-items:center;gap:9px;letter-spacing:0}.login-form label.flex input[type="checkbox"]{width:18px;height:18px;min-height:18px;margin:0;padding:0;accent-color:#2f6d5a;box-shadow:none}
+.btn-simple-add{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:44px;padding:0 18px;border-radius:8px;border:1px solid #173235;background:#173235;color:#ffffff;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .18s ease}
+.btn-simple-add:hover{background:#254c4e;border-color:#254c4e}
+.btn-simple-add:active{transform:translateY(1px)}
+

@@ -915,7 +915,7 @@ export default function Login({ initialMode }) {
                             style={{
                               background: 'none',
                               border: 'none',
-                              color: '#cc694e',
+                              color: '#526668',
                               cursor: 'pointer',
                               fontWeight: '900',
                               fontSize: '14px',
@@ -952,26 +952,13 @@ export default function Login({ initialMode }) {
                     <button
                       type="button"
                       onClick={handleAddParentSport}
-                      style={{
-                        background: '#e07050',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '8px',
-                        padding: '0 16px',
-                        fontSize: '12px',
-                        fontWeight: '800',
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
+                      className="btn-simple-add"
                     >
-                      + ADD SPORT
+                      + Add Sport
                     </button>
                   </div>
 
-                  <small style={{ color: '#cc694e', fontSize: '10px', fontWeight: '800', letterSpacing: '0.05em' }}>
+                  <small style={{ color: '#526668', fontSize: '10px', fontWeight: '700', letterSpacing: '0.04em' }}>
                     MANDATORY — ENTER SPORT NAME IN CAPITAL LETTERS ONLY
                   </small>
 
@@ -1165,7 +1152,7 @@ export default function Login({ initialMode }) {
                             style={{
                               background: 'none',
                               border: 'none',
-                              color: '#cc694e',
+                              color: '#526668',
                               cursor: 'pointer',
                               fontWeight: '900',
                               fontSize: '14px',
@@ -1202,26 +1189,13 @@ export default function Login({ initialMode }) {
                     <button
                       type="button"
                       onClick={handleAddCoachSport}
-                      style={{
-                        background: '#e07050',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '8px',
-                        padding: '0 16px',
-                        fontSize: '12px',
-                        fontWeight: '800',
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}
+                      className="btn-simple-add"
                     >
-                      + ADD SPORT
+                      + Add Sport
                     </button>
                   </div>
 
-                  <small style={{ color: '#cc694e', fontSize: '10px', fontWeight: '800', letterSpacing: '0.05em' }}>
+                  <small style={{ color: '#526668', fontSize: '10px', fontWeight: '700', letterSpacing: '0.04em' }}>
                     MANDATORY — ENTER SPORT NAME IN CAPITAL LETTERS ONLY
                   </small>
 
@@ -1298,7 +1272,7 @@ export default function Login({ initialMode }) {
                     <button
                       type="button"
                       onClick={() => setCoachFields({ ...coachFields, certificateData: null, certificateFileName: '', certificateFileSize: 0 })}
-                      style={{ background: 'none', border: 'none', color: '#cc694e', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}
+                      style={{ background: 'none', border: 'none', color: '#526668', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}
                     >
                       Remove
                     </button>
