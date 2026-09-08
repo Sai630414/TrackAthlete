@@ -269,7 +269,7 @@ export default function FederationDashboard() {
   const fedId = federation?.federationId || 'FED-TKD001';
 
   return (
-    <div className="p-6 md:p-10 max-w-6xl mx-auto space-y-6">
+    <div className="w-full max-w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       
       {/* Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-[#173d3c] via-[#123130] to-[#0c292c] border border-[#2f6d5a] p-6 rounded-2xl text-white shadow-md">

@@ -23,17 +23,19 @@ import {
   Compass,
   Trophy,
   ExternalLink,
-  ChevronRight,
-  UserPlus
+  UserPlus,
+  Calendar
 } from 'lucide-react';
 import AthleteProfileModal from '../components/AthleteProfileModal';
 import CoachProfileModal from '../components/CoachProfileModal';
+import OrganizedEventsSection from '../components/OrganizedEventsSection';
 
 export default function AcademyDashboard() {
   const { user } = useAuth();
 
-  // Active navigation tab: 'sports' | 'openings' | 'requests' | 'profile'
+  // Active navigation tab: 'sports' | 'openings' | 'requests' | 'profile' | 'organized-events'
   const [activeNav, setActiveNav] = useState('sports');
+  const [myOrganizedData, setMyOrganizedData] = useState(null);
 
   // Loading & error states
   const [loading, setLoading] = useState(true);
@@ -132,6 +134,9 @@ export default function AcademyDashboard() {
     fetchSports();
     fetchOpenings();
     fetchRequests();
+    api.get('/organizer-events/my-organized-events')
+      .then(res => setMyOrganizedData(res.data))
+      .catch(() => setMyOrganizedData(null));
   }, []);
 
   // Fetch sport details when selected sport changes
@@ -541,7 +546,7 @@ export default function AcademyDashboard() {
     coachRequests.filter(r => r.status === 'PENDING').length;
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+    <div className="w-full max-w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       {/* Toast / Feedback Banner */}
       {feedback && (
         <div
@@ -598,7 +603,7 @@ export default function AcademyDashboard() {
       </div>
 
       {/* HORIZONTAL NAVIGATION BAR */}
-      <div className="flex items-center gap-2 border-b border-[#cbd5e1] pb-1 overflow-x-auto">
+      <div className="w-full max-w-full flex items-center gap-2 border-b border-[#cbd5e1] pb-1 overflow-x-auto scrollbar-none flex-nowrap">
         <button
           id="tab-sports"
           type="button"
@@ -659,6 +664,22 @@ export default function AcademyDashboard() {
           <Building2 className="w-4 h-4" />
           ACADEMY PROFILE
         </button>
+
+        {myOrganizedData?.hasLinkedOrganizer && (
+          <button
+            id="tab-organized-events"
+            type="button"
+            onClick={() => setActiveNav('organized-events')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
+              activeNav === 'organized-events'
+                ? 'bg-[#173d3c] text-white shadow-sm'
+                : 'text-[#526668] hover:bg-[#f1f5f9]'
+            }`}
+          >
+            <Calendar className="w-4 h-4 text-[#e07050]" />
+            ORGANIZED EVENTS ({myOrganizedData.events?.length || 0})
+          </button>
+        )}
       </div>
 
       {/* =========================================================================
@@ -1211,6 +1232,13 @@ export default function AcademyDashboard() {
             )}
           </div>
         </div>
+      )}
+
+      {/* =========================================================================
+          TAB: ORGANIZED EVENTS (LINKED ORGANIZER)
+          ========================================================================= */}
+      {activeNav === 'organized-events' && myOrganizedData?.hasLinkedOrganizer && (
+        <OrganizedEventsSection initialData={myOrganizedData} />
       )}
 
       {/* =========================================================================

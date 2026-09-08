@@ -21,6 +21,7 @@ import {
   ProgressChart,
 } from '../components/ui';
 import { HeartHandshake, ShieldCheck, DollarSign, Award, Send, CheckCircle2 } from 'lucide-react';
+import OrganizedEventsSection from '../components/OrganizedEventsSection';
 
 export default function SponsorDashboard() {
   const { user } = useAuth();
@@ -28,6 +29,7 @@ export default function SponsorDashboard() {
   const [selectedAthlete, setSelectedAthlete] = useState(null);
   const [fundingAmount, setFundingAmount] = useState('50000');
   const [athletes, setAthletes] = useState([]);
+  const [myOrganizedData, setMyOrganizedData] = useState(null);
 
   useEffect(() => {
     // Query real athletes seeking sponsorship from MongoDB Atlas
@@ -51,10 +53,14 @@ export default function SponsorDashboard() {
         { id: '1', name: 'Rahul Sharma', sport: 'Taekwondo', level: 'Black Belt 1st Dan', need: '₹50,000 for National Championship Equipment', verified: true }
       ]);
     });
+
+    api.get('/organizer-events/my-organized-events')
+      .then(res => setMyOrganizedData(res.data))
+      .catch(() => setMyOrganizedData(null));
   }, []);
 
   return (
-    <div className="p-6 md:p-10 max-w-6xl mx-auto space-y-6">
+    <div className="w-full max-w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       {/* SPONSOR HEADER */}
       <div className="bg-gradient-to-r from-[#173d3c] via-[#123130] to-[#0c292c] border border-[#2f6d5a] p-6 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 text-white shadow-md">
         <div>
@@ -175,6 +181,10 @@ export default function SponsorDashboard() {
           </button>
         </DialogFooter>
       </Dialog>
+
+      {myOrganizedData?.hasLinkedOrganizer && (
+        <OrganizedEventsSection initialData={myOrganizedData} />
+      )}
     </div>
   );
 }

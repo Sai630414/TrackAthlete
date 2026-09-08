@@ -66,6 +66,10 @@ const UserSchema = new mongoose.Schema({
   resetPasswordTokenExpires: Date,
   isEmailVerified: { type: Boolean, default: false },
 
+  // Linked Organizer reference & TrackAthlete ID
+  trackAthleteId: { type: String, trim: true, sparse: true },
+  linkedOrganizerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organizer', default: null, index: true },
+
   createdAt: { type: Date, default: Date.now }
 });
 

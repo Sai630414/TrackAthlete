@@ -37,6 +37,84 @@ const teamRoster = team => [
   ...(team.manualPlayers || []).map(player => ({ participantType: 'manual', name: player.name, mobile: player.mobile || '', email: player.email || '', isCaptain: false }))
 ];
 
+// Server-side TrackAthlete identity resolver
+async function findTrackAthleteUser(rawId) {
+  if (!rawId || !String(rawId).trim()) return null;
+  const cleanId = String(rawId).trim();
+  const escaped = cleanId.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+  const exactRegex = new RegExp('^' + escaped + '$', 'i');
+
+  // 1. Direct field match on User
+  let user = await User.findOne({
+    $or: [
+      { athleteId: exactRegex },
+      { coachId: exactRegex },
+      { trackAthleteId: exactRegex }
+    ]
+  });
+  if (user) return user;
+
+  // 2. TA- prefix variations
+  if (/^TA-/i.test(cleanId)) {
+    const stripped = cleanId.replace(/^TA-/i, '');
+    const strippedEscaped = stripped.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+    user = await User.findOne({
+      $or: [
+        { athleteId: new RegExp('^ATH-' + strippedEscaped + '$', 'i') },
+        { coachId: new RegExp('^COA-' + strippedEscaped + '$', 'i') },
+        { trackAthleteId: new RegExp('^' + strippedEscaped + '$', 'i') }
+      ]
+    });
+    if (user) return user;
+
+    if (/^[0-9a-f]{8}$/i.test(stripped)) {
+      const all = await User.find({}).select('_id').lean();
+      const matched = all.find(u => u._id.toString().toLowerCase().endsWith(stripped.toLowerCase()));
+      if (matched) return await User.findById(matched._id);
+    }
+  }
+
+  // 3. ATH- or COA- prefix variations
+  if (/^(ATH|COA)-/i.test(cleanId)) {
+    const stripped = cleanId.replace(/^(ATH|COA)-/i, '');
+    if (/^[0-9a-f]{8}$/i.test(stripped)) {
+      const all = await User.find({}).select('_id').lean();
+      const matched = all.find(u => u._id.toString().toLowerCase().endsWith(stripped.toLowerCase()));
+      if (matched) return await User.findById(matched._id);
+    }
+  }
+
+  // 4. Full 24-character ObjectId
+  if (mongoose.Types.ObjectId.isValid(cleanId) && cleanId.length === 24) {
+    user = await User.findById(cleanId);
+    if (user) return user;
+  }
+
+  // 5. 8-character hex suffix of _id
+  if (/^[0-9a-f]{8}$/i.test(cleanId)) {
+    const all = await User.find({}).select('_id').lean();
+    const matched = all.find(u => u._id.toString().toLowerCase().endsWith(cleanId.toLowerCase()));
+    if (matched) return await User.findById(matched._id);
+  }
+
+  // 6. Academy collection lookup
+  try {
+    const Academy = require('../models/Academy');
+    const acadDoc = await Academy.findOne({
+      $or: [
+        { _id: (mongoose.Types.ObjectId.isValid(cleanId) && cleanId.length === 24) ? cleanId : null },
+        { name: exactRegex }
+      ].filter(Boolean)
+    });
+    if (acadDoc && acadDoc.userId) {
+      user = await User.findById(acadDoc.userId);
+      if (user) return user;
+    }
+  } catch {}
+
+  return null;
+}
+
 router.post('/auth/signup', async (req, res) => {
   try {
     const b = req.body; const email = cleanEmail(b.email);
@@ -44,12 +122,38 @@ router.post('/auth/signup', async (req, res) => {
     if (organizationTypes.has(b.organizerType) && !b.organizationName) return res.status(400).json({ error: 'Organization name is required for this organizer type.' });
     if (String(b.password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
     if (await Organizer.findOne({ email })) return res.status(409).json({ error: 'This official email is already registered.' });
+
+    let linkedUserId = null;
+    let verifiedTrackAthleteId = null;
+
+    if (b.trackAthleteId && String(b.trackAthleteId).trim()) {
+      const cleanTrackId = String(b.trackAthleteId).trim();
+      const matchedUser = await findTrackAthleteUser(cleanTrackId);
+      if (!matchedUser) {
+        return res.status(400).json({
+          error: 'The provided TrackAthlete ID was not found. Please verify your ID or leave it blank.'
+        });
+      }
+      linkedUserId = matchedUser._id;
+      verifiedTrackAthleteId = cleanTrackId;
+    }
+
     const otp = String(Math.floor(100000 + Math.random() * 900000));
-    await Organizer.create({ ...b, email, passwordHash: await bcrypt.hash(b.password, 10), emailOTPHash: otpHash(otp), emailOTPExpires: new Date(Date.now() + 15 * 60 * 1000), officialAddress: b.officialAddress || {} });
+    await Organizer.create({
+      ...b,
+      email,
+      linkedUserId,
+      trackAthleteId: verifiedTrackAthleteId,
+      passwordHash: await bcrypt.hash(b.password, 10),
+      emailOTPHash: otpHash(otp),
+      emailOTPExpires: new Date(Date.now() + 15 * 60 * 1000),
+      officialAddress: b.officialAddress || {}
+    });
     await sendBrevoEmail({ toEmail: email, toName: b.name, subject: 'TrackAthlete Organizer verification code', textContent: `Your Organizer verification code is ${otp}. It expires in 15 minutes.`, htmlContent: `<p>Your Organizer verification code is <b>${otp}</b>. It expires in 15 minutes.</p>` });
     res.status(201).json({ message: 'Verification code sent to the official email.', email });
   } catch (err) { res.status(500).json({ error: err.message || 'Organizer signup failed.' }); }
 });
+
 router.post('/auth/verify-email', async (req, res) => {
   try {
     const organizer = await Organizer.findOne({ email: cleanEmail(req.body.email) }).select('+emailOTPHash');
@@ -57,6 +161,14 @@ router.post('/auth/verify-email', async (req, res) => {
     organizer.isEmailVerified = true; organizer.accountStatus = 'active'; organizer.emailOTPHash = undefined; organizer.emailOTPExpires = undefined;
     if (!organizer.organizerId) { const count = await Organizer.countDocuments({ organizerId: { $exists: true } }); organizer.organizerId = `ORG-${String(count + 1).padStart(6, '0')}`; }
     await organizer.save();
+
+    // Link organizer reference back to user if linked
+    if (organizer.linkedUserId) {
+      await User.findByIdAndUpdate(organizer.linkedUserId, {
+        $set: { linkedOrganizerId: organizer._id }
+      }).catch(() => {});
+    }
+
     const token = jwt.sign({ id: organizer._id, role: 'organizer' }, secret(), { expiresIn: '7d' }); res.json({ token, organizer });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

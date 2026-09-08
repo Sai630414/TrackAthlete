@@ -39,11 +39,13 @@ function TabsList({
   ...props
 }) {
   return (
-    <TabsPrimitive.List
-      data-slot="tabs-list"
-      data-variant={variant}
-      className={cn("flex flex-wrap sm:flex-nowrap w-full min-h-11 items-center justify-start rounded-xl bg-[#e2eee4] p-1 border border-[#2f6d5a]/30 text-[#526668] gap-1", className)}
-      {...props} />
+    <div className="w-full max-w-full overflow-x-auto scrollbar-none rounded-xl" style={{ WebkitOverflowScrolling: 'touch' }}>
+      <TabsPrimitive.List
+        data-slot="tabs-list"
+        data-variant={variant}
+        className={cn("flex flex-nowrap w-max min-w-full min-h-11 items-center justify-start rounded-xl bg-[#e2eee4] p-1 border border-[#2f6d5a]/30 text-[#526668] gap-1", className)}
+        {...props} />
+    </div>
   );
 }
 
@@ -55,7 +57,7 @@ function TabsTrigger({
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap flex-shrink-0 rounded-lg px-3 sm:px-4 py-2 text-xs font-bold transition-all outline-none text-[#526668] hover:text-[#173235] data-[state=active]:bg-white data-[state=active]:text-[#194e42] data-[state=active]:shadow-sm cursor-pointer",
+        "inline-flex items-center justify-center whitespace-nowrap flex-shrink-0 rounded-lg px-2.5 sm:px-3 py-1.5 text-xs font-bold transition-all outline-none text-[#526668] hover:text-[#173235] data-[state=active]:bg-white data-[state=active]:text-[#194e42] data-[state=active]:shadow-sm cursor-pointer",
         className
       )}
       {...props} />

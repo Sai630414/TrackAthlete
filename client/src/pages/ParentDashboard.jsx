@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import api from '../services/api';
 import SportRankCard from '../components/SportRankCard';
 import FederationListsSection from '../components/FederationListsSection';
+import OrganizedEventsSection from '../components/OrganizedEventsSection';
 import { useAuth } from '../context/AuthContext';
 
 export default function ParentDashboard() {
   const { user } = useAuth();
   const [cities, setCities] = useState([]);
   const [sports, setSports] = useState([]);
+  const [myOrganizedData, setMyOrganizedData] = useState(null);
 
   const [city, setCity] = useState(user?.city || 'Vijayawada');
   const [sport, setSport] = useState(user?.childSport || user?.sport || 'Taekwondo');
@@ -38,6 +40,10 @@ export default function ParentDashboard() {
         .then(searchRes => setSearchResult(searchRes.data))
         .catch(err => setSearchError(err.response?.data?.error || 'Search failed'))
         .finally(() => setSearchLoading(false));
+
+      api.get('/organizer-events/my-organized-events')
+        .then(res => setMyOrganizedData(res.data))
+        .catch(() => setMyOrganizedData(null));
     });
   }, [user]);
 
@@ -74,7 +80,7 @@ export default function ParentDashboard() {
   }
 
   return (
-    <div className="p-6 md:p-10 max-w-5xl mx-auto space-y-6">
+    <div className="w-full max-w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       {/* HEADER BANNER */}
       <div className="bg-gradient-to-r from-[#173d3c] via-[#123130] to-[#0c292c] border border-[#2f6d5a] p-6 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 text-white shadow-md">
         <div>
@@ -238,6 +244,10 @@ export default function ParentDashboard() {
             <SportRankCard key={r.sport} rank={i + 1} result={r} />
           ))}
         </div>
+      )}
+
+      {myOrganizedData?.hasLinkedOrganizer && (
+        <OrganizedEventsSection initialData={myOrganizedData} />
       )}
 
       <FederationListsSection />

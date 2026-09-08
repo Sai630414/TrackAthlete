@@ -32,6 +32,76 @@ router.get('/completed', async (_req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// Fetch organized events for a TrackAthlete user whose identity is linked to an Organizer account
+router.get('/my-organized-events', verifyToken, async (req, res) => {
+  try {
+    const Organizer = require('../models/Organizer');
+    const User = require('../models/User');
+
+    const user = await User.findById(req.user._id || req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    const trackIds = [];
+    if (user.athleteId) {
+      trackIds.push(user.athleteId);
+      trackIds.push(user.athleteId.replace(/^ATH-/i, 'TA-'));
+    }
+    if (user.coachId) {
+      trackIds.push(user.coachId);
+      trackIds.push(user.coachId.replace(/^COA-/i, 'TA-'));
+    }
+    if (user.trackAthleteId) {
+      trackIds.push(user.trackAthleteId);
+    }
+    const hexSuffix = user._id.toString().slice(-8).toUpperCase();
+    trackIds.push(`TA-${hexSuffix}`);
+    trackIds.push(`ATH-${hexSuffix}`);
+
+    const conditions = [
+      { linkedUserId: user._id },
+      { trackAthleteId: { $in: trackIds.map(t => new RegExp('^' + t.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i')) } },
+      { email: String(user.email || '').trim().toLowerCase() }
+    ];
+
+    if (user.linkedOrganizerId) {
+      conditions.push({ _id: user.linkedOrganizerId });
+    }
+
+    try {
+      const Academy = require('../models/Academy');
+      const acad = await Academy.findOne({ userId: user._id });
+      if (acad) {
+        if (acad.email) conditions.push({ email: String(acad.email).trim().toLowerCase() });
+        if (acad.name) conditions.push({ organizationName: new RegExp('^' + acad.name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i') });
+      }
+    } catch {}
+
+    const organizers = await Organizer.find({ $or: conditions });
+
+    if (!organizers || organizers.length === 0) {
+      return res.json({ hasLinkedOrganizer: false, organizer: null, events: [] });
+    }
+
+    const organizerIds = organizers.map(o => o._id);
+    const events = await OrganizerEvent.find({ organizer: { $in: organizerIds } }).sort({ eventDate: -1 });
+
+    res.json({
+      hasLinkedOrganizer: true,
+      organizer: {
+        _id: organizers[0]._id,
+        name: organizers[0].name,
+        organizationName: organizers[0].organizationName,
+        organizerId: organizers[0].organizerId,
+        organizerType: organizers[0].organizerType
+      },
+      events
+    });
+  } catch (err) {
+    console.error('Error fetching organized events:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   const event = await OrganizerEvent.findOne({ _id: req.params.id, status: 'published' })
     .populate('organizer', 'name organizationName organizerId mobile email designation officialAddress');

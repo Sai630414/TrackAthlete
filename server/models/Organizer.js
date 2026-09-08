@@ -14,7 +14,9 @@ const OrganizerSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   passwordHash: { type: String, required: true, select: false },
   emailOTPHash: { type: String, select: false }, emailOTPExpires: Date,
-  isEmailVerified: { type: Boolean, default: false }, accountStatus: { type: String, enum: ['pending_verification', 'active', 'suspended'], default: 'pending_verification' }
+  isEmailVerified: { type: Boolean, default: false }, accountStatus: { type: String, enum: ['pending_verification', 'active', 'suspended'], default: 'pending_verification' },
+  linkedUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+  trackAthleteId: { type: String, trim: true, default: null }
 }, { timestamps: true });
 
 OrganizerSchema.set('toJSON', { transform: (_doc, value) => { delete value.passwordHash; delete value.emailOTPHash; return value; } });

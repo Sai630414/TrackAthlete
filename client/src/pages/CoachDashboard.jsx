@@ -11,10 +11,11 @@ import ChatPanel from '../components/ChatPanel';
 import AthleteProfileModal from '../components/AthleteProfileModal';
 import FederationListsSection from '../components/FederationListsSection';
 import CoachAcademyOpeningsSection from '../components/CoachAcademyOpeningsSection';
+import OrganizedEventsSection from '../components/OrganizedEventsSection';
 import {
   UserCheck, Check, X, Plus, Award, Users, BookOpen,
   Clock, ExternalLink, Trophy, MapPin, MessageCircle, FileText,
-  ChevronDown, Inbox, User, Eye, Briefcase
+  ChevronDown, Inbox, User, Eye, Briefcase, Calendar
 } from 'lucide-react';
 
 export default function CoachDashboard() {
@@ -27,6 +28,7 @@ export default function CoachDashboard() {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [selectedAthleteProfile, setSelectedAthleteProfile] = useState(null);
   const [activeTab, setActiveTab] = useState('inbox');
+  const [myOrganizedData, setMyOrganizedData] = useState(null);
 
   // My Athletes — note form state
   const [noteConnectionId, setNoteConnectionId] = useState('');
@@ -54,6 +56,9 @@ export default function CoachDashboard() {
   useEffect(() => {
     fetchRequests();
     fetchAthletes();
+    api.get('/organizer-events/my-organized-events')
+      .then(res => setMyOrganizedData(res.data))
+      .catch(() => setMyOrganizedData(null));
   }, [fetchRequests, fetchAthletes]);
 
   // ── Socket.IO — live incoming requests ─────────────────────────────────────
@@ -119,7 +124,7 @@ export default function CoachDashboard() {
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-10 max-w-6xl mx-auto space-y-6">
+    <div className="w-full max-w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       {/* HEADER */}
       <div className="bg-gradient-to-r from-[#173d3c] via-[#123130] to-[#0c292c] border border-[#2f6d5a] p-5 sm:p-6 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-white shadow-md">
         <div className="space-y-1">
@@ -176,6 +181,11 @@ export default function CoachDashboard() {
           <TabsTrigger value="federation-lists">
             <FileText className="w-4 h-4 mr-1.5" /> Federation Lists
           </TabsTrigger>
+          {myOrganizedData?.hasLinkedOrganizer && (
+            <TabsTrigger value="organized-events">
+              <Calendar className="w-4 h-4 mr-1.5 text-[#cc694e]" /> Organized Events ({myOrganizedData.events?.length || 0})
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* ── INBOX ─────────────────────────────────────────────────── */}
@@ -467,6 +477,12 @@ export default function CoachDashboard() {
         <TabsContent value="federation-lists" className="space-y-4">
           <FederationListsSection />
         </TabsContent>
+
+        {myOrganizedData?.hasLinkedOrganizer && (
+          <TabsContent value="organized-events" className="space-y-4">
+            <OrganizedEventsSection initialData={myOrganizedData} />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* RICH ATHLETE PROFILE MODAL (From Request Inbox) */}

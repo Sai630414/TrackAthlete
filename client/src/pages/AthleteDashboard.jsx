@@ -27,6 +27,7 @@ import FederationVerifiedSection from '../components/FederationVerifiedSection';
 import OfficialTournamentsSection, { TeamRegistrationModal } from '../components/OfficialTournamentsSection';
 import FederationListsSection from '../components/FederationListsSection';
 import AthleteAcademiesSection from '../components/AthleteAcademiesSection';
+import OrganizedEventsSection from '../components/OrganizedEventsSection';
 import ErrorBoundary from '../components/ErrorBoundary';
 import {
   Shield,
@@ -434,6 +435,7 @@ export default function AthleteDashboard() {
   const [optInSponsorship, setOptInSponsorship] = useState(user?.seekingSponsorship ?? true);
   const [relocationFlexible, setRelocationFlexible] = useState(user?.relocationFlexible ?? true);
   const [activeTab, setActiveTab] = useState('eligible');
+  const [myOrganizedData, setMyOrganizedData] = useState(null);
   const [profile, setProfile] = useState({
     name: user?.name || '',
     sport: user?.sport || 'Taekwondo',
@@ -477,13 +479,15 @@ export default function AthleteDashboard() {
     if (!user?._id) return;
     setLoadingCoaches(true);
     try {
-      const [coachesRes, connsRes, profileRes] = await Promise.all([
+      const [coachesRes, connsRes, profileRes, orgEventsRes] = await Promise.all([
         api.get('/athlete/coaches/list'),
         api.get(`/athlete/${user._id}/connections`),
-        api.get(`/athlete/${user._id}/profile`)
+        api.get(`/athlete/${user._id}/profile`),
+        api.get('/organizer-events/my-organized-events').catch(() => ({ data: { hasLinkedOrganizer: false, events: [] } }))
       ]);
       setCoaches(coachesRes.data || []);
       setConnections(connsRes.data || []);
+      if (orgEventsRes?.data) setMyOrganizedData(orgEventsRes.data);
       if (profileRes.data) {
         const d = profileRes.data;
         setProfile(prev => ({
@@ -638,7 +642,7 @@ export default function AthleteDashboard() {
   const embedUrl = getYouTubeEmbedUrl(profile.videoLink);
 
   return (
-    <div className="p-4 sm:p-6 lg:p-10 max-w-6xl mx-auto space-y-6">
+    <div className="w-full max-w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-[#173d3c] via-[#123130] to-[#0c292c] border border-[#2f6d5a] p-5 sm:p-6 rounded-2xl text-white shadow-md">
         <div className="space-y-1">
@@ -684,6 +688,11 @@ export default function AthleteDashboard() {
           <TabsTrigger value="achievements">
             <Award className="w-4 h-4 mr-1.5" /> Personal Achievements
           </TabsTrigger>
+          {myOrganizedData?.hasLinkedOrganizer && (
+            <TabsTrigger value="organized-events">
+              <Calendar className="w-4 h-4 mr-1.5 text-[#cc694e]" /> Organized Events ({myOrganizedData.events?.length || 0})
+            </TabsTrigger>
+          )}
           <TabsTrigger value="event-registrations">
             <Calendar className="w-4 h-4 mr-1.5" /> My Event Registrations
           </TabsTrigger>
@@ -943,6 +952,13 @@ export default function AthleteDashboard() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ── ORGANIZED EVENTS TAB (SEPARATE FROM PERSONAL ACHIEVEMENTS) ── */}
+        {myOrganizedData?.hasLinkedOrganizer && (
+          <TabsContent value="organized-events" className="space-y-6">
+            <OrganizedEventsSection initialData={myOrganizedData} />
+          </TabsContent>
+        )}
 
         <TabsContent value="federation-lists" className="space-y-6">
           <FederationListsSection />

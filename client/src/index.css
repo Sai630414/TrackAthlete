@@ -3,11 +3,14 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
+html, body {
+  margin: 0;
+  padding: 0;
+  max-width: 100vw;
+  overflow-x: hidden;
   background-color: #e9ece7;
   color: #1d2c31;
   font-family: 'Geist Variable', Arial, sans-serif;
-  margin: 0;
 }
 
 @layer base {
@@ -197,7 +200,18 @@ body {
 .app-main {
   flex: 1;
   min-width: 0;
+  width: calc(100vw - 260px);
+  max-width: calc(100vw - 260px);
   overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }
 
 .mobile-bar {
@@ -211,6 +225,10 @@ body {
   .app-shell {
     flex-direction: column;
     height: 100vh;
+  }
+  .app-main {
+    width: 100vw;
+    max-width: 100vw;
   }
   .mobile-bar {
     display: flex;
