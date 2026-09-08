@@ -48,7 +48,7 @@ function getRankLabel(item, fallbackRank) {
   return 'Participant';
 }
 
-export default function OfficialTournamentsSection({ athleteSport, eligibleOnly = false }) {
+export default function OfficialTournamentsSection({ athleteSport, athleteSports, eligibleOnly = false }) {
   const { user } = useAuth() || {};
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [completedResults, setCompletedResults] = useState([]);
@@ -67,6 +67,21 @@ export default function OfficialTournamentsSection({ athleteSport, eligibleOnly 
   const scrollRail = (rail, direction) => {
     rail.current?.scrollBy({ left: direction * 320, behavior: 'smooth' });
   };
+
+  const allAthleteSports = useMemo(() => {
+    let list = [];
+    if (Array.isArray(athleteSports) && athleteSports.length > 0) {
+      list = athleteSports;
+    } else if (athleteSport) {
+      list = Array.isArray(athleteSport) ? athleteSport : [athleteSport];
+    }
+    return list.map(s => normalize(s)).filter(Boolean);
+  }, [athleteSports, athleteSport]);
+
+  const sportsDisplayLabel = useMemo(() => {
+    if (allAthleteSports.length === 0) return 'YOUR SPORTS';
+    return allAthleteSports.map(s => s.toUpperCase()).join(', ');
+  }, [allAthleteSports]);
 
   const loadData = async () => {
     try {
@@ -360,26 +375,24 @@ export default function OfficialTournamentsSection({ athleteSport, eligibleOnly 
   };
 
   const eligibleEvents = useMemo(() => {
-    if (!athleteSport || !Array.isArray(upcomingEvents)) return [];
-    const normAthleteSport = normalize(athleteSport);
-    if (!normAthleteSport) return [];
+    if (allAthleteSports.length === 0 || !Array.isArray(upcomingEvents)) return [];
 
     const list = [];
     upcomingEvents.forEach(evt => {
       if (!evt) return;
       if (evt.source === 'organizer' || evt.isOrganizerEvent) {
-        const matches = (evt.sports || []).filter(s => normalize(s?.sportName) === normAthleteSport);
+        const matches = (evt.sports || []).filter(s => allAthleteSports.includes(normalize(s?.sportName)));
         if (matches.length > 0) {
           list.push({ ...evt, matchedSports: matches });
         }
       } else {
-        if (normalize(evt.sport) === normAthleteSport) {
+        if (allAthleteSports.includes(normalize(evt.sport))) {
           list.push(evt);
         }
       }
     });
     return list;
-  }, [upcomingEvents, athleteSport]);
+  }, [upcomingEvents, allAthleteSports]);
 
   if (loading) {
     return (
@@ -407,7 +420,7 @@ export default function OfficialTournamentsSection({ athleteSport, eligibleOnly 
               </div>
               <div>
                 <h4 className="font-extrabold text-[#173235] text-sm uppercase tracking-wider">
-                  ELIGIBLE FOR YOU — MATCHING YOUR REGISTERED SPORT ({String(athleteSport || '').toUpperCase()})
+                  ELIGIBLE FOR YOU — MATCHING YOUR REGISTERED SPORT ({sportsDisplayLabel})
                 </h4>
                 <p className="text-xs text-[#526668] mt-0.5">
                   Published upcoming competitions matching your registered sporting discipline
@@ -421,7 +434,7 @@ export default function OfficialTournamentsSection({ athleteSport, eligibleOnly 
 
           {eligibleEvents.length === 0 ? (
             <div className="p-8 text-center text-xs text-[#697c7c] bg-white rounded-xl border border-dashed border-[#d8ded5]">
-              No upcoming tournaments currently matching your registered sport ({athleteSport}).
+              No upcoming tournaments currently matching your registered sport ({sportsDisplayLabel}).
             </div>
           ) : (
             <div ref={eligibleRail} className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-2 pr-1">
@@ -631,13 +644,13 @@ export default function OfficialTournamentsSection({ athleteSport, eligibleOnly 
 
       {activeTab === 'upcoming' ? (
         <div className="space-y-6">
-          {athleteSport && (
+          {allAthleteSports.length > 0 && (
             <div className="bg-[#f4f8f5] border border-[#2f6d5a]/40 rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Award className="w-4 h-4 text-[#cc694e]" />
                   <h4 className="font-extrabold text-[#173235] text-xs uppercase tracking-wider">
-                    ELIGIBLE FOR YOU — MATCHING YOUR REGISTERED SPORT ({String(athleteSport).toUpperCase()})
+                    ELIGIBLE FOR YOU — MATCHING YOUR REGISTERED SPORT ({sportsDisplayLabel})
                   </h4>
                 </div>
                 {eligibleEvents.length > 0 && (
@@ -647,7 +660,7 @@ export default function OfficialTournamentsSection({ athleteSport, eligibleOnly 
 
               {eligibleEvents.length === 0 ? (
                 <div className="p-4 text-center text-xs text-[#697c7c] bg-white rounded-lg border border-dashed border-[#d8ded5]">
-                  No upcoming tournaments currently matching your registered sport ({athleteSport}). View all tournaments below.
+                  No upcoming tournaments currently matching your registered sport ({sportsDisplayLabel}). View all tournaments below.
                 </div>
               ) : (
                 <div ref={eligibleRail} className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-2 pr-1">
@@ -831,9 +844,9 @@ export default function OfficialTournamentsSection({ athleteSport, eligibleOnly 
                         </div>
                       </div>
 
-                      {athleteSport && isOrg && evt.sports?.some(s => normalize(s?.sportName) === normalize(athleteSport)) && (
+                      {allAthleteSports.length > 0 && isOrg && evt.sports?.some(s => allAthleteSports.includes(normalize(s?.sportName))) && (
                         <div className="pt-2 border-t border-[#e2eee4] space-y-1.5">
-                          {evt.sports.filter(s => normalize(s?.sportName) === normalize(athleteSport)).map(sport => {
+                          {evt.sports.filter(s => allAthleteSports.includes(normalize(s?.sportName))).map(sport => {
                               const btn = getButtonProps(evt, sport);
                               return (
                                 <div key={sport._id} className="flex justify-between items-center">

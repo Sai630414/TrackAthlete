@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui';
 
-export default function AthleteAcademiesSection({ athleteSport }) {
+export default function AthleteAcademiesSection({ athleteSport, athleteSports }) {
   const [academies, setAcademies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [myStatus, setMyStatus] = useState({ memberships: [], requests: [] });
@@ -29,7 +29,7 @@ export default function AthleteAcademiesSection({ athleteSport }) {
   useEffect(() => {
     fetchAcademies();
     fetchStatus();
-  }, [athleteSport]);
+  }, [athleteSport, JSON.stringify(athleteSports)]);
 
   const showNotification = (msg, type = 'success') => {
     setFeedback({ msg, type });
@@ -39,7 +39,12 @@ export default function AthleteAcademiesSection({ athleteSport }) {
   const fetchAcademies = async () => {
     setLoading(true);
     try {
-      const sportParam = athleteSport ? `?sport=${encodeURIComponent(athleteSport)}` : '';
+      let sportParam = '';
+      if (Array.isArray(athleteSports) && athleteSports.length > 0) {
+        sportParam = `?sports=${encodeURIComponent(athleteSports.join(','))}`;
+      } else if (athleteSport) {
+        sportParam = `?sport=${encodeURIComponent(athleteSport)}`;
+      }
       const res = await api.get(`/academy/discovery${sportParam}`);
       setAcademies(Array.isArray(res.data) ? res.data : []);
     } catch (err) {

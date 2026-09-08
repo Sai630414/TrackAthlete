@@ -1171,11 +1171,17 @@ router.get('/coaches/:coachUserId/full-profile', verifyToken, requireRoles('acad
  */
 router.get('/discovery', async (req, res) => {
   try {
-    const { sport, city, search, lat, lng } = req.query;
+    const { sport, sports, city, search, lat, lng } = req.query;
     const filter = {};
 
-    if (sport && String(sport).trim()) {
-      filter['sports.sportName'] = new RegExp('^' + String(sport).trim().replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i');
+    const rawSports = sports || sport;
+    if (rawSports && String(rawSports).trim()) {
+      const sportItems = Array.isArray(rawSports) ? rawSports : String(rawSports).split(',');
+      const cleanSportItems = sportItems.map(s => String(s).trim()).filter(Boolean);
+      if (cleanSportItems.length > 0) {
+        const regexes = cleanSportItems.map(s => new RegExp('^' + s.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i'));
+        filter['sports.sportName'] = { $in: regexes };
+      }
     }
 
     if (city && String(city).trim()) {

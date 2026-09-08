@@ -16,10 +16,15 @@ async function linkHistoricalAchievements(user) {
 async function getCoachesList(req, res) {
   try {
     const query = { role: 'coach', acceptingAthletes: { $ne: false } };
-    if (req.query.sport) {
-      const normSport = String(req.query.sport).trim();
-      const reg = new RegExp('^' + normSport.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i');
-      query.$or = [{ sports: reg }, { sport: reg }];
+    if (req.query.sports || req.query.sport) {
+      const rawSports = req.query.sports
+        ? (Array.isArray(req.query.sports) ? req.query.sports : String(req.query.sports).split(','))
+        : [req.query.sport];
+      const sportsClean = rawSports.map(s => String(s).trim()).filter(Boolean);
+      if (sportsClean.length > 0) {
+        const regexes = sportsClean.map(sp => new RegExp('^' + sp.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i'));
+        query.$or = [{ sports: { $in: regexes } }, { sport: { $in: regexes } }];
+      }
     }
     if (req.query.preference) {
       query.coachingPreferences = { $in: [String(req.query.preference).toUpperCase().trim()] };
@@ -77,11 +82,35 @@ router.put('/:id/profile', async (req, res) => {
     delete updates.trackAthleteId;
     delete updates.organizerId;
     delete updates.federationId;
+    delete updates.federationState;
     delete updates.role;
     if (rawAadhaar) {
       const aadhaarHash = hashAadhaar(rawAadhaar);
       if (!aadhaarHash) return res.status(400).json({ error: 'Aadhaar number must contain exactly 12 digits.' });
       updates.aadhaarHash = aadhaarHash;
+    }
+    if (updates.dateOfBirth || updates.dob) {
+      const parsed = new Date(updates.dateOfBirth || updates.dob);
+      if (!isNaN(parsed.getTime())) {
+        updates.dateOfBirth = parsed;
+        updates.dob = parsed;
+        const diffMs = Date.now() - parsed.getTime();
+        const calcAge = Math.floor(diffMs / (365.25 * 24 * 3600 * 1000));
+        updates.age = calcAge >= 0 ? calcAge : 0;
+      }
+    }
+    if (updates.sports && Array.isArray(updates.sports)) {
+      updates.sports = updates.sports.map(s => String(s).trim().toUpperCase()).filter(Boolean);
+      if (updates.sports.length > 0) {
+        updates.sport = updates.sports[0];
+      }
+    }
+    if (updates.yearsOfExperience !== undefined) {
+      updates.yearsOfExperience = Math.max(0, Number(updates.yearsOfExperience) || 0);
+      updates.yearsExperience = updates.yearsOfExperience;
+    }
+    if (updates.athleteLevel) {
+      updates.athleteLevel = String(updates.athleteLevel).toUpperCase().trim();
     }
     const user = await User.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true });
     if (!user) return res.status(404).json({ error: 'Not found' });

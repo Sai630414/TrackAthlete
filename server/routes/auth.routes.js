@@ -65,6 +65,94 @@ router.post('/signup', async (req, res) => {
     let normalizedCoachPrefs = undefined;
     let normalizedCoachLevels = undefined;
     let normalizedWorkTypes = undefined;
+    let athleteParsedDob = undefined;
+    let athleteCalcAge = undefined;
+    let normalizedAthleteSports = undefined;
+    let athleteActiveStatus = undefined;
+    let athleteSeekingSponsorship = undefined;
+
+    if (role === 'athlete') {
+      if (!name || !String(name).trim()) {
+        return res.status(400).json({ error: 'Full Name is required.' });
+      }
+      const athleteMobile = req.body.mobile || req.body.phone;
+      if (!athleteMobile || !String(athleteMobile).trim()) {
+        return res.status(400).json({ error: 'Mobile Number is required.' });
+      }
+      if (!city || !String(city).trim()) {
+        return res.status(400).json({ error: 'City is required.' });
+      }
+      if (!state || !String(state).trim()) {
+        return res.status(400).json({ error: 'State is required.' });
+      }
+      const dobVal = req.body.dateOfBirth || req.body.dob;
+      if (!dobVal) {
+        return res.status(400).json({ error: 'Date of Birth is required.' });
+      }
+      athleteParsedDob = new Date(dobVal);
+      if (isNaN(athleteParsedDob.getTime())) {
+        return res.status(400).json({ error: 'Invalid Date of Birth.' });
+      }
+      const diffMs = Date.now() - athleteParsedDob.getTime();
+      const calcAge = Math.floor(diffMs / (365.25 * 24 * 3600 * 1000));
+      athleteCalcAge = calcAge >= 0 ? calcAge : 0;
+
+      let sportsList = Array.isArray(req.body.sports)
+        ? req.body.sports
+        : (req.body.sport ? (Array.isArray(req.body.sport) ? req.body.sport : [req.body.sport]) : []);
+      sportsList = sportsList.map(s => String(s || '').trim()).filter(Boolean);
+      if (sportsList.length === 0) {
+        return res.status(400).json({ error: 'At least one sport is required.' });
+      }
+
+      normalizedAthleteSports = [];
+      const seenSports = new Set();
+      for (const sp of sportsList) {
+        if (/[a-z]/.test(sp) || sp !== sp.toUpperCase()) {
+          return res.status(400).json({ error: 'Please enter the sport in CAPITAL LETTERS.' });
+        }
+        const normKey = sp.toLowerCase();
+        if (seenSports.has(normKey)) {
+          return res.status(400).json({ error: 'This sport has already been added.' });
+        }
+        seenSports.add(normKey);
+        normalizedAthleteSports.push(sp.toUpperCase());
+      }
+
+      const validLevels = ['BEGINNER', 'DISTRICT', 'STATE', 'NATIONAL', 'INTERNATIONAL'];
+      const rawLevel = String(req.body.athleteLevel || '').toUpperCase().trim();
+      if (!rawLevel || !validLevels.includes(rawLevel)) {
+        return res.status(400).json({ error: 'Athlete Level is required and must be one of: BEGINNER, DISTRICT, STATE, NATIONAL, INTERNATIONAL.' });
+      }
+
+      const cleanAadhaar = String(aadhaarNumber || aadhaar || '').replace(/\D/g, '');
+      if (cleanAadhaar.length !== 12) {
+        return res.status(400).json({ error: 'Athlete Aadhaar number must contain exactly 12 digits.' });
+      }
+
+      const existingAthleteAadhaar = await User.findOne({ role: 'athlete', aadhaarHash });
+      if (existingAthleteAadhaar) {
+        return res.status(400).json({ error: 'An athlete account with this Aadhaar number already exists.' });
+      }
+
+      if (req.body.currentlyActive === undefined || req.body.currentlyActive === null || req.body.currentlyActive === '') {
+        return res.status(400).json({ error: 'Please specify whether you are currently active in sports.' });
+      }
+      athleteActiveStatus = req.body.currentlyActive === true || req.body.currentlyActive === 'true' || req.body.currentlyActive === 'YES';
+
+      if (req.body.activelySeekingSponsorship === undefined && req.body.seekingSponsorship === undefined && req.body.activelySeekingSponsorship === null) {
+        return res.status(400).json({ error: 'Please specify whether you are actively seeking sponsorship.' });
+      }
+      athleteSeekingSponsorship = req.body.activelySeekingSponsorship === true || req.body.activelySeekingSponsorship === 'true' || req.body.activelySeekingSponsorship === 'YES' || req.body.seekingSponsorship === true || req.body.seekingSponsorship === 'true';
+
+      if (req.body.confirmPassword !== undefined && req.body.confirmPassword !== password) {
+        return res.status(400).json({ error: 'Passwords do not match.' });
+      }
+
+      if (req.body.agreeTerms === false || req.body.terms === false) {
+        return res.status(400).json({ error: 'Please accept the Terms & Conditions and Privacy Policy.' });
+      }
+    }
 
     if (role === 'parent') {
       if (!aadhaarNumber && !aadhaar) {
@@ -230,6 +318,37 @@ router.post('/signup', async (req, res) => {
     };
     if (location) userPayload.location = location;
 
+    if (role === 'athlete') {
+      delete userPayload.federationState;
+      userPayload.mobile = String(req.body.mobile || req.body.phone || '').trim();
+      userPayload.phone = userPayload.mobile;
+      userPayload.dateOfBirth = athleteParsedDob;
+      userPayload.dob = athleteParsedDob;
+      userPayload.age = athleteCalcAge;
+      userPayload.gender = req.body.gender ? String(req.body.gender).trim() : undefined;
+      userPayload.sports = normalizedAthleteSports;
+      userPayload.sport = normalizedAthleteSports[0];
+      userPayload.athleteLevel = String(req.body.athleteLevel).toUpperCase().trim();
+      userPayload.beltRank = req.body.beltRank ? String(req.body.beltRank).trim() : undefined;
+      userPayload.yearsOfExperience = req.body.yearsOfExperience !== undefined && req.body.yearsOfExperience !== '' ? Math.max(0, Number(req.body.yearsOfExperience) || 0) : 0;
+      userPayload.yearsExperience = userPayload.yearsOfExperience;
+      userPayload.bio = req.body.bio ? String(req.body.bio).trim() : undefined;
+      userPayload.currentlyActive = athleteActiveStatus;
+      userPayload.activelySeekingSponsorship = athleteSeekingSponsorship;
+      userPayload.seekingSponsorship = athleteSeekingSponsorship;
+      if (athleteSeekingSponsorship && req.body.sponsorshipDetails) {
+        userPayload.sponsorshipDetails = {
+          upcomingEvent: req.body.sponsorshipDetails.upcomingEvent ? String(req.body.sponsorshipDetails.upcomingEvent).trim() : undefined,
+          eventLevel: req.body.sponsorshipDetails.eventLevel ? String(req.body.sponsorshipDetails.eventLevel).toUpperCase().trim() : undefined,
+          expectedEventDate: req.body.sponsorshipDetails.expectedEventDate ? new Date(req.body.sponsorshipDetails.expectedEventDate) : undefined,
+          requirementDescription: req.body.sponsorshipDetails.requirementDescription ? String(req.body.sponsorshipDetails.requirementDescription).trim() : undefined
+        };
+        if (req.body.sponsorshipDetails.requirementDescription) {
+          userPayload.sponsorshipReason = String(req.body.sponsorshipDetails.requirementDescription).trim();
+        }
+      }
+    }
+
     if (role === 'parent') {
       userPayload.mobile = String(req.body.mobile).trim();
       userPayload.childName = String(req.body.childName).trim();
@@ -273,6 +392,25 @@ router.post('/signup', async (req, res) => {
       const athleteIdStr = await generateRolePermanentId('athlete', user._id, async (cand) => !(await User.findOne({ $or: [{ athleteId: cand }, { trackAthleteId: cand }] })));
       user.athleteId = athleteIdStr;
       user.trackAthleteId = athleteIdStr;
+      user.mobile = userPayload.mobile;
+      user.phone = userPayload.phone;
+      user.dateOfBirth = userPayload.dateOfBirth;
+      user.dob = userPayload.dob;
+      user.age = userPayload.age;
+      user.gender = userPayload.gender;
+      user.sports = userPayload.sports;
+      user.sport = userPayload.sport;
+      user.athleteLevel = userPayload.athleteLevel;
+      user.beltRank = userPayload.beltRank;
+      user.yearsOfExperience = userPayload.yearsOfExperience;
+      user.yearsExperience = userPayload.yearsExperience;
+      user.bio = userPayload.bio;
+      user.currentlyActive = userPayload.currentlyActive;
+      user.activelySeekingSponsorship = userPayload.activelySeekingSponsorship;
+      user.seekingSponsorship = userPayload.seekingSponsorship;
+      user.sponsorshipDetails = userPayload.sponsorshipDetails;
+      user.sponsorshipReason = userPayload.sponsorshipReason;
+      user.federationState = undefined;
     }
     if (role === 'parent') {
       const parentIdStr = await generateRolePermanentId('parent', user._id, async (cand) => !(await User.findOne({ $or: [{ parentId: cand }, { trackAthleteId: cand }] })));

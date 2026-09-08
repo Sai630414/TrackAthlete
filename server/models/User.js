@@ -10,13 +10,27 @@ const UserSchema = new mongoose.Schema({
   athleteId: { type: String, trim: true, sparse: true, unique: true },
   aadhaarHash: { type: String, default: null },
   sport: { type: String, trim: true },
+  sports: [{ type: String, trim: true }],
   beltRank: String,
   age: Number,
+  dateOfBirth: Date,
+  dob: Date,
+  gender: { type: String, trim: true },
+  athleteLevel: { type: String, enum: ['BEGINNER', 'DISTRICT', 'STATE', 'NATIONAL', 'INTERNATIONAL'], trim: true },
+  yearsOfExperience: { type: Number, default: 0 },
+  currentlyActive: { type: Boolean, default: true },
+  activelySeekingSponsorship: { type: Boolean, default: false },
+  sponsorshipDetails: {
+    upcomingEvent: { type: String, trim: true },
+    eventLevel: { type: String, enum: ['NATIONAL', 'INTERNATIONAL'], trim: true },
+    expectedEventDate: Date,
+    requirementDescription: { type: String, trim: true }
+  },
   achievements: [String],
   videoLink: String,
   seekingSponsorship: Boolean,
   sponsorshipReason: String,
-  federationState: String, // state used to look up FederationStatus
+  federationState: String, // preserved for backward-compatibility with existing records
   relocationFlexible: { type: Boolean, default: true },
   tournaments: [{
     tournamentName: String,

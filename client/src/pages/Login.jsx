@@ -117,7 +117,67 @@ export default function Login({ initialMode }) {
     }));
   };
 
-  const [athleteFields, setAthleteFields] = useState({ sport: '', beltRank: '', age: '', federationState: 'Andhra Pradesh', aadhaarNumber: '', seekingSponsorship: false, sponsorshipReason: '' });
+  const [athleteFields, setAthleteFields] = useState({
+    mobile: '',
+    dateOfBirth: '',
+    gender: '',
+    sports: [],
+    currentSportInput: '',
+    athleteLevel: '',
+    beltRank: '',
+    yearsOfExperience: '',
+    bio: '',
+    aadhaarNumber: '',
+    currentlyActive: true,
+    activelySeekingSponsorship: false,
+    sponsorshipDetails: {
+      upcomingEvent: '',
+      eventLevel: 'NATIONAL',
+      expectedEventDate: '',
+      requirementDescription: ''
+    },
+    confirmPassword: ''
+  });
+  const [athleteSportError, setAthleteSportError] = useState('');
+
+  const calculateAthleteAge = (dob) => {
+    if (!dob) return null;
+    const d = new Date(dob);
+    if (isNaN(d.getTime())) return null;
+    const diff = Date.now() - d.getTime();
+    const age = Math.floor(diff / (365.25 * 24 * 3600 * 1000));
+    return age >= 0 ? age : 0;
+  };
+
+  const handleAddAthleteSport = () => {
+    const raw = (athleteFields.currentSportInput || '').trim();
+    if (!raw) {
+      setAthleteSportError('Please enter a sport name.');
+      return;
+    }
+    if (/[a-z]/.test(raw) || raw !== raw.toUpperCase()) {
+      setAthleteSportError('Please enter the sport in CAPITAL LETTERS.');
+      return;
+    }
+    const alreadyExists = athleteFields.sports.some(s => s.trim().toLowerCase() === raw.toLowerCase());
+    if (alreadyExists) {
+      setAthleteSportError('This sport has already been added.');
+      return;
+    }
+    setAthleteFields(prev => ({
+      ...prev,
+      sports: [...prev.sports, raw.toUpperCase()],
+      currentSportInput: ''
+    }));
+    setAthleteSportError('');
+  };
+
+  const handleRemoveAthleteSport = (indexToRemove) => {
+    setAthleteFields(prev => ({
+      ...prev,
+      sports: prev.sports.filter((_, idx) => idx !== indexToRemove)
+    }));
+  };
   const [coachFields, setCoachFields] = useState({
     mobile: '',
     sports: [],
@@ -521,6 +581,110 @@ export default function Login({ initialMode }) {
             willingToWorkWithAcademies: coachFields.willingToWorkWithAcademies,
             preferredWorkTypes: coachFields.willingToWorkWithAcademies ? coachFields.preferredWorkTypes : [],
             confirmPassword: coachFields.confirmPassword
+          };
+        } else if (role === 'athlete') {
+          if (!name.trim()) {
+            setError('Full Name is required.');
+            setLoading(false);
+            return;
+          }
+          if (!athleteFields.mobile.trim()) {
+            setError('Mobile Number is required.');
+            setLoading(false);
+            return;
+          }
+          if (!athleteFields.dateOfBirth) {
+            setError('Date of Birth is required.');
+            setLoading(false);
+            return;
+          }
+          if (!city.trim()) {
+            setError('City is required.');
+            setLoading(false);
+            return;
+          }
+          if (!state.trim()) {
+            setError('State is required.');
+            setLoading(false);
+            return;
+          }
+
+          let finalSports = [...athleteFields.sports];
+          if (athleteFields.currentSportInput.trim()) {
+            const raw = athleteFields.currentSportInput.trim();
+            if (/[a-z]/.test(raw) || raw !== raw.toUpperCase()) {
+              setError('Please enter the sport in CAPITAL LETTERS.');
+              setLoading(false);
+              return;
+            }
+            if (finalSports.some(s => s.trim().toLowerCase() === raw.toLowerCase())) {
+              setError('This sport has already been added.');
+              setLoading(false);
+              return;
+            }
+            finalSports.push(raw.toUpperCase());
+          }
+
+          if (finalSports.length === 0) {
+            setError('At least one sport is required.');
+            setLoading(false);
+            return;
+          }
+
+          if (!athleteFields.athleteLevel) {
+            setError('Athlete Level is required.');
+            setLoading(false);
+            return;
+          }
+
+          const cleanAadhaar = (athleteFields.aadhaarNumber || '').replace(/\D/g, '');
+          if (cleanAadhaar.length !== 12) {
+            setError('Athlete Aadhaar number must contain exactly 12 digits.');
+            setLoading(false);
+            return;
+          }
+
+          if (!email.trim()) {
+            setError('Email Address is required.');
+            setLoading(false);
+            return;
+          }
+
+          if (!password || password.length < 6) {
+            setError('Password must be at least 6 characters long.');
+            setLoading(false);
+            return;
+          }
+
+          if (password !== athleteFields.confirmPassword) {
+            setError('Passwords do not match.');
+            setLoading(false);
+            return;
+          }
+
+          rolePayload = {
+            mobile: athleteFields.mobile.trim(),
+            phone: athleteFields.mobile.trim(),
+            dateOfBirth: athleteFields.dateOfBirth,
+            dob: athleteFields.dateOfBirth,
+            gender: athleteFields.gender?.trim() || undefined,
+            sports: finalSports,
+            sport: finalSports[0],
+            athleteLevel: athleteFields.athleteLevel,
+            beltRank: athleteFields.beltRank?.trim() || undefined,
+            yearsOfExperience: athleteFields.yearsOfExperience !== '' && athleteFields.yearsOfExperience !== undefined ? Math.max(0, Number(athleteFields.yearsOfExperience) || 0) : 0,
+            bio: athleteFields.bio?.trim() || undefined,
+            aadhaarNumber: cleanAadhaar,
+            currentlyActive: athleteFields.currentlyActive,
+            activelySeekingSponsorship: athleteFields.activelySeekingSponsorship,
+            seekingSponsorship: athleteFields.activelySeekingSponsorship,
+            sponsorshipDetails: athleteFields.activelySeekingSponsorship ? {
+              upcomingEvent: athleteFields.sponsorshipDetails?.upcomingEvent?.trim() || undefined,
+              eventLevel: athleteFields.sponsorshipDetails?.eventLevel || undefined,
+              expectedEventDate: athleteFields.sponsorshipDetails?.expectedEventDate || undefined,
+              requirementDescription: athleteFields.sponsorshipDetails?.requirementDescription?.trim() || undefined
+            } : undefined,
+            confirmPassword: athleteFields.confirmPassword
           };
         }
         else if (role === 'sponsor') rolePayload = { organizationName: sponsorFields.organizationName, budgetRange: sponsorFields.budgetRange, targetSports: sponsorFields.targetSports.split(',').map(s => s.trim()).filter(Boolean) };
@@ -1030,37 +1194,479 @@ export default function Login({ initialMode }) {
               </>
             )}
 
+            {/* Athlete Sign Up Form */}
             {mode === 'signup' && role === 'athlete' && (
               <>
+                {/* 1. ATHLETE INFORMATION */}
+                <div style={{ borderBottom: '1px solid #d8ded5', paddingBottom: '6px', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#173235', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    1. ATHLETE INFORMATION
+                  </span>
+                </div>
+
+                <label>Full Name *
+                  <input
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    type="text"
+                    placeholder="e.g. Arjun Sharma"
+                    required
+                  />
+                </label>
+
+                <label>Mobile Number *
+                  <input
+                    value={athleteFields.mobile}
+                    onChange={e => setAthleteFields({ ...athleteFields, mobile: e.target.value.replace(/[^\d+-\s]/g, '') })}
+                    type="tel"
+                    placeholder="e.g. +91 9876543210"
+                    required
+                  />
+                </label>
+
                 <div className="form-row">
-                  <label>Sport *
-                    <input value={athleteFields.sport} onChange={e => setAthleteFields({ ...athleteFields, sport: e.target.value })} type="text" placeholder="e.g. Cricket" required />
+                  <label>Date of Birth *
+                    <input
+                      value={athleteFields.dateOfBirth}
+                      onChange={e => setAthleteFields({ ...athleteFields, dateOfBirth: e.target.value })}
+                      type="date"
+                      max={new Date().toISOString().split('T')[0]}
+                      required
+                    />
+                    {athleteFields.dateOfBirth && (
+                      <small style={{ color: '#194e42', fontSize: '11px', fontWeight: '700' }}>
+                        Calculated Age: {calculateAthleteAge(athleteFields.dateOfBirth)} years
+                      </small>
+                    )}
                   </label>
-                  <label>Age
-                    <input value={athleteFields.age} onChange={e => setAthleteFields({ ...athleteFields, age: e.target.value })} type="number" min="5" max="40" placeholder="e.g. 16" required />
+                  <label>Gender (Optional)
+                    <select
+                      value={athleteFields.gender}
+                      onChange={e => setAthleteFields({ ...athleteFields, gender: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: '1px solid #d8ded5',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        background: '#ffffff',
+                        color: '#173235',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <option value="">Select Gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                      <option value="Prefer not to say">Prefer not to say</option>
+                    </select>
                   </label>
                 </div>
+
                 <div className="form-row">
-                  <label>Belt / Rank Level
-                    <input value={athleteFields.beltRank} onChange={e => setAthleteFields({ ...athleteFields, beltRank: e.target.value })} type="text" placeholder="e.g. Black Belt 1st Dan" required />
+                  <label>City *
+                    <input
+                      value={city}
+                      onChange={e => setCity(e.target.value)}
+                      type="text"
+                      placeholder="e.g. Vijayawada"
+                      required
+                    />
                   </label>
-                  <label>Federation State
-                    <input value={athleteFields.federationState} onChange={e => setAthleteFields({ ...athleteFields, federationState: e.target.value })} type="text" placeholder="e.g. Andhra Pradesh" required />
+                  <label>State *
+                    <input
+                      value={state}
+                      onChange={e => setState(e.target.value)}
+                      type="text"
+                      placeholder="e.g. Andhra Pradesh"
+                      required
+                    />
                   </label>
                 </div>
-                <label>Athlete Aadhaar Number
-                  <input value={athleteFields.aadhaarNumber} onChange={e => setAthleteFields({ ...athleteFields, aadhaarNumber: e.target.value.replace(/\D/g, '').slice(0, 12) })} type="password" inputMode="numeric" autoComplete="off" pattern="[0-9]{12}" minLength="12" maxLength="12" placeholder="12-digit Aadhaar number" required />
-                  <small>Used only for secure federation-result matching. It is never displayed.</small>
-                </label>
-                <label className="checkbox-label">
-                  <input type="checkbox" checked={athleteFields.seekingSponsorship} onChange={e => setAthleteFields({ ...athleteFields, seekingSponsorship: e.target.checked })} />
-                  Actively seeking sponsorship for upcoming national/international events
-                </label>
-                {athleteFields.seekingSponsorship && (
-                  <label>Sponsorship Goal / Tournament Notes
-                    <input value={athleteFields.sponsorshipReason} onChange={e => setAthleteFields({ ...athleteFields, sponsorshipReason: e.target.value })} type="text" placeholder="e.g. Funding for National Championship equipment and travel" />
+
+                {/* 2. SPORT */}
+                <div style={{ borderBottom: '1px solid #d8ded5', paddingBottom: '6px', marginBottom: '8px', marginTop: '12px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#173235', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    2. SPORT *
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '8px' }}>
+                  {athleteFields.sports.length > 0 && (
+                    <div className="selected-sports-tags" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '6px' }}>
+                      {athleteFields.sports.map((sp, idx) => (
+                        <span
+                          key={idx}
+                          className="sport-tag"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            background: '#e2eee4',
+                            border: '1px solid #2f6d5a',
+                            color: '#194e42',
+                            fontSize: '11px',
+                            fontWeight: '800',
+                            padding: '4px 8px',
+                            borderRadius: '6px'
+                          }}
+                        >
+                          [ {sp} ]
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAthleteSport(idx)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#cc694e',
+                              cursor: 'pointer',
+                              fontWeight: '900',
+                              fontSize: '13px',
+                              lineHeight: 1,
+                              padding: 0
+                            }}
+                            title="Remove sport"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      placeholder="e.g. TAEKWONDO, BADMINTON"
+                      value={athleteFields.currentSportInput}
+                      onChange={e => {
+                        setAthleteFields({ ...athleteFields, currentSportInput: e.target.value });
+                        if (athleteSportError) setAthleteSportError('');
+                      }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddAthleteSport();
+                        }
+                      }}
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddAthleteSport}
+                      className="btn-simple-add"
+                    >
+                      + Add Sport
+                    </button>
+                  </div>
+
+                  <small style={{ color: '#526668', fontSize: '10px', fontWeight: '700', letterSpacing: '0.04em' }}>
+                    MANDATORY — ENTER SPORT NAME IN CAPITAL LETTERS ONLY
+                  </small>
+
+                  {athleteSportError && (
+                    <span style={{ color: '#dc2626', fontSize: '11px', fontWeight: '700' }}>
+                      {athleteSportError}
+                    </span>
+                  )}
+                </div>
+
+                {/* 3. ATHLETE PROFILE */}
+                <div style={{ borderBottom: '1px solid #d8ded5', paddingBottom: '6px', marginBottom: '8px', marginTop: '12px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#173235', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    3. ATHLETE PROFILE
+                  </span>
+                </div>
+
+                <div style={{ marginBottom: '8px' }}>
+                  <span style={{ color: '#526668', fontSize: '11px', fontWeight: '800', display: 'block', marginBottom: '4px' }}>
+                    ATHLETE LEVEL * (Single Selection)
+                  </span>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '6px' }}>
+                    {['BEGINNER', 'DISTRICT', 'STATE', 'NATIONAL', 'INTERNATIONAL'].map(lvl => {
+                      const isSelected = athleteFields.athleteLevel === lvl;
+                      return (
+                        <button
+                          key={lvl}
+                          type="button"
+                          onClick={() => setAthleteFields({ ...athleteFields, athleteLevel: lvl })}
+                          style={{
+                            padding: '8px 10px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: '800',
+                            border: `1px solid ${isSelected ? '#2f6d5a' : '#d8ded5'}`,
+                            background: isSelected ? '#e2eee4' : '#f9faf8',
+                            color: isSelected ? '#194e42' : '#526668',
+                            cursor: 'pointer',
+                            textAlign: 'center',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {isSelected ? '✓ ' : ''}{lvl}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <label>Belt / Rank Level (Optional)
+                    <input
+                      value={athleteFields.beltRank}
+                      onChange={e => setAthleteFields({ ...athleteFields, beltRank: e.target.value })}
+                      type="text"
+                      placeholder="e.g. Black Belt 1st Dan, State Rank 4"
+                    />
                   </label>
+                  <label>Years of Experience (Optional)
+                    <input
+                      value={athleteFields.yearsOfExperience}
+                      onChange={e => setAthleteFields({ ...athleteFields, yearsOfExperience: e.target.value })}
+                      type="number"
+                      min="0"
+                      max="50"
+                      placeholder="e.g. 4"
+                    />
+                  </label>
+                </div>
+
+                <label>About / Athlete Bio (Optional)
+                  <textarea
+                    value={athleteFields.bio}
+                    onChange={e => setAthleteFields({ ...athleteFields, bio: e.target.value })}
+                    placeholder="Tell coaches, scouts, and sponsors about your sporting journey, achievements, and goals..."
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid #d8ded5',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      background: '#ffffff',
+                      color: '#173235',
+                      boxSizing: 'border-box',
+                      resize: 'vertical'
+                    }}
+                  />
+                </label>
+
+                <div style={{ marginTop: '8px', marginBottom: '8px' }}>
+                  <span style={{ fontWeight: '800', fontSize: '11px', color: '#526668', display: 'block' }}>
+                    CURRENTLY ACTIVE *
+                  </span>
+                  <div style={{ display: 'flex', gap: '16px', marginTop: '6px' }}>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '700' }}>
+                      <input
+                        type="radio"
+                        name="athleteCurrentlyActive"
+                        checked={athleteFields.currentlyActive === true}
+                        onChange={() => setAthleteFields({ ...athleteFields, currentlyActive: true })}
+                      />
+                      YES
+                    </label>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '700' }}>
+                      <input
+                        type="radio"
+                        name="athleteCurrentlyActive"
+                        checked={athleteFields.currentlyActive === false}
+                        onChange={() => setAthleteFields({ ...athleteFields, currentlyActive: false })}
+                      />
+                      NO
+                    </label>
+                  </div>
+                </div>
+
+                {/* 4. SECURE IDENTITY */}
+                <div style={{ borderBottom: '1px solid #d8ded5', paddingBottom: '6px', marginBottom: '8px', marginTop: '12px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#173235', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    4. SECURE IDENTITY
+                  </span>
+                </div>
+
+                <label>Athlete Aadhaar Number *
+                  <input
+                    value={athleteFields.aadhaarNumber}
+                    onChange={e => setAthleteFields({ ...athleteFields, aadhaarNumber: e.target.value.replace(/\D/g, '').slice(0, 12) })}
+                    type="password"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    pattern="[0-9]{12}"
+                    minLength="12"
+                    maxLength="12"
+                    placeholder="12-digit Aadhaar number"
+                    required
+                  />
+                  <small style={{ color: '#526668', fontSize: '11px', fontWeight: '500' }}>
+                    Used only for secure federation-result matching. It is never displayed or shared publicly.
+                  </small>
+                </label>
+
+                {/* 5. SPONSORSHIP */}
+                <div style={{ borderBottom: '1px solid #d8ded5', paddingBottom: '6px', marginBottom: '8px', marginTop: '12px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#173235', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    5. SPONSORSHIP
+                  </span>
+                </div>
+
+                <div style={{ marginTop: '8px', marginBottom: '8px' }}>
+                  <span style={{ fontWeight: '800', fontSize: '11px', color: '#526668', display: 'block' }}>
+                    ACTIVELY SEEKING SPONSORSHIP *
+                  </span>
+                  <div style={{ display: 'flex', gap: '16px', marginTop: '6px' }}>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '700' }}>
+                      <input
+                        type="radio"
+                        name="athleteActivelySeekingSponsorship"
+                        checked={athleteFields.activelySeekingSponsorship === true}
+                        onChange={() => setAthleteFields({ ...athleteFields, activelySeekingSponsorship: true })}
+                      />
+                      YES
+                    </label>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '700' }}>
+                      <input
+                        type="radio"
+                        name="athleteActivelySeekingSponsorship"
+                        checked={athleteFields.activelySeekingSponsorship === false}
+                        onChange={() => setAthleteFields({ ...athleteFields, activelySeekingSponsorship: false })}
+                      />
+                      NO
+                    </label>
+                  </div>
+                </div>
+
+                {athleteFields.activelySeekingSponsorship && (
+                  <div style={{ padding: '10px', background: '#f4f8f5', border: '1px solid #2f6d5a', borderRadius: '8px', marginTop: '6px', marginBottom: '8px' }}>
+                    <label>Upcoming Event / Competition
+                      <input
+                        value={athleteFields.sponsorshipDetails?.upcomingEvent || ''}
+                        onChange={e => setAthleteFields({
+                          ...athleteFields,
+                          sponsorshipDetails: { ...athleteFields.sponsorshipDetails, upcomingEvent: e.target.value }
+                        })}
+                        type="text"
+                        placeholder="e.g. National Youth Taekwondo Championship 2026"
+                      />
+                    </label>
+
+                    <div className="form-row" style={{ marginTop: '6px' }}>
+                      <label>Event Level
+                        <select
+                          value={athleteFields.sponsorshipDetails?.eventLevel || 'NATIONAL'}
+                          onChange={e => setAthleteFields({
+                            ...athleteFields,
+                            sponsorshipDetails: { ...athleteFields.sponsorshipDetails, eventLevel: e.target.value }
+                          })}
+                          style={{
+                            width: '100%',
+                            padding: '10px 12px',
+                            border: '1px solid #d8ded5',
+                            borderRadius: '8px',
+                            fontSize: '13px',
+                            background: '#ffffff',
+                            color: '#173235',
+                            boxSizing: 'border-box'
+                          }}
+                        >
+                          <option value="NATIONAL">NATIONAL</option>
+                          <option value="INTERNATIONAL">INTERNATIONAL</option>
+                        </select>
+                      </label>
+                      <label>Expected Event Date
+                        <input
+                          value={athleteFields.sponsorshipDetails?.expectedEventDate || ''}
+                          onChange={e => setAthleteFields({
+                            ...athleteFields,
+                            sponsorshipDetails: { ...athleteFields.sponsorshipDetails, expectedEventDate: e.target.value }
+                          })}
+                          type="date"
+                        />
+                      </label>
+                    </div>
+
+                    <label style={{ marginTop: '6px' }}>Sponsorship Requirement / Description
+                      <textarea
+                        value={athleteFields.sponsorshipDetails?.requirementDescription || ''}
+                        onChange={e => setAthleteFields({
+                          ...athleteFields,
+                          sponsorshipDetails: { ...athleteFields.sponsorshipDetails, requirementDescription: e.target.value }
+                        })}
+                        placeholder="e.g. Financial support required for travel, competition gear, training camp fees, and tournament registration."
+                        rows={2}
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          border: '1px solid #d8ded5',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          background: '#ffffff',
+                          color: '#173235',
+                          boxSizing: 'border-box',
+                          resize: 'vertical'
+                        }}
+                      />
+                    </label>
+                  </div>
                 )}
+
+                {/* 6. ACCOUNT CREDENTIALS */}
+                <div style={{ borderBottom: '1px solid #d8ded5', paddingBottom: '6px', marginBottom: '8px', marginTop: '12px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#173235', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    6. ACCOUNT CREDENTIALS
+                  </span>
+                </div>
+
+                <label>Email Address *
+                  <input
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    type="email"
+                    placeholder="you@example.com"
+                    required
+                    autoComplete="email"
+                  />
+                </label>
+
+                <label>Password *
+                  <input
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    type="password"
+                    placeholder="At least 6 characters"
+                    required
+                    autoComplete="new-password"
+                  />
+                </label>
+
+                <label>Confirm Password *
+                  <input
+                    value={athleteFields.confirmPassword}
+                    onChange={e => setAthleteFields({ ...athleteFields, confirmPassword: e.target.value })}
+                    type="password"
+                    placeholder="Re-enter password"
+                    required
+                    autoComplete="new-password"
+                  />
+                </label>
+
+                {/* 7. TERMS & SUBMIT */}
+                <label className="checkbox-label" style={{ marginTop: '8px' }}>
+                  <input
+                    type="checkbox"
+                    checked={agreeTerms}
+                    onChange={e => setAgreeTerms(e.target.checked)}
+                    required
+                  />
+                  I accept the Terms &amp; Conditions and Privacy Policy of TrackAthlete.
+                </label>
+
+                <button className="login-submit" disabled={loading} style={{ marginTop: '8px' }}>
+                  {loading ? (
+                    <><LoaderCircle className="spin" size={17} /> Creating Athlete Account...</>
+                  ) : (
+                    <>CREATE ATHLETE ACCOUNT <ArrowRight size={17} /></>
+                  )}
+                </button>
               </>
             )}
 
@@ -1756,8 +2362,8 @@ export default function Login({ initialMode }) {
               </div>
             )}
 
-            {/* Email & Password (Common for both Sign In and Sign Up for non-parent and non-coach roles) */}
-            {!(mode === 'signup' && (role === 'parent' || role === 'coach')) && (
+            {/* Email & Password (Common for both Sign In and Sign Up for non-parent, non-coach, and non-athlete roles) */}
+            {!(mode === 'signup' && (role === 'parent' || role === 'coach' || role === 'athlete')) && (
               <>
                 <label>{role === 'academy' && mode === 'signin' ? 'Academy Email, Phone, or Name' : 'Email address'}
                   <input

@@ -438,14 +438,76 @@ export default function AthleteDashboard() {
   const [myOrganizedData, setMyOrganizedData] = useState(null);
   const [profile, setProfile] = useState({
     name: user?.name || '',
-    sport: user?.sport || 'Taekwondo',
-    age: user?.age ? String(user.age) : '16',
-    state: user?.state || 'Andhra Pradesh',
-    city: user?.city || 'Vijayawada',
-    level: user?.beltRank || 'State Representative',
+    sport: user?.sport || '',
+    sports: Array.isArray(user?.sports) && user.sports.length > 0 ? user.sports : (user?.sport ? [user.sport] : []),
+    age: user?.age ? String(user.age) : '',
+    dateOfBirth: user?.dateOfBirth ? String(user.dateOfBirth).slice(0, 10) : (user?.dob ? String(user.dob).slice(0, 10) : ''),
+    gender: user?.gender || '',
+    athleteLevel: user?.athleteLevel || 'BEGINNER',
+    yearsOfExperience: user?.yearsOfExperience || user?.yearsExperience || 0,
+    bio: user?.bio || '',
+    currentlyActive: user?.currentlyActive !== undefined ? user.currentlyActive : true,
+    activelySeekingSponsorship: user?.activelySeekingSponsorship !== undefined ? user.activelySeekingSponsorship : (user?.seekingSponsorship || false),
+    sponsorshipDetails: user?.sponsorshipDetails || {
+      upcomingEvent: '',
+      eventLevel: 'NATIONAL',
+      expectedEventDate: '',
+      requirementDescription: ''
+    },
+    state: user?.state || '',
+    city: user?.city || '',
+    level: user?.beltRank || '',
     videoLink: user?.videoLink || '',
     tournaments: user?.tournaments || []
   });
+
+  const [newSportInput, setNewSportInput] = useState('');
+  const [sportInputError, setSportInputError] = useState('');
+
+  const handleAddProfileSport = () => {
+    const raw = (newSportInput || '').trim();
+    if (!raw) return;
+    if (/[a-z]/.test(raw) || raw !== raw.toUpperCase()) {
+      setSportInputError('Please enter sport in CAPITAL LETTERS.');
+      return;
+    }
+    const currentSports = Array.isArray(profile.sports) ? profile.sports : (profile.sport ? [profile.sport] : []);
+    if (currentSports.some(s => s.toLowerCase() === raw.toLowerCase())) {
+      setSportInputError('This sport has already been added.');
+      return;
+    }
+    const nextSports = [...currentSports, raw.toUpperCase()];
+    setProfile(prev => ({
+      ...prev,
+      sports: nextSports,
+      sport: nextSports[0]
+    }));
+    setNewSportInput('');
+    setSportInputError('');
+  };
+
+  const handleRemoveProfileSport = (idx) => {
+    const currentSports = Array.isArray(profile.sports) ? profile.sports : (profile.sport ? [profile.sport] : []);
+    const nextSports = currentSports.filter((_, i) => i !== idx);
+    setProfile(prev => ({
+      ...prev,
+      sports: nextSports,
+      sport: nextSports[0] || ''
+    }));
+  };
+
+  const handleDobChange = (e) => {
+    const val = e.target.value;
+    let calcAge = profile.age;
+    if (val) {
+      const d = new Date(val);
+      if (!isNaN(d.getTime())) {
+        const diff = Date.now() - d.getTime();
+        calcAge = String(Math.max(0, Math.floor(diff / (365.25 * 24 * 3600 * 1000))));
+      }
+    }
+    setProfile(prev => ({ ...prev, dateOfBirth: val, dob: val, age: calcAge }));
+  };
 
   // New Tournament Input State
   const [newTournament, setNewTournament] = useState({
@@ -479,8 +541,10 @@ export default function AthleteDashboard() {
     if (!user?._id) return;
     setLoadingCoaches(true);
     try {
+      const sportsList = Array.isArray(user?.sports) && user.sports.length > 0 ? user.sports : (user?.sport ? [user.sport] : []);
+      const sportsQuery = sportsList.length > 0 ? `?sports=${encodeURIComponent(sportsList.join(','))}` : '';
       const [coachesRes, connsRes, profileRes, orgEventsRes] = await Promise.all([
-        api.get('/athlete/coaches/list'),
+        api.get(`/athlete/coaches/list${sportsQuery}`),
         api.get(`/athlete/${user._id}/connections`),
         api.get(`/athlete/${user._id}/profile`),
         api.get('/organizer-events/my-organized-events').catch(() => ({ data: { hasLinkedOrganizer: false, events: [] } }))
@@ -490,18 +554,29 @@ export default function AthleteDashboard() {
       if (orgEventsRes?.data) setMyOrganizedData(orgEventsRes.data);
       if (profileRes.data) {
         const d = profileRes.data;
+        const dSports = Array.isArray(d.sports) && d.sports.length > 0 ? d.sports : (d.sport ? [d.sport] : []);
         setProfile(prev => ({
           ...prev,
           name: d.name || prev.name,
-          sport: d.sport || prev.sport,
+          sport: d.sport || (dSports[0] || prev.sport),
+          sports: dSports.length > 0 ? dSports : prev.sports,
           age: d.age ? String(d.age) : prev.age,
+          dateOfBirth: d.dateOfBirth ? String(d.dateOfBirth).slice(0, 10) : (d.dob ? String(d.dob).slice(0, 10) : prev.dateOfBirth),
+          gender: d.gender || prev.gender,
+          athleteLevel: d.athleteLevel || prev.athleteLevel || 'BEGINNER',
+          yearsOfExperience: d.yearsOfExperience !== undefined ? d.yearsOfExperience : (d.yearsExperience !== undefined ? d.yearsExperience : prev.yearsOfExperience),
+          bio: d.bio || prev.bio,
+          currentlyActive: d.currentlyActive !== undefined ? d.currentlyActive : prev.currentlyActive,
+          activelySeekingSponsorship: d.activelySeekingSponsorship !== undefined ? d.activelySeekingSponsorship : (d.seekingSponsorship !== undefined ? d.seekingSponsorship : prev.activelySeekingSponsorship),
+          sponsorshipDetails: d.sponsorshipDetails || prev.sponsorshipDetails,
           state: d.state || prev.state,
           city: d.city || prev.city,
           level: d.beltRank || prev.level,
           videoLink: d.videoLink || prev.videoLink,
           tournaments: d.tournaments || prev.tournaments || []
         }));
-        if (d.seekingSponsorship !== undefined) setOptInSponsorship(d.seekingSponsorship);
+        if (d.activelySeekingSponsorship !== undefined) setOptInSponsorship(d.activelySeekingSponsorship);
+        else if (d.seekingSponsorship !== undefined) setOptInSponsorship(d.seekingSponsorship);
         if (d.relocationFlexible !== undefined) setRelocationFlexible(d.relocationFlexible);
       }
     } catch (err) {
@@ -509,7 +584,7 @@ export default function AthleteDashboard() {
     } finally {
       setLoadingCoaches(false);
     }
-  }, [user?._id]);
+  }, [user?._id, user?.sports, user?.sport]);
 
   useEffect(() => {
     fetchData();
@@ -542,12 +617,22 @@ export default function AthleteDashboard() {
       if (user?._id) {
         await api.put(`/athlete/${user._id}/profile`, {
           name: profile.name,
-          sport: profile.sport,
+          sports: profile.sports,
+          sport: profile.sports?.[0] || profile.sport,
+          dateOfBirth: profile.dateOfBirth || profile.dob,
+          dob: profile.dateOfBirth || profile.dob,
           age: Number(profile.age) || undefined,
+          gender: profile.gender,
+          athleteLevel: profile.athleteLevel,
+          yearsOfExperience: Number(profile.yearsOfExperience) || 0,
+          bio: profile.bio,
+          currentlyActive: profile.currentlyActive,
+          activelySeekingSponsorship: optInSponsorship,
+          seekingSponsorship: optInSponsorship,
+          sponsorshipDetails: profile.sponsorshipDetails,
           state: profile.state,
           city: profile.city,
           beltRank: profile.level,
-          seekingSponsorship: optInSponsorship,
           relocationFlexible: relocationFlexible,
           videoLink: profile.videoLink,
           tournaments: profile.tournaments
@@ -555,7 +640,7 @@ export default function AthleteDashboard() {
       }
       toast({
         title: 'Profile Updated',
-        description: 'Your athlete portfolio & tournament records have been saved.',
+        description: 'Your athlete portfolio & records have been saved.',
         variant: 'success'
       });
     } catch (err) {
@@ -648,8 +733,8 @@ export default function AthleteDashboard() {
     <div className="w-full max-w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-[#173d3c] via-[#123130] to-[#0c292c] border border-[#2f6d5a] p-5 sm:p-6 rounded-2xl text-white shadow-md">
-        <div className="space-y-1">
-          <div className="flex flex-wrap items-center gap-2 mb-1">
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
               <CheckCircle2 className="w-3.5 h-3.5 text-[#cc694e]" /> Verified Athlete Profile
             </span>
@@ -660,9 +745,28 @@ export default function AthleteDashboard() {
           <h1 className="text-2xl sm:text-3xl font-normal text-white" style={{ fontFamily: 'Georgia, serif' }}>
             <span style={{ textTransform: 'capitalize' }}>{profile.name || user?.name || 'Athlete'}</span> <em style={{ color: '#b9d9bf', fontStyle: 'italic' }}>Portfolio</em>
           </h1>
-          <p className="text-xs text-[#c5d3ce]">
-            {profile.sport} · {profile.level} · {profile.city}, {profile.state}
-          </p>
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+            {(profile.sports && profile.sports.length > 0 ? profile.sports : (profile.sport ? [profile.sport] : (user?.sports && user.sports.length > 0 ? user.sports : (user?.sport ? [user.sport] : [])))).map((sp, idx) => (
+              <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-extrabold uppercase bg-white/10 text-[#b9d9bf] border border-white/25">
+                [ {String(sp).toUpperCase()} ]
+              </span>
+            ))}
+            {profile.athleteLevel && (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold uppercase bg-[#e07050]/20 text-[#ffb09c] border border-[#e07050]/40">
+                {profile.athleteLevel}
+              </span>
+            )}
+            {profile.currentlyActive !== undefined && (
+              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-bold uppercase ${profile.currentlyActive ? 'bg-[#2f6d5a] text-[#e2eee4]' : 'bg-gray-600/40 text-gray-300'}`}>
+                {profile.currentlyActive ? '● ACTIVE' : '○ INACTIVE'}
+              </span>
+            )}
+            <span className="text-xs text-[#c5d3ce] ml-1">
+              · {profile.city}{profile.city && profile.state ? ', ' : ''}{profile.state}
+              {profile.age ? ` · Age: ${profile.age}` : ''}
+              {profile.level ? ` · ${profile.level}` : ''}
+            </span>
+          </div>
         </div>
 
         <div className="flex shrink-0">
@@ -741,27 +845,113 @@ export default function AthleteDashboard() {
                     />
                   </div>
                   <div>
-                    <Label required>Primary Discipline</Label>
+                    <Label>Athlete Level</Label>
+                    <select
+                      value={profile.athleteLevel || 'BEGINNER'}
+                      onChange={(e) => setProfile({ ...profile, athleteLevel: e.target.value })}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: '1px solid #d8ded5',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        background: '#ffffff',
+                        color: '#173235',
+                        boxSizing: 'border-box'
+                      }}
+                    >
+                      <option value="BEGINNER">BEGINNER</option>
+                      <option value="DISTRICT">DISTRICT</option>
+                      <option value="STATE">STATE</option>
+                      <option value="NATIONAL">NATIONAL</option>
+                      <option value="INTERNATIONAL">INTERNATIONAL</option>
+                    </select>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <Label required>Sport Disciplines (Capital Letters)</Label>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {(Array.isArray(profile.sports) ? profile.sports : (profile.sport ? [profile.sport] : [])).map((sp, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-extrabold uppercase bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]"
+                        >
+                          [ {sp} ]
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveProfileSport(idx)}
+                            className="text-[#cc694e] hover:text-[#a34028] font-black cursor-pointer ml-0.5"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="ENTER SPORT IN CAPITAL LETTERS"
+                        value={newSportInput}
+                        onChange={(e) => {
+                          setNewSportInput(e.target.value);
+                          if (sportInputError) setSportInputError('');
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddProfileSport();
+                          }
+                        }}
+                        className="flex-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddProfileSport}
+                        className="btn-simple-add"
+                      >
+                        + Add Sport
+                      </button>
+                    </div>
+                    {sportInputError && (
+                      <p className="text-xs text-red-600 mt-1 font-bold">{sportInputError}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label>Date of Birth</Label>
                     <Input
-                      value={profile.sport}
-                      onChange={(e) => setProfile({ ...profile, sport: e.target.value })}
-                      className="bg-[#fffefa] text-[#194e42] font-bold border-[#2f6d5a]/40"
+                      type="date"
+                      value={profile.dateOfBirth || profile.dob || ''}
+                      onChange={handleDobChange}
+                      max={new Date().toISOString().split('T')[0]}
                     />
                   </div>
                   <div>
-                    <Label>Age</Label>
+                    <Label>Calculated Age</Label>
                     <Input
-                      value={profile.age}
-                      onChange={(e) => setProfile({ ...profile, age: e.target.value })}
+                      value={profile.age ? `${profile.age} years` : 'N/A'}
+                      disabled
+                      className="bg-[#f9faf8] text-[#526668]"
                     />
                   </div>
+
                   <div>
-                    <Label>Highest Competition Level / Rank</Label>
+                    <Label>Belt / Rank Level</Label>
                     <Input
                       value={profile.level}
                       onChange={(e) => setProfile({ ...profile, level: e.target.value })}
+                      placeholder="e.g. Black Belt 1st Dan"
                     />
                   </div>
+                  <div>
+                    <Label>Years of Experience</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={profile.yearsOfExperience}
+                      onChange={(e) => setProfile({ ...profile, yearsOfExperience: e.target.value })}
+                    />
+                  </div>
+
                   <div>
                     <Label>City</Label>
                     <Input
@@ -776,9 +966,25 @@ export default function AthleteDashboard() {
                       onChange={(e) => setProfile({ ...profile, state: e.target.value })}
                     />
                   </div>
+
+                  <div className="sm:col-span-2">
+                    <Label>Athlete Bio</Label>
+                    <textarea
+                      value={profile.bio || ''}
+                      onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
+                      rows={3}
+                      className="w-full p-2.5 border border-[#d8ded5] rounded-lg text-xs bg-white text-[#173235]"
+                      placeholder="Tell coaches and scouts about your training background and competitive achievements..."
+                    />
+                  </div>
                 </div>
 
                 <div className="pt-3 space-y-3 border-t border-[#d8ded5]">
+                  <Switch
+                    checked={profile.currentlyActive}
+                    onChange={(val) => setProfile({ ...profile, currentlyActive: val })}
+                    label="Currently Active in Competitive Sports"
+                  />
                   <Switch
                     checked={relocationFlexible}
                     onChange={setRelocationFlexible}
@@ -786,9 +992,63 @@ export default function AthleteDashboard() {
                   />
                   <Switch
                     checked={optInSponsorship}
-                    onChange={setOptInSponsorship}
-                    label="Opt-in to Verified CSR Sponsor Browser Ledger"
+                    onChange={(val) => {
+                      setOptInSponsorship(val);
+                      setProfile({ ...profile, activelySeekingSponsorship: val });
+                    }}
+                    label="Actively Seeking Event Sponsorship (CSR Ledger)"
                   />
+                  {optInSponsorship && (
+                    <div className="p-3 bg-[#f4f8f5] border border-[#2f6d5a] rounded-xl space-y-3">
+                      <Label className="text-xs font-bold text-[#194e42]">Sponsorship Requirement Details</Label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <Label>Upcoming Event / Competition</Label>
+                          <Input
+                            placeholder="e.g. National Championship 2026"
+                            value={profile.sponsorshipDetails?.upcomingEvent || ''}
+                            onChange={(e) => setProfile({
+                              ...profile,
+                              sponsorshipDetails: { ...profile.sponsorshipDetails, upcomingEvent: e.target.value }
+                            })}
+                          />
+                        </div>
+                        <div>
+                          <Label>Event Level</Label>
+                          <select
+                            value={profile.sponsorshipDetails?.eventLevel || 'NATIONAL'}
+                            onChange={(e) => setProfile({
+                              ...profile,
+                              sponsorshipDetails: { ...profile.sponsorshipDetails, eventLevel: e.target.value }
+                            })}
+                            style={{
+                              width: '100%',
+                              padding: '8px 12px',
+                              border: '1px solid #d8ded5',
+                              borderRadius: '8px',
+                              fontSize: '12px',
+                              background: '#ffffff',
+                              color: '#173235'
+                            }}
+                          >
+                            <option value="NATIONAL">NATIONAL</option>
+                            <option value="INTERNATIONAL">INTERNATIONAL</option>
+                          </select>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <Label>Requirement Description</Label>
+                          <Input
+                            placeholder="e.g. Funding needed for travel, accommodation, and high-performance gear."
+                            value={profile.sponsorshipDetails?.requirementDescription || ''}
+                            onChange={(e) => setProfile({
+                              ...profile,
+                              sponsorshipDetails: { ...profile.sponsorshipDetails, requirementDescription: e.target.value }
+                            })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -809,7 +1069,11 @@ export default function AthleteDashboard() {
 
         {/* ── ELIGIBLE FOR YOU TAB ──────────────────────────────── */}
         <TabsContent value="eligible" className="space-y-6">
-          <OfficialTournamentsSection athleteSport={profile.sport} eligibleOnly={true} />
+          <OfficialTournamentsSection
+            athleteSport={profile.sport}
+            athleteSports={profile.sports && profile.sports.length > 0 ? profile.sports : (profile.sport ? [profile.sport] : user?.sports)}
+            eligibleOnly={true}
+          />
         </TabsContent>
 
         {/* ── PERSONAL ACHIEVEMENTS TAB ─────────────────────────── */}
@@ -970,7 +1234,10 @@ export default function AthleteDashboard() {
           <MyEventRegistrations />
         </TabsContent>
         <TabsContent value="academies" className="space-y-6">
-          <AthleteAcademiesSection athleteSport={profile.sport || user?.sport} />
+          <AthleteAcademiesSection
+            athleteSport={profile.sport || user?.sport}
+            athleteSports={profile.sports && profile.sports.length > 0 ? profile.sports : (profile.sport ? [profile.sport] : user?.sports)}
+          />
         </TabsContent>
 
         {/* ── COACHES & MENTORSHIP TAB ──────────────────────────────── */}
