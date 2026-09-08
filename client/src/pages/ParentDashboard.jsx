@@ -98,10 +98,23 @@ export default function ParentDashboard() {
           </p>
         </div>
         {user?.childName && (
-          <div className="bg-[#e2eee4] border border-[#2f6d5a] rounded-xl px-4 py-2.5 text-xs text-[#194e42]">
-            <span className="text-[#cc694e] font-extrabold block text-[10px] tracking-wider uppercase">Child Profile</span>
+          <div className="bg-[#e2eee4] border border-[#2f6d5a] rounded-xl px-4 py-2.5 text-xs text-[#194e42] flex flex-col gap-0.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[#cc694e] font-extrabold text-[10px] tracking-wider uppercase">Child Profile</span>
+              {user.relationshipToChild && (
+                <span className="text-[10px] font-bold text-[#2f6d5a] bg-white/70 px-1.5 py-0.5 rounded">
+                  {user.relationshipToChild}
+                </span>
+              )}
+            </div>
             <span className="font-bold text-[#173235]">{user.childName}</span>
-            <span className="text-[#526668]"> (Age: {user.childAge || 'N/A'}, Target Sport: {user.childSport || 'Taekwondo'})</span>
+            <span className="text-[#526668]">
+              Age: {user.childAge !== undefined && user.childAge !== null ? `${user.childAge} yrs` : (user.childDob ? `${Math.floor((Date.now() - new Date(user.childDob)) / (365.25 * 24 * 3600 * 1000))} yrs` : 'N/A')}
+              {user.childDob ? ` (DOB: ${new Date(user.childDob).toLocaleDateString()})` : ''}
+            </span>
+            <span className="text-[#194e42] font-semibold">
+              Sports: {user.sports && user.sports.length > 0 ? user.sports.join(', ') : (user.childSport || 'Taekwondo')}
+            </span>
           </div>
         )}
       </div>

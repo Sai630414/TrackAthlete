@@ -27,7 +27,11 @@ const UserSchema = new mongoose.Schema({
 
   // Parent-specific
   parentId: { type: String, trim: true, sparse: true, unique: true },
-  childName: String,
+  mobile: { type: String, trim: true },
+  childName: { type: String, trim: true },
+  childDob: { type: Date },
+  relationshipToChild: { type: String, enum: ['FATHER', 'MOTHER', 'LEGAL GUARDIAN', 'OTHER'], trim: true },
+  sports: [{ type: String, trim: true }],
   childAge: Number,
   childSport: String,
 

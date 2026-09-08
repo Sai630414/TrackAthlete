@@ -57,6 +57,67 @@ router.post('/signup', async (req, res) => {
       return res.status(400).json({ error: 'Aadhaar number must contain exactly 12 digits.' });
     }
 
+    let parsedDob = undefined;
+    let normalizedParentSports = undefined;
+    let parentRelationship = undefined;
+
+    if (role === 'parent') {
+      if (!aadhaarNumber && !aadhaar) {
+        return res.status(400).json({ error: 'Aadhaar number is required.' });
+      }
+      if (!aadhaarHash) {
+        return res.status(400).json({ error: 'Parent Aadhaar number must contain exactly 12 digits.' });
+      }
+      if (!req.body.mobile || !String(req.body.mobile).trim()) {
+        return res.status(400).json({ error: 'Mobile Number is required.' });
+      }
+      if (!req.body.childName || !String(req.body.childName).trim()) {
+        return res.status(400).json({ error: "Child's Full Name is required." });
+      }
+      if (!req.body.childDob) {
+        return res.status(400).json({ error: "Child's Date of Birth is required." });
+      }
+      parsedDob = new Date(req.body.childDob);
+      if (isNaN(parsedDob.getTime())) {
+        return res.status(400).json({ error: "Invalid Child's Date of Birth." });
+      }
+      const validRel = ['FATHER', 'MOTHER', 'LEGAL GUARDIAN', 'OTHER'];
+      parentRelationship = String(req.body.relationshipToChild || '').toUpperCase().trim();
+      if (!parentRelationship || !validRel.includes(parentRelationship)) {
+        return res.status(400).json({ error: 'Relationship to Child is required and must be one of: FATHER, MOTHER, LEGAL GUARDIAN, OTHER.' });
+      }
+
+      let sportsList = Array.isArray(req.body.sports)
+        ? req.body.sports
+        : (req.body.childSport ? (Array.isArray(req.body.childSport) ? req.body.childSport : [req.body.childSport]) : []);
+      sportsList = sportsList.map(s => String(s || '').trim()).filter(Boolean);
+      if (sportsList.length === 0) {
+        return res.status(400).json({ error: 'At least one sport is required.' });
+      }
+
+      normalizedParentSports = [];
+      const seenSports = new Set();
+      for (const sp of sportsList) {
+        if (/[a-z]/.test(sp) || sp !== sp.toUpperCase()) {
+          return res.status(400).json({ error: 'Please enter the sport in CAPITAL LETTERS.' });
+        }
+        const normKey = sp.toLowerCase();
+        if (seenSports.has(normKey)) {
+          return res.status(400).json({ error: 'This sport has already been added.' });
+        }
+        seenSports.add(normKey);
+        normalizedParentSports.push(sp.toUpperCase());
+      }
+
+      if (req.body.confirmPassword !== undefined && req.body.confirmPassword !== password) {
+        return res.status(400).json({ error: 'Passwords do not match.' });
+      }
+
+      if (req.body.agreeTerms === false || req.body.terms === false) {
+        return res.status(400).json({ error: 'Please accept the Terms & Conditions and Privacy Policy.' });
+      }
+    }
+
     const passwordHash = await bcrypt.hash(password, 10);
     const userPayload = {
       name: String(name).trim(),
@@ -72,6 +133,18 @@ router.post('/signup', async (req, res) => {
     };
     if (location) userPayload.location = location;
 
+    if (role === 'parent') {
+      userPayload.mobile = String(req.body.mobile).trim();
+      userPayload.childName = String(req.body.childName).trim();
+      userPayload.childDob = parsedDob;
+      const diffMs = Date.now() - parsedDob.getTime();
+      const calcAge = Math.floor(diffMs / (365.25 * 24 * 3600 * 1000));
+      userPayload.childAge = calcAge >= 0 ? calcAge : 0;
+      userPayload.relationshipToChild = parentRelationship;
+      userPayload.sports = normalizedParentSports;
+      userPayload.childSport = normalizedParentSports[0];
+    }
+
     const user = await User.create(userPayload);
     const { generateRolePermanentId } = require('../utils/idGenerator');
 
@@ -84,6 +157,13 @@ router.post('/signup', async (req, res) => {
       const parentIdStr = await generateRolePermanentId('parent', user._id, async (cand) => !(await User.findOne({ $or: [{ parentId: cand }, { trackAthleteId: cand }] })));
       user.parentId = parentIdStr;
       user.trackAthleteId = parentIdStr;
+      user.mobile = userPayload.mobile;
+      user.childName = userPayload.childName;
+      user.childDob = userPayload.childDob;
+      user.childAge = userPayload.childAge;
+      user.relationshipToChild = userPayload.relationshipToChild;
+      user.sports = userPayload.sports;
+      user.childSport = userPayload.childSport;
     }
     if (role === 'coach') {
       const coachIdStr = await generateRolePermanentId('coach', user._id, async (cand) => !(await User.findOne({ $or: [{ coachId: cand }, { trackAthleteId: cand }] })));

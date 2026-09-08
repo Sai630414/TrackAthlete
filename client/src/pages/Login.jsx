@@ -75,7 +75,48 @@ export default function Login({ initialMode }) {
   const [agreeTerms, setAgreeTerms] = useState(false);
 
   // Role-Specific Payload State
-  const [parentFields, setParentFields] = useState({ childName: '', childAge: '', childSport: 'Taekwondo' });
+  const [parentFields, setParentFields] = useState({
+    mobile: '',
+    aadhaarNumber: '',
+    childName: '',
+    childDob: '',
+    relationshipToChild: 'FATHER',
+    sports: [],
+    currentSportInput: '',
+    confirmPassword: ''
+  });
+  const [parentSportError, setParentSportError] = useState('');
+
+  const handleAddParentSport = () => {
+    const raw = (parentFields.currentSportInput || '').trim();
+    if (!raw) {
+      setParentSportError('Please enter a sport name.');
+      return;
+    }
+    if (/[a-z]/.test(raw) || raw !== raw.toUpperCase()) {
+      setParentSportError('Please enter the sport in CAPITAL LETTERS.');
+      return;
+    }
+    const exists = (parentFields.sports || []).some(s => s.trim().toLowerCase() === raw.toLowerCase());
+    if (exists) {
+      setParentSportError('This sport has already been added.');
+      return;
+    }
+    setParentFields(prev => ({
+      ...prev,
+      sports: [...prev.sports, raw.toUpperCase()],
+      currentSportInput: ''
+    }));
+    setParentSportError('');
+  };
+
+  const handleRemoveParentSport = (indexToRemove) => {
+    setParentFields(prev => ({
+      ...prev,
+      sports: prev.sports.filter((_, idx) => idx !== indexToRemove)
+    }));
+  };
+
   const [athleteFields, setAthleteFields] = useState({ sport: '', beltRank: '', age: '', federationState: 'Andhra Pradesh', aadhaarNumber: '', seekingSponsorship: false, sponsorshipReason: '' });
   const [coachFields, setCoachFields] = useState({ sport: 'Taekwondo', yearsExperience: '', certifications: '', acceptingAthletes: true });
   const [sponsorFields, setSponsorFields] = useState({ organizationName: '', budgetRange: '₹50,000 - ₹2,000,000', targetSports: 'Taekwondo' });
@@ -215,15 +256,97 @@ export default function Login({ initialMode }) {
         }
       } else if (mode === 'signup') {
         if (!agreeTerms) {
-          setError('You must accept the Terms of Service & Privacy Policy to sign up.');
+          setError(role === 'parent' ? 'Please accept the Terms & Conditions and Privacy Policy.' : 'You must accept the Terms of Service & Privacy Policy to sign up.');
           setLoading(false);
           return;
         }
 
         // Build role specific payload
         let rolePayload = {};
-        if (role === 'parent') rolePayload = { childName: parentFields.childName, childAge: Number(parentFields.childAge) || 0, childSport: parentFields.childSport };
-        else if (role === 'athlete') rolePayload = { sport: String(athleteFields.sport || '').trim(), age: Number(athleteFields.age) || 0, beltRank: athleteFields.beltRank, federationState: athleteFields.federationState, aadhaarNumber: athleteFields.aadhaarNumber, seekingSponsorship: athleteFields.seekingSponsorship, sponsorshipReason: athleteFields.sponsorshipReason };
+        if (role === 'parent') {
+          if (!name.trim()) {
+            setError('Full Name is required.');
+            setLoading(false);
+            return;
+          }
+          if (!parentFields.mobile.trim()) {
+            setError('Mobile Number is required.');
+            setLoading(false);
+            return;
+          }
+          const cleanAadhaar = parentFields.aadhaarNumber.replace(/\D/g, '');
+          if (cleanAadhaar.length !== 12) {
+            setError('Aadhaar number must contain exactly 12 digits.');
+            setLoading(false);
+            return;
+          }
+          if (!parentFields.childName.trim()) {
+            setError("Child's Full Name is required.");
+            setLoading(false);
+            return;
+          }
+          if (!parentFields.childDob) {
+            setError("Child's Date of Birth is required.");
+            setLoading(false);
+            return;
+          }
+          if (!parentFields.relationshipToChild) {
+            setError('Relationship to Child is required.');
+            setLoading(false);
+            return;
+          }
+
+          let finalSports = [...parentFields.sports];
+          if (parentFields.currentSportInput.trim()) {
+            const raw = parentFields.currentSportInput.trim();
+            if (/[a-z]/.test(raw) || raw !== raw.toUpperCase()) {
+              setError('Please enter the sport in CAPITAL LETTERS.');
+              setLoading(false);
+              return;
+            }
+            if (finalSports.some(s => s.trim().toLowerCase() === raw.toLowerCase())) {
+              setError('This sport has already been added.');
+              setLoading(false);
+              return;
+            }
+            finalSports.push(raw.toUpperCase());
+          }
+
+          if (finalSports.length === 0) {
+            setError('At least one sport is required.');
+            setLoading(false);
+            return;
+          }
+
+          if (!email.trim()) {
+            setError('Email Address is required.');
+            setLoading(false);
+            return;
+          }
+
+          if (!password || password.length < 6) {
+            setError('Password must be at least 6 characters long.');
+            setLoading(false);
+            return;
+          }
+
+          if (password !== parentFields.confirmPassword) {
+            setError('Passwords do not match.');
+            setLoading(false);
+            return;
+          }
+
+          rolePayload = {
+            mobile: parentFields.mobile.trim(),
+            aadhaarNumber: cleanAadhaar,
+            childName: parentFields.childName.trim(),
+            childDob: parentFields.childDob,
+            relationshipToChild: parentFields.relationshipToChild,
+            sports: finalSports,
+            childSport: finalSports[0],
+            confirmPassword: parentFields.confirmPassword
+          };
+        } else if (role === 'athlete') rolePayload = { sport: String(athleteFields.sport || '').trim(), age: Number(athleteFields.age) || 0, beltRank: athleteFields.beltRank, federationState: athleteFields.federationState, aadhaarNumber: athleteFields.aadhaarNumber, seekingSponsorship: athleteFields.seekingSponsorship, sponsorshipReason: athleteFields.sponsorshipReason };
         else if (role === 'coach') rolePayload = { sport: coachFields.sport, yearsExperience: Number(coachFields.yearsExperience) || 0, certifications: coachFields.certifications.split(',').map(s => s.trim()).filter(Boolean), acceptingAthletes: coachFields.acceptingAthletes };
         else if (role === 'sponsor') rolePayload = { organizationName: sponsorFields.organizationName, budgetRange: sponsorFields.budgetRange, targetSports: sponsorFields.targetSports.split(',').map(s => s.trim()).filter(Boolean) };
         else if (role === 'academy') rolePayload = {
@@ -473,8 +596,8 @@ export default function Login({ initialMode }) {
             {error && <div className="login-error"><LockKeyhole size={15} /> {error}</div>}
             {successMsg && <div className="login-success" style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '10px', borderRadius: '8px', background: '#e2eee4', color: '#194e42', fontSize: '11px', border: '1px solid #b7da78' }}><CheckCircle2 size={15} /> {successMsg}</div>}
 
-            {/* Common Sign Up Fields */}
-            {mode === 'signup' && (
+            {/* Common Sign Up Fields (for non-parent roles) */}
+            {mode === 'signup' && role !== 'parent' && (
               <>
                 <label>Full Name
                   <input value={name} onChange={e => setName(e.target.value)} type="text" placeholder="e.g. Rajesh Kumar" required />
@@ -490,26 +613,258 @@ export default function Login({ initialMode }) {
               </>
             )}
 
-            {/* Role-Specific Sign Up Fields */}
+            {/* Parent Sign Up — 5 Logical Sections */}
             {mode === 'signup' && role === 'parent' && (
               <>
-                <label>Child's Full Name
-                  <input value={parentFields.childName} onChange={e => setParentFields({ ...parentFields, childName: e.target.value })} type="text" placeholder="e.g. Ananya Kumar" required />
+                {/* SECTION 1 — PARENT INFORMATION */}
+                <div style={{ borderBottom: '1px solid #d8ded5', paddingBottom: '6px', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#173235', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    SECTION 1 — PARENT INFORMATION
+                  </span>
+                </div>
+
+                <label>Full Name *
+                  <input
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    type="text"
+                    placeholder="e.g. Ramesh Sharma"
+                    required
+                  />
                 </label>
+
+                <label>Mobile Number *
+                  <input
+                    value={parentFields.mobile}
+                    onChange={e => setParentFields({ ...parentFields, mobile: e.target.value.replace(/[^\d+-\s]/g, '') })}
+                    type="tel"
+                    placeholder="e.g. +91 9876543210"
+                    required
+                  />
+                </label>
+
+                <label>Aadhaar Number *
+                  <input
+                    value={parentFields.aadhaarNumber}
+                    onChange={e => setParentFields({ ...parentFields, aadhaarNumber: e.target.value.replace(/\D/g, '').slice(0, 12) })}
+                    type="password"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    pattern="[0-9]{12}"
+                    minLength={12}
+                    maxLength={12}
+                    placeholder="12-digit Aadhaar number"
+                    required
+                  />
+                  <small style={{ color: '#697c7c', fontSize: '11px' }}>
+                    Parent identity information. Securely hashed with HMAC-SHA256 before storage. Never stored in plaintext.
+                  </small>
+                </label>
+
+                {/* SECTION 2 — CHILD INFORMATION */}
+                <div style={{ borderBottom: '1px solid #d8ded5', paddingBottom: '6px', marginBottom: '8px', marginTop: '12px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#173235', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    SECTION 2 — CHILD INFORMATION
+                  </span>
+                </div>
+
+                <label>Child's Full Name *
+                  <input
+                    value={parentFields.childName}
+                    onChange={e => setParentFields({ ...parentFields, childName: e.target.value })}
+                    type="text"
+                    placeholder="e.g. Aarav Sharma"
+                    required
+                  />
+                </label>
+
                 <div className="form-row">
-                  <label>Child's Age
-                    <input value={parentFields.childAge} onChange={e => setParentFields({ ...parentFields, childAge: e.target.value })} type="number" min="3" max="25" placeholder="e.g. 14" required />
+                  <label>Child's Date of Birth *
+                    <input
+                      value={parentFields.childDob}
+                      onChange={e => setParentFields({ ...parentFields, childDob: e.target.value })}
+                      type="date"
+                      max={new Date().toISOString().split('T')[0]}
+                      required
+                    />
                   </label>
-                  <label>Primary Sport Interested In
-                    <select value={parentFields.childSport} onChange={e => setParentFields({ ...parentFields, childSport: e.target.value })}>
-                      <option value="Taekwondo">Taekwondo</option>
-                      <option value="Badminton">Badminton</option>
-                      <option value="Table Tennis">Table Tennis</option>
-                      <option value="Athletics">Athletics</option>
-                      <option value="Boxing">Boxing</option>
+
+                  <label>Relationship to Child *
+                    <select
+                      value={parentFields.relationshipToChild}
+                      onChange={e => setParentFields({ ...parentFields, relationshipToChild: e.target.value })}
+                      required
+                    >
+                      <option value="FATHER">FATHER</option>
+                      <option value="MOTHER">MOTHER</option>
+                      <option value="LEGAL GUARDIAN">LEGAL GUARDIAN</option>
+                      <option value="OTHER">OTHER</option>
                     </select>
                   </label>
                 </div>
+
+                {/* SECTION 3 — SPORT INTEREST */}
+                <div style={{ borderBottom: '1px solid #d8ded5', paddingBottom: '6px', marginBottom: '8px', marginTop: '12px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#173235', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    SECTION 3 — SPORT INTEREST
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ margin: 0 }}>SPORT INTERESTED IN *</label>
+
+                  {/* Added Sport Tags / Boxes */}
+                  {parentFields.sports.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '4px' }}>
+                      {parentFields.sports.map((sp, idx) => (
+                        <span
+                          key={idx}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            background: '#e2eee4',
+                            border: '1px solid #2f6d5a',
+                            color: '#194e42',
+                            fontWeight: '700',
+                            fontSize: '12px',
+                            letterSpacing: '0.04em'
+                          }}
+                        >
+                          {sp}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveParentSport(idx)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#cc694e',
+                              cursor: 'pointer',
+                              fontWeight: '900',
+                              fontSize: '14px',
+                              lineHeight: 1,
+                              padding: 0
+                            }}
+                            title={`Remove ${sp}`}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Sport Input & Add Button */}
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      placeholder="ENTER SPORT NAME"
+                      value={parentFields.currentSportInput}
+                      onChange={e => {
+                        setParentFields({ ...parentFields, currentSportInput: e.target.value });
+                        setParentSportError('');
+                      }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddParentSport();
+                        }
+                      }}
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddParentSport}
+                      style={{
+                        background: '#e07050',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '0 16px',
+                        fontSize: '12px',
+                        fontWeight: '800',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      + ADD SPORT
+                    </button>
+                  </div>
+
+                  <small style={{ color: '#cc694e', fontSize: '10px', fontWeight: '800', letterSpacing: '0.05em' }}>
+                    MANDATORY — ENTER SPORT NAME IN CAPITAL LETTERS ONLY
+                  </small>
+
+                  {parentSportError && (
+                    <span style={{ color: '#dc2626', fontSize: '11px', fontWeight: '700' }}>
+                      {parentSportError}
+                    </span>
+                  )}
+                </div>
+
+                {/* SECTION 4 — ACCOUNT CREDENTIALS */}
+                <div style={{ borderBottom: '1px solid #d8ded5', paddingBottom: '6px', marginBottom: '8px', marginTop: '12px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#173235', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    SECTION 4 — ACCOUNT CREDENTIALS
+                  </span>
+                </div>
+
+                <label>Email Address *
+                  <input
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    type="email"
+                    placeholder="you@example.com"
+                    required
+                    autoComplete="email"
+                  />
+                </label>
+
+                <label>Password *
+                  <input
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    type="password"
+                    placeholder="At least 6 characters"
+                    required
+                    autoComplete="new-password"
+                  />
+                </label>
+
+                <label>Confirm Password *
+                  <input
+                    value={parentFields.confirmPassword}
+                    onChange={e => setParentFields({ ...parentFields, confirmPassword: e.target.value })}
+                    type="password"
+                    placeholder="Re-enter password"
+                    required
+                    autoComplete="new-password"
+                  />
+                </label>
+
+                {/* SECTION 5 — TERMS & SUBMIT */}
+                <label className="checkbox-label" style={{ marginTop: '8px' }}>
+                  <input
+                    type="checkbox"
+                    checked={agreeTerms}
+                    onChange={e => setAgreeTerms(e.target.checked)}
+                    required
+                  />
+                  I accept the Terms &amp; Conditions and Privacy Policy of TrackAthlete.
+                </label>
+
+                <button className="login-submit" disabled={loading} style={{ marginTop: '8px' }}>
+                  {loading ? (
+                    <><LoaderCircle className="spin" size={17} /> Creating Parent Account...</>
+                  ) : (
+                    <>CREATE PARENT ACCOUNT <ArrowRight size={17} /></>
+                  )}
+                </button>
               </>
             )}
 
@@ -768,50 +1123,54 @@ export default function Login({ initialMode }) {
               </div>
             )}
 
-            {/* Email & Password (Common for both Sign In and Sign Up) */}
-            <label>{role === 'academy' && mode === 'signin' ? 'Academy Email, Phone, or Name' : 'Email address'}
-              <input
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                type={mode === 'signin' ? 'text' : 'email'}
-                placeholder={role === 'academy' && mode === 'signin' ? 'Registered email, contact phone, or academy name' : 'you@example.com'}
-                required
-                autoComplete={mode === 'signin' ? 'username' : 'email'}
-              />
-            </label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: '#526668', fontSize: '11px', fontWeight: '800', letterSpacing: '.03em' }}>Password</span>
-                {mode === 'signin' && (
-                  <button type="button" onClick={() => { setMode('forgot'); setError(''); setSuccessMsg(''); setForgotStep('request'); }} style={{ background: 'none', border: 'none', color: '#e07050', fontSize: '11px', fontWeight: '700', cursor: 'pointer', textDecoration: 'underline' }}>
-                    Forgot password?
-                  </button>
+            {/* Email & Password (Common for both Sign In and Sign Up for non-parent roles) */}
+            {!(mode === 'signup' && role === 'parent') && (
+              <>
+                <label>{role === 'academy' && mode === 'signin' ? 'Academy Email, Phone, or Name' : 'Email address'}
+                  <input
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    type={mode === 'signin' ? 'text' : 'email'}
+                    placeholder={role === 'academy' && mode === 'signin' ? 'Registered email, contact phone, or academy name' : 'you@example.com'}
+                    required
+                    autoComplete={mode === 'signin' ? 'username' : 'email'}
+                  />
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#526668', fontSize: '11px', fontWeight: '800', letterSpacing: '.03em' }}>Password</span>
+                    {mode === 'signin' && (
+                      <button type="button" onClick={() => { setMode('forgot'); setError(''); setSuccessMsg(''); setForgotStep('request'); }} style={{ background: 'none', border: 'none', color: '#e07050', fontSize: '11px', fontWeight: '700', cursor: 'pointer', textDecoration: 'underline' }}>
+                        Forgot password?
+                      </button>
+                    )}
+                  </div>
+                  <input value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder="Your password" required autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} />
+                </div>
+
+                {/* Checkboxes */}
+                <label className="checkbox-label">
+                  <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} />
+                  Remember me on this device
+                </label>
+
+                {mode === 'signup' && (
+                  <label className="checkbox-label">
+                    <input type="checkbox" checked={agreeTerms} onChange={e => setAgreeTerms(e.target.checked)} required />
+                    I agree to the Terms of Service & Privacy Policy
+                  </label>
                 )}
-              </div>
-              <input value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder="Your password" required autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} />
-            </div>
 
-            {/* Checkboxes */}
-            <label className="checkbox-label">
-              <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} />
-              Remember me on this device
-            </label>
-
-            {mode === 'signup' && (
-              <label className="checkbox-label">
-                <input type="checkbox" checked={agreeTerms} onChange={e => setAgreeTerms(e.target.checked)} required />
-                I agree to the Terms of Service & Privacy Policy
-              </label>
+                {/* Submit Button */}
+                <button className="login-submit" disabled={loading}>
+                  {loading ? (
+                    <><LoaderCircle className="spin" size={17} /> {mode === 'signin' ? 'Signing in...' : 'Creating profile...'}</>
+                  ) : (
+                    <>{mode === 'signin' ? `Enter ${roles.find(item => item.id === role)?.label} workspace` : `Register as ${roles.find(item => item.id === role)?.label}`} <ArrowRight size={17} /></>
+                  )}
+                </button>
+              </>
             )}
-
-            {/* Submit Button */}
-            <button className="login-submit" disabled={loading}>
-              {loading ? (
-                <><LoaderCircle className="spin" size={17} /> {mode === 'signin' ? 'Signing in...' : 'Creating profile...'}</>
-              ) : (
-                <>{mode === 'signin' ? `Enter ${roles.find(item => item.id === role)?.label} workspace` : `Register as ${roles.find(item => item.id === role)?.label}`} <ArrowRight size={17} /></>
-              )}
-            </button>
           </form>
         )}
 
@@ -820,7 +1179,7 @@ export default function Login({ initialMode }) {
             {mode === 'signin' ? (
               <>New to TrackAthlete? <button type="button" onClick={() => { setMode('signup'); setError(''); setSuccessMsg(''); const nextParams = new URLSearchParams(searchParams); nextParams.set('mode', 'signup'); if (role) nextParams.set('role', role); setSearchParams(nextParams, { replace: true }); }} style={{ background: 'none', border: 'none', color: '#e07050', fontWeight: 'bold', cursor: 'pointer', textDecoration: 'underline' }}>Click here to Sign Up</button></>
             ) : (
-              <>Already have an account? <button type="button" onClick={() => { setMode('signin'); setError(''); setSuccessMsg(''); const nextParams = new URLSearchParams(searchParams); nextParams.set('mode', 'signin'); if (role) nextParams.set('role', role); setSearchParams(nextParams, { replace: true }); }} style={{ background: 'none', border: 'none', color: '#e07050', fontWeight: 'bold', cursor: 'pointer', textDecoration: 'underline' }}>Click here to Sign In</button></>
+              <>Already have an account? <button type="button" onClick={() => { setMode('signin'); setError(''); setSuccessMsg(''); const nextParams = new URLSearchParams(searchParams); nextParams.set('mode', 'signin'); if (role) nextParams.set('role', role); setSearchParams(nextParams, { replace: true }); }} style={{ background: 'none', border: 'none', color: '#e07050', fontWeight: 'bold', cursor: 'pointer', textDecoration: 'underline' }}>Sign In</button></>
             )}
           </p>
         )}
