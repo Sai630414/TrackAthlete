@@ -36,13 +36,22 @@ export default class ErrorBoundary extends React.Component {
           <p className="text-xs text-[#526668] max-w-md mx-auto">
             {this.state.error?.message || 'Something went wrong rendering this component.'}
           </p>
-          <button
-            type="button"
-            onClick={this.handleReset}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#194e42] text-white text-xs font-bold hover:bg-[#143d34] transition cursor-pointer shadow-xs"
-          >
-            <RefreshCw size={12} /> Try Again
-          </button>
+          <div className="flex justify-center gap-2">
+            <button
+              type="button"
+              onClick={this.handleReset}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#194e42] text-white text-xs font-bold hover:bg-[#143d34] transition cursor-pointer shadow-xs"
+            >
+              <RefreshCw size={12} /> Try Again
+            </button>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[#2f6d5a] text-[#194e42] text-xs font-bold hover:bg-[#e2eee4] transition cursor-pointer shadow-xs"
+            >
+              Reload Page
+            </button>
+          </div>
         </div>
       );
     }
