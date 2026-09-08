@@ -13,28 +13,42 @@ async function linkHistoricalAchievements(user) {
   );
 }
 
-// GET /api/athlete/coaches or /api/athlete/coaches/list — list all coaches
-router.get('/coaches', async (req, res) => {
+async function getCoachesList(req, res) {
   try {
-    const coaches = await User.find({ role: 'coach', acceptingAthletes: { $ne: false } })
-      .select('-passwordHash')
-      .sort({ yearsExperience: -1 });
-    res.json(coaches);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+    const query = { role: 'coach', acceptingAthletes: { $ne: false } };
+    if (req.query.sport) {
+      const normSport = String(req.query.sport).trim();
+      const reg = new RegExp('^' + normSport.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i');
+      query.$or = [{ sports: reg }, { sport: reg }];
+    }
+    if (req.query.preference) {
+      query.coachingPreferences = { $in: [String(req.query.preference).toUpperCase().trim()] };
+    }
+    if (req.query.level) {
+      query.coachingLevels = { $in: [String(req.query.level).toUpperCase().trim()] };
+    }
 
-router.get('/coaches/list', async (req, res) => {
-  try {
-    const coaches = await User.find({ role: 'coach', acceptingAthletes: { $ne: false } })
-      .select('-passwordHash')
+    const rawCoaches = await User.find(query)
+      .select('-passwordHash -aadhaarHash -resetPasswordOTP -resetPasswordToken')
       .sort({ yearsExperience: -1 });
+
+    const coaches = rawCoaches.map(c => {
+      const obj = withoutAadhaar(c);
+      obj.hasCertificate = Boolean(c.certificateData);
+      delete obj.certificateData;
+      return obj;
+    });
+
     res.json(coaches);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-});
+}
+
+// GET /api/athlete/coaches or /api/athlete/coaches/list — list all coaches with optional recommendation filters
+router.get('/coaches', getCoachesList);
+router.get('/coaches/list', getCoachesList);
+router.get('/recommendations/coaches', getCoachesList);
 
 // GET /api/athlete/:id/profile
 router.get('/:id/profile', async (req, res) => {

@@ -629,16 +629,19 @@ export default function AthleteDashboard() {
   const pendingConnections = connections.filter(c => c.status === 'Pending');
 
   const filteredCoaches = coaches.filter(c => {
+    const coachSports = Array.isArray(c.sports) && c.sports.length > 0 ? c.sports : (c.sport ? [c.sport] : []);
     const matchesSearch =
       c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.sport?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      coachSports.some(sp => sp.toLowerCase().includes(searchTerm.toLowerCase())) ||
       c.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.state?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSport = selectedSport === 'all' || c.sport?.toLowerCase() === selectedSport.toLowerCase();
+    const matchesSport = selectedSport === 'all' || coachSports.some(sp => sp.toLowerCase() === selectedSport.toLowerCase());
     return matchesSearch && matchesSport;
   });
 
-  const uniqueSports = Array.from(new Set(coaches.map(c => c.sport).filter(Boolean)));
+  const uniqueSports = Array.from(new Set(
+    coaches.flatMap(c => (Array.isArray(c.sports) && c.sports.length > 0 ? c.sports : (c.sport ? [c.sport] : []))).filter(Boolean)
+  ));
   const embedUrl = getYouTubeEmbedUrl(profile.videoLink);
 
   return (
@@ -1197,13 +1200,15 @@ export default function AthleteDashboard() {
                               <div>
                                 <h4 className="font-bold text-[#173235] text-sm">{c.name}</h4>
                                 <p className="text-xs text-[#526668]">
-                                  {c.sport || 'Sports'} Specialist
+                                  {(c.sports && c.sports.length > 0 ? c.sports.join(', ') : c.sport) || 'Sports'} Specialist
                                 </p>
                               </div>
                             </div>
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a] shrink-0">
-                              Accredited
-                            </span>
+                            <div className="flex flex-col items-end gap-1 shrink-0">
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
+                                {c.coachId || 'Accredited'}
+                              </span>
+                            </div>
                           </div>
 
                           <div className="space-y-1 my-3 text-xs text-[#526668]">

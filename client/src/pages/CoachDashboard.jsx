@@ -116,6 +116,31 @@ export default function CoachDashboard() {
     }
   };
 
+  // ── Download or View Certificate ─────────────────────────────────────────
+  const handleDownloadCertificate = () => {
+    if (user?.certificateData) {
+      const link = document.createElement('a');
+      link.href = user.certificateData;
+      link.download = user.certificateFileName || `${user.name || 'Coach'}_Certificate.pdf`;
+      link.click();
+    } else if (user?._id || user?.coachId) {
+      api.get(`/coach/${user._id || user.coachId}/certificate`)
+        .then(res => {
+          if (res.data?.certificateData) {
+            const link = document.createElement('a');
+            link.href = res.data.certificateData;
+            link.download = res.data.certificateFileName || `${user.name || 'Coach'}_Certificate.pdf`;
+            link.click();
+          } else {
+            toast({ title: 'Certificate Not Found', description: 'No certificate file is on record.', variant: 'destructive' });
+          }
+        })
+        .catch(() => {
+          toast({ title: 'Certificate Not Found', description: 'Could not load certificate.', variant: 'destructive' });
+        });
+    }
+  };
+
   // ── Open chat ───────────────────────────────────────────────────────────────
   const openChat = (conn) => {
     openChatForConnection(conn._id);
@@ -135,15 +160,26 @@ export default function CoachDashboard() {
             <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono text-[#c5d3ce] border border-white/20">
               ID: {user?.coachId || user?.trackAthleteId || 'COA-N/A'}
             </span>
-            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono text-[#c5d3ce] border border-white/20">
-              {user?.certifications?.[0] || 'Accredited'}
-            </span>
+            {user?.acceptingAthletes !== false ? (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
+                Accepting Athletes
+              </span>
+            ) : (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-white/20 text-[#c5d3ce] border border-white/20">
+                Not Accepting Athletes
+              </span>
+            )}
+            {user?.certifications?.[0] && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono text-[#c5d3ce] border border-white/20">
+                {user.certifications[0]}
+              </span>
+            )}
           </div>
           <h1 className="text-2xl sm:text-3xl font-normal text-white" style={{ fontFamily: 'Georgia, serif' }}>
             Coach <em style={{ color: '#b9d9bf', fontStyle: 'italic', textTransform: 'capitalize' }}>{user?.name || 'Desk'}</em>
           </h1>
           <p className="text-xs text-[#c5d3ce]">
-            {user?.sport || 'Sports'} Specialist · {user?.city || 'India'}, {user?.state || ''}
+            Sports: <strong>{user?.sports && user.sports.length > 0 ? user.sports.join(', ') : (user?.sport || 'Sports')}</strong> · {user?.city || 'India'}, {user?.state || ''} {user?.mobile || user?.phone ? `· Mobile: ${user.mobile || user.phone}` : ''}
           </p>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
@@ -174,6 +210,9 @@ export default function CoachDashboard() {
                 {totalUnreadMessages}
               </span>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="profile">
+            <User className="w-4 h-4 mr-1.5" /> Coach Profile
           </TabsTrigger>
           <TabsTrigger value="notes">
             <BookOpen className="w-4 h-4 mr-1.5" /> Session Notes
@@ -413,6 +452,208 @@ export default function CoachDashboard() {
           </Card>
         </TabsContent>
 
+        {/* ── COACH PROFILE TAB ────────────────────────────────────────── */}
+        <TabsContent value="profile" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <CardTitle>Coach Profile &amp; Credentials</CardTitle>
+                  <CardDescription>
+                    Official accredited coach profile stored on TrackAthlete.
+                  </CardDescription>
+                </div>
+                <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-mono font-bold bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a] self-start">
+                  Permanent ID: {user?.coachId || user?.trackAthleteId || 'COA-N/A'}
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Section 1: Personal & Contact Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 p-4 rounded-xl bg-[#f4f8f3] border border-[#d8ded5]">
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#526668] block">Coach Full Name</span>
+                  <span className="text-sm font-bold text-[#173235]">{user?.name || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#526668] block">Mobile Number</span>
+                  <span className="text-sm font-bold text-[#173235]">{user?.mobile || user?.phone || 'Not Provided'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#526668] block">City &amp; State</span>
+                  <span className="text-sm font-bold text-[#173235]">{user?.city || 'India'}, {user?.state || ''}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#526668] block">Email Address</span>
+                  <span className="text-sm font-bold text-[#173235]">{user?.email || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#526668] block">Years of Experience</span>
+                  <span className="text-sm font-bold text-[#173235]">{user?.yearsExperience ? `${user.yearsExperience} Years` : '0 Years'}</span>
+                </div>
+                {user?.nisId && (
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#526668] block">NIS ID</span>
+                    <span className="text-sm font-mono font-bold text-[#194e42]">{user.nisId}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Section 2: Sports Coached */}
+              <div>
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#173235] block mb-2">
+                  Sports Coached
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {user?.sports && user.sports.length > 0 ? (
+                    user.sports.map(sp => (
+                      <span
+                        key={sp}
+                        className="px-3 py-1 rounded-lg text-xs font-extrabold bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a] tracking-wider uppercase"
+                      >
+                        {sp}
+                      </span>
+                    ))
+                  ) : user?.sport ? (
+                    <span className="px-3 py-1 rounded-lg text-xs font-extrabold bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a] tracking-wider uppercase">
+                      {user.sport}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-gray-500 italic">No sports recorded.</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Section 3: Certifications & Combined Certificate PDF */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl border border-[#d8ded5] bg-white space-y-2">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#173235] block">
+                    Accreditations &amp; Certifications
+                  </span>
+                  {user?.certifications && user.certifications.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {user.certifications.map((c, i) => (
+                        <span key={i} className="text-xs bg-[#f4f8f3] text-[#194e42] px-2.5 py-1 rounded-md border border-[#d8ded5] font-semibold">
+                          {c}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 italic">No certifications listed.</p>
+                  )}
+                </div>
+
+                <div className="p-4 rounded-xl border border-[#d8ded5] bg-white space-y-2">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#173235] block">
+                    Combined Coaching Certificate PDF
+                  </span>
+                  {(user?.certificateData || user?.certificateFileName || user?.hasCertificate) ? (
+                    <div className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-[#e2eee4] border border-[#2f6d5a]">
+                      <div className="flex items-center gap-2 text-xs font-bold text-[#194e42] truncate">
+                        <FileText className="w-4 h-4 text-[#cc694e] shrink-0" />
+                        <span className="truncate">{user?.certificateFileName || `${user?.name || 'Coach'}_Certificate.pdf`}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleDownloadCertificate}
+                        className="px-2.5 py-1 rounded bg-[#2f6d5a] hover:bg-[#194e42] text-white text-[11px] font-bold shrink-0 cursor-pointer transition"
+                      >
+                        View / Download
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 italic">No certificate PDF on record.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Section 4: Bio / About */}
+              {user?.bio && (
+                <div className="p-4 rounded-xl border border-[#d8ded5] bg-white space-y-1">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#173235] block">
+                    About / Coaching Bio
+                  </span>
+                  <p className="text-xs text-[#526668] leading-relaxed whitespace-pre-line">
+                    {user.bio}
+                  </p>
+                </div>
+              )}
+
+              {/* Section 5: Availability & Preferences */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-xl bg-[#f4f8f3] border border-[#d8ded5] text-xs">
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#526668] block mb-1">
+                    Accepting New Athletes
+                  </span>
+                  <span className={`inline-flex px-2 py-0.5 rounded font-bold text-[11px] ${
+                    user?.acceptingAthletes !== false ? 'bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]' : 'bg-gray-200 text-gray-700'
+                  }`}>
+                    {user?.acceptingAthletes !== false ? 'YES — Accepting' : 'NO — Busy'}
+                  </span>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#526668] block mb-1">
+                    Coaching Preferences
+                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {user?.coachingPreferences && user.coachingPreferences.length > 0 ? (
+                      user.coachingPreferences.map(p => (
+                        <span key={p} className="px-1.5 py-0.5 rounded bg-white text-[#194e42] border border-[#d8ded5] text-[10px] font-bold">
+                          {p}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-gray-500">INDIVIDUAL</span>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#526668] block mb-1">
+                    Willing With Academies
+                  </span>
+                  <span className={`inline-flex px-2 py-0.5 rounded font-bold text-[11px] ${
+                    user?.willingToWorkWithAcademies !== false ? 'bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]' : 'bg-gray-200 text-gray-700'
+                  }`}>
+                    {user?.willingToWorkWithAcademies !== false ? 'YES — Open to Academies' : 'NO — Independent Only'}
+                  </span>
+                </div>
+
+                {user?.coachingLevels && user.coachingLevels.length > 0 && (
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#526668] block mb-1">
+                      Coaching Levels
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {user.coachingLevels.map(lvl => (
+                        <span key={lvl} className="px-1.5 py-0.5 rounded bg-white text-[#173235] border border-[#d8ded5] text-[10px] font-bold">
+                          {lvl}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {user?.willingToWorkWithAcademies !== false && user?.preferredWorkTypes && user.preferredWorkTypes.length > 0 && (
+                  <div className="sm:col-span-2">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#526668] block mb-1">
+                      Preferred Work Types
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {user.preferredWorkTypes.map(wt => (
+                        <span key={wt} className="px-2 py-0.5 rounded bg-white text-[#194e42] border border-[#d8ded5] text-[10px] font-bold">
+                          {wt}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* ── SESSION NOTES ─────────────────────────────────────────── */}
         <TabsContent value="notes" className="space-y-4">
           <Card>
@@ -474,7 +715,12 @@ export default function CoachDashboard() {
         </TabsContent>
 
         <TabsContent value="openings" className="space-y-4">
-          <CoachAcademyOpeningsSection coachSport={user?.sport} />
+          <CoachAcademyOpeningsSection
+            coachSport={user?.sport}
+            coachSports={user?.sports || (user?.sport ? [user?.sport] : [])}
+            willingToWorkWithAcademies={user?.willingToWorkWithAcademies !== false}
+            defaultCertificate={user?.certificateData ? { certificateData: user.certificateData, certificateFileName: user.certificateFileName } : null}
+          />
         </TabsContent>
 
         <TabsContent value="federation-lists" className="space-y-4">

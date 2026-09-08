@@ -118,7 +118,85 @@ export default function Login({ initialMode }) {
   };
 
   const [athleteFields, setAthleteFields] = useState({ sport: '', beltRank: '', age: '', federationState: 'Andhra Pradesh', aadhaarNumber: '', seekingSponsorship: false, sponsorshipReason: '' });
-  const [coachFields, setCoachFields] = useState({ sport: 'Taekwondo', yearsExperience: '', certifications: '', acceptingAthletes: true });
+  const [coachFields, setCoachFields] = useState({
+    mobile: '',
+    sports: [],
+    currentSportInput: '',
+    yearsExperience: '',
+    certifications: '',
+    nisId: '',
+    certificateData: null,
+    certificateFileName: '',
+    certificateFileSize: 0,
+    bio: '',
+    coachingLevels: [],
+    acceptingAthletes: true,
+    coachingPreferences: ['INDIVIDUAL'],
+    willingToWorkWithAcademies: true,
+    preferredWorkTypes: [],
+    confirmPassword: ''
+  });
+  const [coachSportError, setCoachSportError] = useState('');
+  const [coachCertError, setCoachCertError] = useState('');
+
+  const handleAddCoachSport = () => {
+    const raw = (coachFields.currentSportInput || '').trim();
+    if (!raw) {
+      setCoachSportError('Please enter a sport name.');
+      return;
+    }
+    if (/[a-z]/.test(raw) || raw !== raw.toUpperCase()) {
+      setCoachSportError('Please enter the sport in CAPITAL LETTERS.');
+      return;
+    }
+    const exists = (coachFields.sports || []).some(s => s.trim().toLowerCase() === raw.toLowerCase());
+    if (exists) {
+      setCoachSportError('This sport has already been added.');
+      return;
+    }
+    setCoachFields(prev => ({
+      ...prev,
+      sports: [...prev.sports, raw.toUpperCase()],
+      currentSportInput: ''
+    }));
+    setCoachSportError('');
+  };
+
+  const handleRemoveCoachSport = (indexToRemove) => {
+    setCoachFields(prev => ({
+      ...prev,
+      sports: prev.sports.filter((_, idx) => idx !== indexToRemove)
+    }));
+  };
+
+  const handleCoachCertUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      setCoachCertError('Only PDF files are allowed for coaching certificates.');
+      e.target.value = '';
+      return;
+    }
+
+    if (file.size >= 2 * 1024 * 1024) {
+      setCoachCertError('File size must be strictly less than 2 MB.');
+      e.target.value = '';
+      return;
+    }
+
+    setCoachCertError('');
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCoachFields(prev => ({
+        ...prev,
+        certificateData: reader.result,
+        certificateFileName: file.name,
+        certificateFileSize: file.size
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
   const [sponsorFields, setSponsorFields] = useState({ organizationName: '', budgetRange: '₹50,000 - ₹2,000,000', targetSports: 'Taekwondo' });
   const [academyFields, setAcademyFields] = useState({
     academyName: '',
@@ -346,8 +424,105 @@ export default function Login({ initialMode }) {
             childSport: finalSports[0],
             confirmPassword: parentFields.confirmPassword
           };
-        } else if (role === 'athlete') rolePayload = { sport: String(athleteFields.sport || '').trim(), age: Number(athleteFields.age) || 0, beltRank: athleteFields.beltRank, federationState: athleteFields.federationState, aadhaarNumber: athleteFields.aadhaarNumber, seekingSponsorship: athleteFields.seekingSponsorship, sponsorshipReason: athleteFields.sponsorshipReason };
-        else if (role === 'coach') rolePayload = { sport: coachFields.sport, yearsExperience: Number(coachFields.yearsExperience) || 0, certifications: coachFields.certifications.split(',').map(s => s.trim()).filter(Boolean), acceptingAthletes: coachFields.acceptingAthletes };
+        } else if (role === 'coach') {
+          if (!name.trim()) {
+            setError('Full Name is required.');
+            setLoading(false);
+            return;
+          }
+          if (!coachFields.mobile.trim()) {
+            setError('Mobile Number is required.');
+            setLoading(false);
+            return;
+          }
+          if (!city.trim()) {
+            setError('City is required.');
+            setLoading(false);
+            return;
+          }
+          if (!state.trim()) {
+            setError('State is required.');
+            setLoading(false);
+            return;
+          }
+
+          let finalSports = [...coachFields.sports];
+          if (coachFields.currentSportInput.trim()) {
+            const raw = coachFields.currentSportInput.trim();
+            if (/[a-z]/.test(raw) || raw !== raw.toUpperCase()) {
+              setError('Please enter the sport in CAPITAL LETTERS.');
+              setLoading(false);
+              return;
+            }
+            if (finalSports.some(s => s.trim().toLowerCase() === raw.toLowerCase())) {
+              setError('This sport has already been added.');
+              setLoading(false);
+              return;
+            }
+            finalSports.push(raw.toUpperCase());
+          }
+
+          if (finalSports.length === 0) {
+            setError('At least one sport is required.');
+            setLoading(false);
+            return;
+          }
+
+          if (coachFields.yearsExperience === '' || isNaN(Number(coachFields.yearsExperience)) || Number(coachFields.yearsExperience) < 0) {
+            setError('Years of Experience is required.');
+            setLoading(false);
+            return;
+          }
+
+          if (!coachFields.certificateData) {
+            setError('Coaching Certificate PDF is required.');
+            setLoading(false);
+            return;
+          }
+
+          if (!coachFields.coachingPreferences || coachFields.coachingPreferences.length === 0) {
+            setError('Please select at least one Coaching Preference (Individual Athlete, Academy, or both).');
+            setLoading(false);
+            return;
+          }
+
+          if (!email.trim()) {
+            setError('Email Address is required.');
+            setLoading(false);
+            return;
+          }
+
+          if (!password || password.length < 6) {
+            setError('Password must be at least 6 characters long.');
+            setLoading(false);
+            return;
+          }
+
+          if (password !== coachFields.confirmPassword) {
+            setError('Passwords do not match.');
+            setLoading(false);
+            return;
+          }
+
+          rolePayload = {
+            mobile: coachFields.mobile.trim(),
+            phone: coachFields.mobile.trim(),
+            sports: finalSports,
+            sport: finalSports[0],
+            yearsExperience: Number(coachFields.yearsExperience) || 0,
+            certifications: coachFields.certifications ? coachFields.certifications.split(',').map(s => s.trim()).filter(Boolean) : [],
+            nisId: coachFields.nisId.trim() || null,
+            certificateData: coachFields.certificateData,
+            certificateFileName: coachFields.certificateFileName,
+            bio: coachFields.bio.trim() || null,
+            coachingLevels: coachFields.coachingLevels,
+            acceptingAthletes: coachFields.acceptingAthletes,
+            coachingPreferences: coachFields.coachingPreferences,
+            willingToWorkWithAcademies: coachFields.willingToWorkWithAcademies,
+            preferredWorkTypes: coachFields.willingToWorkWithAcademies ? coachFields.preferredWorkTypes : [],
+            confirmPassword: coachFields.confirmPassword
+          };
+        }
         else if (role === 'sponsor') rolePayload = { organizationName: sponsorFields.organizationName, budgetRange: sponsorFields.budgetRange, targetSports: sponsorFields.targetSports.split(',').map(s => s.trim()).filter(Boolean) };
         else if (role === 'academy') rolePayload = {
           academyName: academyFields.academyName || name,
@@ -596,8 +771,8 @@ export default function Login({ initialMode }) {
             {error && <div className="login-error"><LockKeyhole size={15} /> {error}</div>}
             {successMsg && <div className="login-success" style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '10px', borderRadius: '8px', background: '#e2eee4', color: '#194e42', fontSize: '11px', border: '1px solid #b7da78' }}><CheckCircle2 size={15} /> {successMsg}</div>}
 
-            {/* Common Sign Up Fields (for non-parent roles) */}
-            {mode === 'signup' && role !== 'parent' && (
+            {/* Common Sign Up Fields (for non-parent and non-coach roles) */}
+            {mode === 'signup' && role !== 'parent' && role !== 'coach' && (
               <>
                 <label>Full Name
                   <input value={name} onChange={e => setName(e.target.value)} type="text" placeholder="e.g. Rajesh Kumar" required />
@@ -902,29 +1077,513 @@ export default function Login({ initialMode }) {
               </>
             )}
 
+            {/* Coach Sign Up Form */}
             {mode === 'signup' && role === 'coach' && (
               <>
+                {/* 1. PERSONAL INFORMATION */}
+                <div style={{ borderBottom: '1px solid #d8ded5', paddingBottom: '6px', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#173235', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    1. PERSONAL INFORMATION
+                  </span>
+                </div>
+
+                <label>Full Name *
+                  <input
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    type="text"
+                    placeholder="e.g. Rajesh Kumar"
+                    required
+                  />
+                </label>
+
+                <label>Mobile Number *
+                  <input
+                    value={coachFields.mobile}
+                    onChange={e => setCoachFields({ ...coachFields, mobile: e.target.value.replace(/[^\d+-\s]/g, '') })}
+                    type="tel"
+                    placeholder="e.g. +91 9876543210"
+                    required
+                  />
+                </label>
+
                 <div className="form-row">
-                  <label>Coaching Sport
-                    <select value={coachFields.sport} onChange={e => setCoachFields({ ...coachFields, sport: e.target.value })}>
-                      <option value="Taekwondo">Taekwondo</option>
-                      <option value="Badminton">Badminton</option>
-                      <option value="Table Tennis">Table Tennis</option>
-                      <option value="Athletics">Athletics</option>
-                      <option value="Boxing">Boxing</option>
-                    </select>
+                  <label>City *
+                    <input
+                      value={city}
+                      onChange={e => setCity(e.target.value)}
+                      type="text"
+                      placeholder="e.g. Vijayawada"
+                      required
+                    />
                   </label>
-                  <label>Years of Experience
-                    <input value={coachFields.yearsExperience} onChange={e => setCoachFields({ ...coachFields, yearsExperience: e.target.value })} type="number" min="0" max="50" placeholder="e.g. 8" required />
+                  <label>State *
+                    <input
+                      value={state}
+                      onChange={e => setState(e.target.value)}
+                      type="text"
+                      placeholder="e.g. Andhra Pradesh"
+                      required
+                    />
                   </label>
                 </div>
-                <label>Certifications (comma separated)
-                  <input value={coachFields.certifications} onChange={e => setCoachFields({ ...coachFields, certifications: e.target.value })} type="text" placeholder="e.g. NIS Certified, World Taekwondo Level 2" />
+
+                {/* 2. SPORT COACHING * */}
+                <div style={{ borderBottom: '1px solid #d8ded5', paddingBottom: '6px', marginBottom: '8px', marginTop: '12px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#173235', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    2. SPORT COACHING *
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ margin: 0 }}>SPORT COACHING IN *</label>
+
+                  {/* Added Sport Tags */}
+                  {coachFields.sports.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '4px' }}>
+                      {coachFields.sports.map((sp, idx) => (
+                        <span
+                          key={idx}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            background: '#e2eee4',
+                            border: '1px solid #2f6d5a',
+                            color: '#194e42',
+                            fontWeight: '700',
+                            fontSize: '12px',
+                            letterSpacing: '0.04em'
+                          }}
+                        >
+                          {sp}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCoachSport(idx)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#cc694e',
+                              cursor: 'pointer',
+                              fontWeight: '900',
+                              fontSize: '14px',
+                              lineHeight: 1,
+                              padding: 0
+                            }}
+                            title={`Remove ${sp}`}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Sport Input & Add Button */}
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      placeholder="ENTER SPORT NAME"
+                      value={coachFields.currentSportInput}
+                      onChange={e => {
+                        setCoachFields({ ...coachFields, currentSportInput: e.target.value });
+                        setCoachSportError('');
+                      }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddCoachSport();
+                        }
+                      }}
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddCoachSport}
+                      style={{
+                        background: '#e07050',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '0 16px',
+                        fontSize: '12px',
+                        fontWeight: '800',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      + ADD SPORT
+                    </button>
+                  </div>
+
+                  <small style={{ color: '#cc694e', fontSize: '10px', fontWeight: '800', letterSpacing: '0.05em' }}>
+                    MANDATORY — ENTER SPORT NAME IN CAPITAL LETTERS ONLY
+                  </small>
+
+                  {coachSportError && (
+                    <span style={{ color: '#dc2626', fontSize: '11px', fontWeight: '700' }}>
+                      {coachSportError}
+                    </span>
+                  )}
+                </div>
+
+                {/* 3. COACHING EXPERIENCE */}
+                <div style={{ borderBottom: '1px solid #d8ded5', paddingBottom: '6px', marginBottom: '8px', marginTop: '12px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#173235', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    3. COACHING EXPERIENCE
+                  </span>
+                </div>
+
+                <div className="form-row">
+                  <label>Years of Experience *
+                    <input
+                      value={coachFields.yearsExperience}
+                      onChange={e => setCoachFields({ ...coachFields, yearsExperience: e.target.value })}
+                      type="number"
+                      min="0"
+                      max="60"
+                      placeholder="e.g. 8"
+                      required
+                    />
+                  </label>
+                  <label>NIS ID (Optional)
+                    <input
+                      value={coachFields.nisId}
+                      onChange={e => setCoachFields({ ...coachFields, nisId: e.target.value })}
+                      type="text"
+                      placeholder="e.g. NIS-2022-XXXX"
+                    />
+                  </label>
+                </div>
+
+                <label>Certifications (Optional)
+                  <input
+                    value={coachFields.certifications}
+                    onChange={e => setCoachFields({ ...coachFields, certifications: e.target.value })}
+                    type="text"
+                    placeholder="e.g. NIS Certified, World Taekwondo Level 2"
+                  />
+                  <small style={{ color: '#697c7c', fontSize: '11px' }}>Separate certifications with commas if multiple.</small>
                 </label>
-                <label className="checkbox-label">
-                  <input type="checkbox" checked={coachFields.acceptingAthletes} onChange={e => setCoachFields({ ...coachFields, acceptingAthletes: e.target.checked })} />
-                  Currently accepting new athletes for coaching sessions
+
+                {/* 4. COMBINED COACHING CERTIFICATE PDF * */}
+                <div style={{ borderBottom: '1px solid #d8ded5', paddingBottom: '6px', marginBottom: '8px', marginTop: '12px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#173235', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    4. COMBINED COACHING CERTIFICATE PDF *
+                  </span>
+                </div>
+
+                <label>COACHING CERTIFICATE PDF *
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    onChange={handleCoachCertUpload}
+                    required={!coachFields.certificateData}
+                  />
+                  <small style={{ color: '#526668', fontSize: '11px', fontWeight: '500' }}>
+                    Maximum file size: less than 2 MB — Upload all coaching certificates as one combined PDF.
+                  </small>
                 </label>
+
+                {coachFields.certificateFileName && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#e2eee4', border: '1px solid #2f6d5a', borderRadius: '8px', marginTop: '4px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: '700', color: '#194e42' }}>
+                      ✓ {coachFields.certificateFileName} {coachFields.certificateFileSize ? `(${Math.round(coachFields.certificateFileSize / 1024)} KB)` : ''}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setCoachFields({ ...coachFields, certificateData: null, certificateFileName: '', certificateFileSize: 0 })}
+                      style={{ background: 'none', border: 'none', color: '#cc694e', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
+
+                {coachCertError && (
+                  <span style={{ color: '#dc2626', fontSize: '11px', fontWeight: '700', marginTop: '2px' }}>
+                    {coachCertError}
+                  </span>
+                )}
+
+                {/* 5. COACH PROFILE */}
+                <div style={{ borderBottom: '1px solid #d8ded5', paddingBottom: '6px', marginBottom: '8px', marginTop: '12px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#173235', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    5. COACH PROFILE &amp; AVAILABILITY
+                  </span>
+                </div>
+
+                <label>About / Coaching Bio (Optional)
+                  <textarea
+                    value={coachFields.bio}
+                    onChange={e => setCoachFields({ ...coachFields, bio: e.target.value })}
+                    rows={3}
+                    placeholder="Describe your coaching experience, specialization, and approach..."
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #d8ded5',
+                      fontSize: '13px',
+                      fontFamily: 'inherit',
+                      resize: 'vertical'
+                    }}
+                  />
+                </label>
+
+                <div style={{ marginBottom: '8px' }}>
+                  <span style={{ color: '#526668', fontSize: '11px', fontWeight: '800', display: 'block', marginBottom: '4px' }}>
+                    COACHING LEVEL (Select all that apply)
+                  </span>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+                    {['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'COMPETITIVE'].map(lvl => {
+                      const isChecked = coachFields.coachingLevels.includes(lvl);
+                      return (
+                        <label
+                          key={lvl}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            padding: '6px 10px',
+                            borderRadius: '6px',
+                            background: isChecked ? '#e2eee4' : '#f4f8f3',
+                            border: `1px solid ${isChecked ? '#2f6d5a' : '#d8ded5'}`,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                setCoachFields({ ...coachFields, coachingLevels: [...coachFields.coachingLevels, lvl] });
+                              } else {
+                                setCoachFields({ ...coachFields, coachingLevels: coachFields.coachingLevels.filter(l => l !== lvl) });
+                              }
+                            }}
+                          />
+                          {lvl}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 6. COACH AVAILABILITY */}
+                <div style={{ marginTop: '8px', marginBottom: '8px' }}>
+                  <span style={{ fontWeight: '800', fontSize: '11px', color: '#526668', display: 'block' }}>
+                    CURRENTLY ACCEPTING NEW ATHLETES *
+                  </span>
+                  <div style={{ display: 'flex', gap: '16px', marginTop: '6px' }}>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '700' }}>
+                      <input
+                        type="radio"
+                        name="acceptingAthletes"
+                        checked={coachFields.acceptingAthletes === true}
+                        onChange={() => setCoachFields({ ...coachFields, acceptingAthletes: true })}
+                      />
+                      YES
+                    </label>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '700' }}>
+                      <input
+                        type="radio"
+                        name="acceptingAthletes"
+                        checked={coachFields.acceptingAthletes === false}
+                        onChange={() => setCoachFields({ ...coachFields, acceptingAthletes: false })}
+                      />
+                      NO
+                    </label>
+                  </div>
+                </div>
+
+                {/* 7. COACHING PREFERENCE */}
+                <div style={{ borderBottom: '1px solid #d8ded5', paddingBottom: '6px', marginBottom: '8px', marginTop: '12px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#173235', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    6. COACHING &amp; ACADEMY PREFERENCES
+                  </span>
+                </div>
+
+                <div style={{ marginBottom: '8px' }}>
+                  <span style={{ color: '#526668', fontSize: '11px', fontWeight: '800', display: 'block', marginBottom: '4px' }}>
+                    COACHING PREFERENCE * (Select either or both)
+                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {[
+                      { id: 'INDIVIDUAL', label: 'INDIVIDUAL ATHLETE COACHING' },
+                      { id: 'ACADEMY', label: 'ACADEMY COACHING' }
+                    ].map(pref => {
+                      const isChecked = coachFields.coachingPreferences.includes(pref.id);
+                      return (
+                        <label
+                          key={pref.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            fontSize: '12px',
+                            fontWeight: '700',
+                            padding: '6px 10px',
+                            borderRadius: '6px',
+                            background: isChecked ? '#e2eee4' : '#f4f8f3',
+                            border: `1px solid ${isChecked ? '#2f6d5a' : '#d8ded5'}`,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                setCoachFields({ ...coachFields, coachingPreferences: [...coachFields.coachingPreferences, pref.id] });
+                              } else {
+                                setCoachFields({ ...coachFields, coachingPreferences: coachFields.coachingPreferences.filter(p => p !== pref.id) });
+                              }
+                            }}
+                          />
+                          {pref.label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 8. ACADEMY WORK PREFERENCE */}
+                <div style={{ marginTop: '8px', marginBottom: '8px' }}>
+                  <span style={{ fontWeight: '800', fontSize: '11px', color: '#526668', display: 'block' }}>
+                    WILLING TO WORK WITH ACADEMIES *
+                  </span>
+                  <div style={{ display: 'flex', gap: '16px', marginTop: '6px' }}>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '700' }}>
+                      <input
+                        type="radio"
+                        name="willingToWorkWithAcademies"
+                        checked={coachFields.willingToWorkWithAcademies === true}
+                        onChange={() => setCoachFields({ ...coachFields, willingToWorkWithAcademies: true })}
+                      />
+                      YES
+                    </label>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '700' }}>
+                      <input
+                        type="radio"
+                        name="willingToWorkWithAcademies"
+                        checked={coachFields.willingToWorkWithAcademies === false}
+                        onChange={() => setCoachFields({ ...coachFields, willingToWorkWithAcademies: false })}
+                      />
+                      NO
+                    </label>
+                  </div>
+                </div>
+
+                {/* If YES, preferred work types */}
+                {coachFields.willingToWorkWithAcademies && (
+                  <div style={{ marginTop: '8px', marginBottom: '8px' }}>
+                    <span style={{ color: '#526668', fontSize: '11px', fontWeight: '700', display: 'block', marginBottom: '4px' }}>
+                      Preferred Work Types (Optional)
+                    </span>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+                      {['FULL-TIME', 'PART-TIME', 'CONTRACT', 'FLEXIBLE'].map(wt => {
+                        const isChecked = coachFields.preferredWorkTypes.includes(wt);
+                        return (
+                          <label
+                            key={wt}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              padding: '5px 8px',
+                              borderRadius: '6px',
+                              background: isChecked ? '#e2eee4' : '#f4f8f3',
+                              border: `1px solid ${isChecked ? '#2f6d5a' : '#d8ded5'}`,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  setCoachFields({ ...coachFields, preferredWorkTypes: [...coachFields.preferredWorkTypes, wt] });
+                                } else {
+                                  setCoachFields({ ...coachFields, preferredWorkTypes: coachFields.preferredWorkTypes.filter(w => w !== wt) });
+                                }
+                              }}
+                            />
+                            {wt}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* 7. ACCOUNT CREDENTIALS (Strictly final three input fields) */}
+                <div style={{ borderBottom: '1px solid #d8ded5', paddingBottom: '6px', marginBottom: '8px', marginTop: '12px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', color: '#173235', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    ACCOUNT CREDENTIALS
+                  </span>
+                </div>
+
+                <label>Email Address *
+                  <input
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    type="email"
+                    placeholder="you@example.com"
+                    required
+                    autoComplete="email"
+                  />
+                </label>
+
+                <label>Password *
+                  <input
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    type="password"
+                    placeholder="At least 6 characters"
+                    required
+                    autoComplete="new-password"
+                  />
+                </label>
+
+                <label>Confirm Password *
+                  <input
+                    value={coachFields.confirmPassword}
+                    onChange={e => setCoachFields({ ...coachFields, confirmPassword: e.target.value })}
+                    type="password"
+                    placeholder="Re-enter password"
+                    required
+                    autoComplete="new-password"
+                  />
+                </label>
+
+                {/* 8. TERMS & SUBMIT */}
+                <label className="checkbox-label" style={{ marginTop: '8px' }}>
+                  <input
+                    type="checkbox"
+                    checked={agreeTerms}
+                    onChange={e => setAgreeTerms(e.target.checked)}
+                    required
+                  />
+                  I accept the Terms &amp; Conditions and Privacy Policy of TrackAthlete.
+                </label>
+
+                <button className="login-submit" disabled={loading} style={{ marginTop: '8px' }}>
+                  {loading ? (
+                    <><LoaderCircle className="spin" size={17} /> Creating Coach Account...</>
+                  ) : (
+                    <>CREATE COACH ACCOUNT <ArrowRight size={17} /></>
+                  )}
+                </button>
               </>
             )}
 
@@ -1123,8 +1782,8 @@ export default function Login({ initialMode }) {
               </div>
             )}
 
-            {/* Email & Password (Common for both Sign In and Sign Up for non-parent roles) */}
-            {!(mode === 'signup' && role === 'parent') && (
+            {/* Email & Password (Common for both Sign In and Sign Up for non-parent and non-coach roles) */}
+            {!(mode === 'signup' && (role === 'parent' || role === 'coach')) && (
               <>
                 <label>{role === 'academy' && mode === 'signin' ? 'Academy Email, Phone, or Name' : 'Email address'}
                   <input

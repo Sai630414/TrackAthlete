@@ -15,23 +15,44 @@ import {
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui';
 
-export default function CoachAcademyOpeningsSection({ coachSport }) {
+export default function CoachAcademyOpeningsSection({
+  coachSport,
+  coachSports = [],
+  willingToWorkWithAcademies = true,
+  defaultCertificate = null
+}) {
+  const [selectedSportFilter, setSelectedSportFilter] = useState('');
   const [openings, setOpenings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [myStatus, setMyStatus] = useState({ assignments: [], applications: [] });
   const [selectedOpeningForApply, setSelectedOpeningForApply] = useState(null);
   const [applyForm, setApplyForm] = useState({
     salary: 'Negotiated During Joining',
-    certificateData: null,
-    certificateFileName: ''
+    certificateData: defaultCertificate?.certificateData || null,
+    certificateFileName: defaultCertificate?.certificateFileName || ''
   });
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
   useEffect(() => {
+    if (defaultCertificate?.certificateData && !applyForm.certificateData) {
+      setApplyForm(prev => ({
+        ...prev,
+        certificateData: defaultCertificate.certificateData,
+        certificateFileName: defaultCertificate.certificateFileName || ''
+      }));
+    }
+  }, [defaultCertificate]);
+
+  useEffect(() => {
+    if (willingToWorkWithAcademies === false) {
+      setOpenings([]);
+      setLoading(false);
+      return;
+    }
     fetchOpenings();
     fetchStatus();
-  }, [coachSport]);
+  }, [coachSport, selectedSportFilter, willingToWorkWithAcademies]);
 
   const showNotification = (msg, type = 'success') => {
     setFeedback({ msg, type });
@@ -41,7 +62,8 @@ export default function CoachAcademyOpeningsSection({ coachSport }) {
   const fetchOpenings = async () => {
     setLoading(true);
     try {
-      const sportParam = coachSport ? `?sport=${encodeURIComponent(coachSport)}` : '';
+      const activeSport = selectedSportFilter || (coachSport && coachSport !== 'all' ? coachSport : '');
+      const sportParam = activeSport ? `?sport=${encodeURIComponent(activeSport)}` : '';
       const res = await api.get(`/academy/openings/discovery${sportParam}`);
       setOpenings(Array.isArray(res.data) ? res.data : []);
     } catch (err) {

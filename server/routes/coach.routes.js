@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const Connection = require('../models/Connection');
+const User = require('../models/User');
+const { withoutAadhaar } = require('../utils/aadhaar');
 
 let _io = null;
 router.use((req, _res, next) => { _io = req.app.get('io'); next(); });
@@ -78,6 +81,63 @@ router.post('/:coachId/athletes/:connectionId/notes', async (req, res) => {
 
     if (!conn) return res.status(404).json({ error: 'Active connection not found' });
     res.json(conn);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/coach/:id/profile — fetch complete coach profile
+router.get('/:id/profile', async (req, res) => {
+  try {
+    const isObjectId = mongoose.Types.ObjectId.isValid(req.params.id);
+    const orConditions = [
+      { coachId: req.params.id },
+      { trackAthleteId: req.params.id }
+    ];
+    if (isObjectId) {
+      orConditions.unshift({ _id: req.params.id });
+    }
+
+    const coach = await User.findOne({
+      $or: orConditions,
+      role: 'coach'
+    }).select('-passwordHash -aadhaarHash -resetPasswordOTP -resetPasswordToken');
+
+    if (!coach) return res.status(404).json({ error: 'Coach not found' });
+    const sanitized = withoutAadhaar(coach);
+    res.json(sanitized);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/coach/:id/certificate — download or view coach certificate PDF
+router.get('/:id/certificate', async (req, res) => {
+  try {
+    const isObjectId = mongoose.Types.ObjectId.isValid(req.params.id);
+    const orConditions = [
+      { coachId: req.params.id },
+      { trackAthleteId: req.params.id }
+    ];
+    if (isObjectId) {
+      orConditions.unshift({ _id: req.params.id });
+    }
+
+    const coach = await User.findOne({
+      $or: orConditions,
+      role: 'coach'
+    }).select('certificateData certificateFileName certificateFileSize name coachId');
+
+    if (!coach || !coach.certificateData) {
+      return res.status(404).json({ error: 'Coaching certificate PDF not found for this coach.' });
+    }
+
+    res.json({
+      certificateData: coach.certificateData,
+      certificateFileName: coach.certificateFileName || `${coach.name || 'Coach'}_Certificate.pdf`,
+      certificateFileSize: coach.certificateFileSize || 0,
+      coachId: coach.coachId
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

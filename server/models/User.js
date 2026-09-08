@@ -37,13 +37,20 @@ const UserSchema = new mongoose.Schema({
 
   // Coach-specific
   coachId: { type: String, trim: true, sparse: true, unique: true },
-  nisId: { type: String, default: null },
+  nisId: { type: String, default: null, trim: true },
   certifications: [String],
   yearsExperience: Number,
   acceptingAthletes: { type: Boolean, default: true },
   phone: { type: String, default: null },
   profilePhoto: { type: String, default: null },
-  bio: { type: String, default: null },
+  bio: { type: String, default: null, trim: true },
+  coachingLevels: [{ type: String, enum: ['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'COMPETITIVE'] }],
+  coachingPreferences: [{ type: String, enum: ['INDIVIDUAL', 'ACADEMY'] }],
+  willingToWorkWithAcademies: { type: Boolean, default: true },
+  preferredWorkTypes: [{ type: String, enum: ['FULL-TIME', 'PART-TIME', 'CONTRACT', 'FLEXIBLE'] }],
+  certificateData: { type: String, default: null },
+  certificateFileName: { type: String, default: null },
+  certificateFileSize: { type: Number, default: 0 },
 
   // Sponsor-specific
   sponsorId: { type: String, trim: true, sparse: true, unique: true },

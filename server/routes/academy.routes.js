@@ -1285,12 +1285,24 @@ router.post('/:academyId/request-join', verifyToken, requireRoles('athlete'), as
  */
 router.get('/openings/discovery', verifyToken, requireRoles('coach'), async (req, res) => {
   try {
+    // Respect coach's academy preference
+    if (req.user.willingToWorkWithAcademies === false) {
+      return res.json([]);
+    }
+
     const { sport } = req.query;
     const filter = { status: 'OPEN' };
 
-    const coachSport = sport ? String(sport).trim() : (req.user.sport ? String(req.user.sport).trim() : null);
-    if (coachSport) {
-      filter.sportName = new RegExp('^' + coachSport.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i');
+    const coachSports = Array.isArray(req.user.sports) && req.user.sports.length > 0
+      ? req.user.sports
+      : (req.user.sport ? [req.user.sport] : []);
+
+    if (sport) {
+      filter.sportName = new RegExp('^' + String(sport).trim().replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i');
+    } else if (coachSports.length > 0) {
+      filter.$or = coachSports.map(sp => ({
+        sportName: new RegExp('^' + String(sp).trim().replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i')
+      }));
     }
 
     const openings = await AcademyOpening.find(filter)

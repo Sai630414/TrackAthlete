@@ -60,6 +60,11 @@ router.post('/signup', async (req, res) => {
     let parsedDob = undefined;
     let normalizedParentSports = undefined;
     let parentRelationship = undefined;
+    let normalizedCoachSports = undefined;
+    let coachCertBufferLength = 0;
+    let normalizedCoachPrefs = undefined;
+    let normalizedCoachLevels = undefined;
+    let normalizedWorkTypes = undefined;
 
     if (role === 'parent') {
       if (!aadhaarNumber && !aadhaar) {
@@ -118,6 +123,98 @@ router.post('/signup', async (req, res) => {
       }
     }
 
+    if (role === 'coach') {
+      const coachMobile = req.body.mobile || req.body.phone;
+      if (!coachMobile || !String(coachMobile).trim()) {
+        return res.status(400).json({ error: 'Mobile Number is required.' });
+      }
+      if (!city || !String(city).trim()) {
+        return res.status(400).json({ error: 'City is required.' });
+      }
+      if (!state || !String(state).trim()) {
+        return res.status(400).json({ error: 'State is required.' });
+      }
+
+      let sportsList = Array.isArray(req.body.sports)
+        ? req.body.sports
+        : (req.body.sport ? (Array.isArray(req.body.sport) ? req.body.sport : [req.body.sport]) : []);
+      sportsList = sportsList.map(s => String(s || '').trim()).filter(Boolean);
+      if (sportsList.length === 0) {
+        return res.status(400).json({ error: 'At least one sport is required.' });
+      }
+
+      normalizedCoachSports = [];
+      const seenSports = new Set();
+      for (const sp of sportsList) {
+        if (/[a-z]/.test(sp) || sp !== sp.toUpperCase()) {
+          return res.status(400).json({ error: 'Please enter the sport in CAPITAL LETTERS.' });
+        }
+        const normKey = sp.toLowerCase();
+        if (seenSports.has(normKey)) {
+          return res.status(400).json({ error: 'This sport has already been added.' });
+        }
+        seenSports.add(normKey);
+        normalizedCoachSports.push(sp.toUpperCase());
+      }
+
+      if (req.body.yearsExperience === undefined || req.body.yearsExperience === null || req.body.yearsExperience === '' || isNaN(Number(req.body.yearsExperience)) || Number(req.body.yearsExperience) < 0) {
+        return res.status(400).json({ error: 'Years of Experience is required.' });
+      }
+
+      // Certificate PDF validation
+      const { certificateData, certificateFileName } = req.body;
+      if (!certificateData || !certificateFileName) {
+        return res.status(400).json({ error: 'Coaching Certificate PDF is required.' });
+      }
+      if (!String(certificateData).startsWith('data:application/pdf;base64,')) {
+        return res.status(400).json({ error: 'Only PDF files are allowed for coaching certificates.' });
+      }
+      const base64Content = String(certificateData).split(',')[1] || '';
+      coachCertBufferLength = Buffer.byteLength(base64Content, 'base64');
+      if (coachCertBufferLength >= 2 * 1024 * 1024) {
+        return res.status(400).json({ error: 'Coaching certificate PDF must be strictly less than 2 MB.' });
+      }
+
+      if (req.body.acceptingAthletes === undefined || req.body.acceptingAthletes === null || req.body.acceptingAthletes === '') {
+        return res.status(400).json({ error: 'Please specify whether you are currently accepting new athletes.' });
+      }
+
+      let coachPreferences = req.body.coachingPreferences;
+      if (typeof coachPreferences === 'string') {
+        coachPreferences = [coachPreferences];
+      }
+      if (!Array.isArray(coachPreferences) || coachPreferences.length === 0) {
+        return res.status(400).json({ error: 'Coaching Preference is required (Individual Athlete, Academy, or both).' });
+      }
+      const validPrefs = ['INDIVIDUAL', 'ACADEMY'];
+      normalizedCoachPrefs = coachPreferences.map(p => String(p).toUpperCase().trim()).filter(p => validPrefs.includes(p));
+      if (normalizedCoachPrefs.length === 0) {
+        return res.status(400).json({ error: 'Coaching Preference must include INDIVIDUAL and/or ACADEMY.' });
+      }
+
+      if (req.body.willingToWorkWithAcademies === undefined || req.body.willingToWorkWithAcademies === null || req.body.willingToWorkWithAcademies === '') {
+        return res.status(400).json({ error: 'Please specify whether you are willing to work with academies.' });
+      }
+
+      if (Array.isArray(req.body.coachingLevels)) {
+        const validLevels = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'COMPETITIVE'];
+        normalizedCoachLevels = req.body.coachingLevels.map(l => String(l).toUpperCase().trim()).filter(l => validLevels.includes(l));
+      }
+
+      if (Array.isArray(req.body.preferredWorkTypes)) {
+        const validTypes = ['FULL-TIME', 'PART-TIME', 'CONTRACT', 'FLEXIBLE'];
+        normalizedWorkTypes = req.body.preferredWorkTypes.map(t => String(t).toUpperCase().trim()).filter(t => validTypes.includes(t));
+      }
+
+      if (req.body.confirmPassword !== undefined && req.body.confirmPassword !== password) {
+        return res.status(400).json({ error: 'Passwords do not match.' });
+      }
+
+      if (req.body.agreeTerms === false || req.body.terms === false) {
+        return res.status(400).json({ error: 'Please accept the Terms & Conditions and Privacy Policy.' });
+      }
+    }
+
     const passwordHash = await bcrypt.hash(password, 10);
     const userPayload = {
       name: String(name).trim(),
@@ -145,6 +242,30 @@ router.post('/signup', async (req, res) => {
       userPayload.childSport = normalizedParentSports[0];
     }
 
+    if (role === 'coach') {
+      const coachMob = String(req.body.mobile || req.body.phone || '').trim();
+      userPayload.mobile = coachMob;
+      userPayload.phone = coachMob;
+      userPayload.sports = normalizedCoachSports;
+      userPayload.sport = normalizedCoachSports[0];
+      userPayload.yearsExperience = Number(req.body.yearsExperience) || 0;
+      userPayload.nisId = req.body.nisId ? String(req.body.nisId).trim() : null;
+      if (req.body.certifications) {
+        userPayload.certifications = Array.isArray(req.body.certifications)
+          ? req.body.certifications.map(c => String(c).trim()).filter(Boolean)
+          : String(req.body.certifications).split(',').map(c => c.trim()).filter(Boolean);
+      }
+      userPayload.bio = req.body.bio ? String(req.body.bio).trim() : null;
+      userPayload.coachingLevels = normalizedCoachLevels || [];
+      userPayload.acceptingAthletes = req.body.acceptingAthletes === true || req.body.acceptingAthletes === 'true' || req.body.acceptingAthletes === 'YES';
+      userPayload.coachingPreferences = normalizedCoachPrefs || [];
+      userPayload.willingToWorkWithAcademies = req.body.willingToWorkWithAcademies === true || req.body.willingToWorkWithAcademies === 'true' || req.body.willingToWorkWithAcademies === 'YES';
+      userPayload.preferredWorkTypes = normalizedWorkTypes || [];
+      userPayload.certificateData = req.body.certificateData;
+      userPayload.certificateFileName = req.body.certificateFileName;
+      userPayload.certificateFileSize = coachCertBufferLength;
+    }
+
     const user = await User.create(userPayload);
     const { generateRolePermanentId } = require('../utils/idGenerator');
 
@@ -169,6 +290,22 @@ router.post('/signup', async (req, res) => {
       const coachIdStr = await generateRolePermanentId('coach', user._id, async (cand) => !(await User.findOne({ $or: [{ coachId: cand }, { trackAthleteId: cand }] })));
       user.coachId = coachIdStr;
       user.trackAthleteId = coachIdStr;
+      user.mobile = userPayload.mobile;
+      user.phone = userPayload.phone;
+      user.sports = userPayload.sports;
+      user.sport = userPayload.sport;
+      user.yearsExperience = userPayload.yearsExperience;
+      user.nisId = userPayload.nisId;
+      user.certifications = userPayload.certifications;
+      user.bio = userPayload.bio;
+      user.coachingLevels = userPayload.coachingLevels;
+      user.acceptingAthletes = userPayload.acceptingAthletes;
+      user.coachingPreferences = userPayload.coachingPreferences;
+      user.willingToWorkWithAcademies = userPayload.willingToWorkWithAcademies;
+      user.preferredWorkTypes = userPayload.preferredWorkTypes;
+      user.certificateData = userPayload.certificateData;
+      user.certificateFileName = userPayload.certificateFileName;
+      user.certificateFileSize = userPayload.certificateFileSize;
     }
     if (role === 'sponsor') {
       const sponsorIdStr = await generateRolePermanentId('sponsor', user._id, async (cand) => !(await User.findOne({ $or: [{ sponsorId: cand }, { trackAthleteId: cand }] })));
