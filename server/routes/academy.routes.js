@@ -158,15 +158,12 @@ router.post(['/login', '/auth/login'], async (req, res) => {
     const { withoutAadhaar } = require('../utils/aadhaar');
     const passStr = String(password != null ? password : '');
     let match = (await bcrypt.compare(passStr, user.passwordHash)) || (await bcrypt.compare(passStr.trim(), user.passwordHash));
-    if (!match && user.email === 'venkatsaibokam3@gmail.com' && (passStr === 'Athlete@2026' || passStr === '123456')) {
-      match = true;
-    }
     if (!match) {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
-    // Account must either have role === 'academy' or an associated Academy document
-    if (user.role !== 'academy' && !acadDoc) {
+    // Account must strictly have role === 'academy'
+    if (user.role !== 'academy') {
       const regRole = (user.role || '').toUpperCase() || 'ANOTHER ROLE';
       return res.status(403).json({
         error: `This account is registered as ${regRole}. Please select the ${regRole} tab to sign in.`

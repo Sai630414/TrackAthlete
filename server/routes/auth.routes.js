@@ -293,7 +293,7 @@ async function resolveAcademyUser(identifier) {
   }
 
   if (!user) return null;
-  if (user.role !== 'academy' && !acadDoc) return null;
+  if (user.role !== 'academy') return null;
 
   // Self-heal permanent academyId if missing
   if (acadDoc && !acadDoc.academyId) {
@@ -328,11 +328,11 @@ router.post('/login', async (req, res) => {
       email: new RegExp('^' + cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i')
     });
     
-    // Dedicated Academy Account Fallback Resolution (Isolated for Academy accounts)
-    if (!user || (role === 'academy' && user.role !== 'academy')) {
+    // Dedicated Academy Account Fallback Resolution (Only if user not found by email and role is academy)
+    if (!user && role === 'academy') {
       const acadUser = await resolveAcademyUser(cleanInput);
-      if (acadUser) {
-        user = acadUser.user || acadUser;
+      if (acadUser && acadUser.user) {
+        user = acadUser.user;
       }
     }
     
@@ -348,29 +348,12 @@ router.post('/login', async (req, res) => {
         match = await bcrypt.compare(passStr.trim(), user.passwordHash);
       }
     }
-    if (!match && user.email === 'venkatsaibokam3@gmail.com') {
-      if (passStr === 'Athlete@2026' || passStr === '123456') {
-        match = true;
-      }
-    }
     if (!match) {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
-    
-    let effectiveRole = user.role;
-    // If role requested is academy and the account has a registered Academy profile
-    if (role === 'academy') {
-      try {
-        const Academy = require('../models/Academy');
-        const acad = await Academy.findOne({ $or: [{ userId: user._id }, { email: user.email }] });
-        if (acad) {
-          effectiveRole = 'academy';
-        }
-      } catch {}
-    }
 
     // If role is specified and does not match the account's registered role
-    if (role && effectiveRole !== role && user.role !== role && user.role !== 'admin') {
+    if (role && user.role !== role && user.role !== 'admin') {
       const regRole = (user.role || '').toUpperCase() || 'ANOTHER ROLE';
       return res.status(403).json({
         error: `This account is registered as ${regRole}. Please select the ${regRole} tab to sign in.`
@@ -378,7 +361,7 @@ router.post('/login', async (req, res) => {
     }
 
     // Role handling: smoothly direct Academy users to academy workspace
-    if (effectiveRole === 'academy') {
+    if (user.role === 'academy') {
       try {
         const Academy = require('../models/Academy');
         let acad = await Academy.findOne({ userId: user._id });
@@ -427,11 +410,11 @@ router.post('/login', async (req, res) => {
     
     const expiresIn = rememberMe ? '30d' : '7d';
     const jwtSecret = process.env.JWT_SECRET || 'trackathlete_sih_secret_2026';
-    const token = jwt.sign({ id: user._id, role: effectiveRole }, jwtSecret, { expiresIn });
+    const token = jwt.sign({ id: user._id, role: user.role }, jwtSecret, { expiresIn });
     
     const userObj = withoutAadhaar(user);
-    userObj.role = effectiveRole;
-    if (effectiveRole === 'academy') {
+    userObj.role = user.role;
+    if (user.role === 'academy') {
       const Academy = require('../models/Academy');
       const acad = await Academy.findOne({ $or: [{ userId: user._id }, { email: user.email }] });
       userObj.academyId = acad?.academyId || user.academyId || `ACA-${user._id.toString().slice(-8).toUpperCase()}`;
@@ -458,21 +441,35 @@ router.post('/academy-login', async (req, res) => {
     }
 
     const resolved = await resolveAcademyUser(loginIdent);
-    if (!resolved || !resolved.user) {
+    let user = resolved?.user;
+    let acadDoc = resolved?.academy;
+
+    if (!user) {
+      const cleanInput = String(loginIdent).trim();
+      const cleanEmail = cleanInput.toLowerCase().replace(/[\u200B-\u200D\uFEFF]/g, '');
+      user = await User.findOne({
+        email: new RegExp('^' + cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i')
+      });
+    }
+
+    if (!user) {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
-    const { user, academy: acadDoc } = resolved;
 
     const passStr = String(password != null ? password : '');
     let match = false;
     if (user.passwordHash) {
       match = (await bcrypt.compare(passStr, user.passwordHash)) || (await bcrypt.compare(passStr.trim(), user.passwordHash));
     }
-    if (!match && user.email === 'venkatsaibokam3@gmail.com' && (passStr === 'Athlete@2026' || passStr === '123456')) {
-      match = true;
-    }
     if (!match) {
       return res.status(401).json({ error: 'Invalid email or password.' });
+    }
+
+    if (user.role !== 'academy') {
+      const regRole = (user.role || '').toUpperCase() || 'ANOTHER ROLE';
+      return res.status(403).json({
+        error: `This account is registered as ${regRole}. Please select the ${regRole} tab to sign in.`
+      });
     }
 
     const expiresIn = rememberMe ? '30d' : '7d';
