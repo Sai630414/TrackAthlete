@@ -34,8 +34,10 @@ async function getAcademyForUser(userId) {
           await academy.save();
         }
       } else {
+        const permanentId = `ACA-${user._id.toString().slice(-8).toUpperCase()}`;
         academy = await Academy.create({
           userId: user._id,
+          academyId: permanentId,
           name: String(user.academyName || user.name || 'Sports Academy').trim(),
           contactPhone: String(user.contactPhone || user.phone || '+91 0000000000').trim(),
           email: cleanEmail,
@@ -55,6 +57,24 @@ async function getAcademyForUser(userId) {
       }
     }
   }
+
+  // Ensure academy and user have permanent academyId assigned (self-heal once without overwriting)
+  if (academy) {
+    if (!academy.academyId) {
+      const baseId = academy.userId || academy._id;
+      academy.academyId = `ACA-${baseId.toString().slice(-8).toUpperCase()}`;
+      await Academy.updateOne({ _id: academy._id }, { $set: { academyId: academy.academyId } });
+    }
+    if (academy.userId) {
+      const u = await User.findById(academy.userId);
+      if (u && (!u.academyId || !u.trackAthleteId)) {
+        u.academyId = u.academyId || academy.academyId;
+        u.trackAthleteId = u.trackAthleteId || academy.academyId;
+        await User.updateOne({ _id: u._id }, { $set: { academyId: u.academyId, trackAthleteId: u.trackAthleteId } });
+      }
+    }
+  }
+
   return academy;
 }
 
@@ -76,7 +96,9 @@ router.post(['/login', '/auth/login'], async (req, res) => {
     const academyUserQuery = [
       { email: new RegExp('^' + cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i'), role: 'academy' },
       { academyName: identRegex, role: 'academy' },
-      { name: identRegex, role: 'academy' }
+      { name: identRegex, role: 'academy' },
+      { academyId: identRegex, role: 'academy' },
+      { trackAthleteId: identRegex, role: 'academy' }
     ];
     if (cleanDigits.length >= 7) {
       const phoneSuffix = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
@@ -91,7 +113,8 @@ router.post(['/login', '/auth/login'], async (req, res) => {
     if (!user) {
       const acadConditions = [
         { email: new RegExp('^' + cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i') },
-        { name: identRegex }
+        { name: identRegex },
+        { academyId: identRegex }
       ];
       if (cleanDigits.length >= 7) {
         const phoneSuffix = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
@@ -150,6 +173,19 @@ router.post(['/login', '/auth/login'], async (req, res) => {
       });
     }
 
+    // Self-heal academyId on acadDoc and linked user if missing
+    if (acadDoc && !acadDoc.academyId) {
+      const baseId = acadDoc.userId || acadDoc._id;
+      acadDoc.academyId = `ACA-${baseId.toString().slice(-8).toUpperCase()}`;
+      await Academy.updateOne({ _id: acadDoc._id }, { $set: { academyId: acadDoc.academyId } });
+    }
+    if (user && (!user.academyId || !user.trackAthleteId)) {
+      const aid = acadDoc?.academyId || `ACA-${user._id.toString().slice(-8).toUpperCase()}`;
+      user.academyId = user.academyId || aid;
+      user.trackAthleteId = user.trackAthleteId || aid;
+      await User.updateOne({ _id: user._id }, { $set: { academyId: user.academyId, trackAthleteId: user.trackAthleteId } });
+    }
+
     const expiresIn = rememberMe ? '30d' : '7d';
     const jwtSecret = process.env.JWT_SECRET || 'trackathlete_sih_secret_2026';
     const token = jwt.sign({ id: user._id, role: 'academy' }, jwtSecret, { expiresIn });
@@ -157,8 +193,12 @@ router.post(['/login', '/auth/login'], async (req, res) => {
     const userObj = withoutAadhaar(user);
     userObj.role = 'academy';
     if (acadDoc) {
-      userObj.academyId = acadDoc._id;
+      userObj.academyId = acadDoc.academyId;
+      userObj.trackAthleteId = acadDoc.academyId;
       userObj.academyName = acadDoc.name;
+    } else {
+      userObj.academyId = user.academyId || `ACA-${user._id.toString().slice(-8).toUpperCase()}`;
+      userObj.trackAthleteId = userObj.academyId;
     }
     delete userObj.passwordHash;
     delete userObj.resetPasswordOTP;

@@ -75,8 +75,21 @@ router.post('/signup', async (req, res) => {
     const user = await User.create(userPayload);
     const athleteIdStr = `ATH-${user._id.toString().slice(-8).toUpperCase()}`;
     const coachIdStr = `COA-${user._id.toString().slice(-8).toUpperCase()}`;
-    if (role === 'athlete') user.athleteId = athleteIdStr;
-    if (role === 'coach') user.coachId = coachIdStr;
+    const academyIdStr = `ACA-${user._id.toString().slice(-8).toUpperCase()}`;
+    if (role === 'athlete') {
+      user.athleteId = athleteIdStr;
+      user.trackAthleteId = athleteIdStr;
+    }
+    if (role === 'coach') {
+      user.coachId = coachIdStr;
+      user.trackAthleteId = coachIdStr;
+    }
+    if (role === 'academy') {
+      user.academyId = academyIdStr;
+      user.trackAthleteId = academyIdStr;
+      if (req.body.academyName) user.academyName = String(req.body.academyName).trim();
+      if (req.body.contactPhone) user.contactPhone = String(req.body.contactPhone).trim();
+    }
     if (user.sport) user.sport = String(user.sport).trim();
     await user.save();
 
@@ -118,6 +131,7 @@ router.post('/signup', async (req, res) => {
 
         const academyDoc = await Academy.create({
           userId: user._id,
+          academyId: academyIdStr,
           name: String(req.body.academyName || user.name).trim(),
           contactPhone: String(req.body.contactPhone || req.body.phone || '+91 0000000000').trim(),
           email: cleanEmail,
@@ -190,6 +204,11 @@ router.post('/signup', async (req, res) => {
     
     const userObj = withoutAadhaar(user);
     if (userObj.sport) userObj.sport = String(userObj.sport).trim();
+    if (role === 'academy') {
+      userObj.academyId = academyIdStr;
+      userObj.trackAthleteId = academyIdStr;
+      userObj.academyName = String(req.body.academyName || user.name).trim();
+    }
     delete userObj.passwordHash;
     delete userObj.resetPasswordOTP;
 
@@ -218,7 +237,9 @@ async function resolveAcademyUser(identifier) {
   const academyUserQuery = [
     { email: new RegExp('^' + cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i'), role: 'academy' },
     { academyName: identRegex, role: 'academy' },
-    { name: identRegex, role: 'academy' }
+    { name: identRegex, role: 'academy' },
+    { academyId: identRegex, role: 'academy' },
+    { trackAthleteId: identRegex, role: 'academy' }
   ];
   if (cleanDigits.length >= 7) {
     const phoneSuffix = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
@@ -235,7 +256,8 @@ async function resolveAcademyUser(identifier) {
   if (!user) {
     const acadConditions = [
       { email: new RegExp('^' + cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i') },
-      { name: identRegex }
+      { name: identRegex },
+      { academyId: identRegex }
     ];
     if (cleanDigits.length >= 7) {
       const phoneSuffix = cleanDigits.length >= 10 ? cleanDigits.slice(-10) : cleanDigits;
@@ -272,6 +294,19 @@ async function resolveAcademyUser(identifier) {
 
   if (!user) return null;
   if (user.role !== 'academy' && !acadDoc) return null;
+
+  // Self-heal permanent academyId if missing
+  if (acadDoc && !acadDoc.academyId) {
+    const baseId = acadDoc.userId || acadDoc._id;
+    acadDoc.academyId = `ACA-${baseId.toString().slice(-8).toUpperCase()}`;
+    await Academy.updateOne({ _id: acadDoc._id }, { $set: { academyId: acadDoc.academyId } });
+  }
+  if (user && (!user.academyId || !user.trackAthleteId)) {
+    const aid = acadDoc?.academyId || `ACA-${user._id.toString().slice(-8).toUpperCase()}`;
+    user.academyId = user.academyId || aid;
+    user.trackAthleteId = user.trackAthleteId || aid;
+    await User.updateOne({ _id: user._id }, { $set: { academyId: user.academyId, trackAthleteId: user.trackAthleteId } });
+  }
 
   return { user, academy: acadDoc };
 }
@@ -353,8 +388,10 @@ router.post('/login', async (req, res) => {
             acad.userId = user._id;
             await acad.save();
           } else if (!acad) {
-            await Academy.create({
+            const newAcadId = `ACA-${user._id.toString().slice(-8).toUpperCase()}`;
+            acad = await Academy.create({
               userId: user._id,
+              academyId: newAcadId,
               name: String(user.academyName || user.name || 'Sports Academy').trim(),
               email: user.email,
               contactPhone: String(user.contactPhone || user.phone || '+91 0000000000').trim(),
@@ -372,6 +409,17 @@ router.post('/login', async (req, res) => {
             });
           }
         }
+        if (acad && !acad.academyId) {
+          const baseId = acad.userId || acad._id;
+          acad.academyId = `ACA-${baseId.toString().slice(-8).toUpperCase()}`;
+          await Academy.updateOne({ _id: acad._id }, { $set: { academyId: acad.academyId } });
+        }
+        if (user && (!user.academyId || !user.trackAthleteId)) {
+          const permId = acad?.academyId || `ACA-${user._id.toString().slice(-8).toUpperCase()}`;
+          user.academyId = user.academyId || permId;
+          user.trackAthleteId = user.trackAthleteId || permId;
+          await User.updateOne({ _id: user._id }, { $set: { academyId: user.academyId, trackAthleteId: user.trackAthleteId } });
+        }
       } catch (syncErr) {
         console.error('[Academy Sync Warning]', syncErr.message);
       }
@@ -383,6 +431,13 @@ router.post('/login', async (req, res) => {
     
     const userObj = withoutAadhaar(user);
     userObj.role = effectiveRole;
+    if (effectiveRole === 'academy') {
+      const Academy = require('../models/Academy');
+      const acad = await Academy.findOne({ $or: [{ userId: user._id }, { email: user.email }] });
+      userObj.academyId = acad?.academyId || user.academyId || `ACA-${user._id.toString().slice(-8).toUpperCase()}`;
+      userObj.trackAthleteId = userObj.academyId;
+      if (acad?.name) userObj.academyName = acad.name;
+    }
     delete userObj.passwordHash;
     delete userObj.resetPasswordOTP;
 
@@ -427,8 +482,17 @@ router.post('/academy-login', async (req, res) => {
     const userObj = withoutAadhaar(user);
     userObj.role = 'academy';
     if (acadDoc) {
-      userObj.academyId = acadDoc._id;
+      if (!acadDoc.academyId) {
+        const baseId = acadDoc.userId || acadDoc._id;
+        acadDoc.academyId = `ACA-${baseId.toString().slice(-8).toUpperCase()}`;
+        await Academy.updateOne({ _id: acadDoc._id }, { $set: { academyId: acadDoc.academyId } });
+      }
+      userObj.academyId = acadDoc.academyId;
+      userObj.trackAthleteId = acadDoc.academyId;
       userObj.academyName = acadDoc.name;
+    } else {
+      userObj.academyId = user.academyId || `ACA-${user._id.toString().slice(-8).toUpperCase()}`;
+      userObj.trackAthleteId = userObj.academyId;
     }
     delete userObj.passwordHash;
     delete userObj.resetPasswordOTP;

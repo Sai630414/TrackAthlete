@@ -46,6 +46,7 @@ const UserSchema = new mongoose.Schema({
   targetSports: [String],
 
   // Academy-specific
+  academyId: { type: String, trim: true, sparse: true },
   academyName: String,
   sportsOffered: [String],
   contactPhone: String,

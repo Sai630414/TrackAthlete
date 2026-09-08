@@ -568,6 +568,9 @@ export default function AcademyDashboard() {
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
               <ShieldCheck className="w-3.5 h-3.5 text-[#cc694e]" /> Verified Sports Academy
             </span>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#0f2928] text-[#b9d9bf] border border-[#2f6d5a] tracking-wider">
+              ID: {profile?.academyId || user?.academyId || user?.trackAthleteId || 'ACA-N/A'}
+            </span>
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-mono text-[#c5d3ce] border border-white/20">
               TrackAthlete Facility
             </span>
@@ -1255,6 +1258,20 @@ export default function AcademyDashboard() {
               <p className="text-xs text-gray-500">
                 Facility identity displayed across national discovery and athlete recommendations.
               </p>
+            </div>
+
+            <div className="bg-[#f0fdf4] border border-[#bbf7d0] rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <span className="text-[11px] font-bold text-[#166534] uppercase tracking-wider block">
+                  Permanent TrackAthlete / Academy ID
+                </span>
+                <span className="text-sm font-mono font-bold text-[#14532d]">
+                  {profile?.academyId || user?.academyId || user?.trackAthleteId || 'ACA-N/A'}
+                </span>
+              </div>
+              <span className="text-xs text-[#15803d]">
+                Official platform identifier permanently registered in MongoDB
+              </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -50,6 +50,10 @@ router.get('/my-organized-events', verifyToken, async (req, res) => {
       trackIds.push(user.coachId);
       trackIds.push(user.coachId.replace(/^COA-/i, 'TA-'));
     }
+    if (user.academyId) {
+      trackIds.push(user.academyId);
+      trackIds.push(user.academyId.replace(/^ACA-/i, 'TA-'));
+    }
     if (user.trackAthleteId) {
       trackIds.push(user.trackAthleteId);
     }
@@ -57,6 +61,7 @@ router.get('/my-organized-events', verifyToken, async (req, res) => {
     const hexSuffix6 = user._id.toString().slice(-6).toUpperCase();
     trackIds.push(`TA-${hexSuffix8}`);
     trackIds.push(`ATH-${hexSuffix8}`);
+    trackIds.push(`ACA-${hexSuffix8}`);
     trackIds.push(`TA-${hexSuffix6}`);
     trackIds.push(`ATH-${hexSuffix6}`);
     trackIds.push(hexSuffix8);

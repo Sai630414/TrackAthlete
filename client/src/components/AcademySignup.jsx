@@ -228,6 +228,7 @@ export default function AcademySignup({ onSwitchRole, onSwitchToSignIn }) {
           sportName: s.sportName.trim().toUpperCase()
         }))
       });
+      navigate('/academy', { replace: true });
     } catch (err) {
       console.error('Academy signup error:', err);
       const serverMsg = err.response?.data?.error || err.response?.data?.message || err.message;

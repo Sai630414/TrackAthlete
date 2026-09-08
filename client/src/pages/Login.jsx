@@ -209,6 +209,7 @@ export default function Login({ initialMode }) {
             password,
             rememberMe
           });
+          navigate('/academy', { replace: true });
         } else {
           await login({ email: email.trim(), password, role, rememberMe });
         }

@@ -49,6 +49,7 @@ async function findTrackAthleteUser(rawId) {
     $or: [
       { athleteId: exactRegex },
       { coachId: exactRegex },
+      { academyId: exactRegex },
       { trackAthleteId: exactRegex }
     ]
   });
@@ -62,6 +63,7 @@ async function findTrackAthleteUser(rawId) {
       $or: [
         { athleteId: new RegExp('^(ATH-)?' + strippedEscaped + '$', 'i') },
         { coachId: new RegExp('^(COA-)?' + strippedEscaped + '$', 'i') },
+        { academyId: new RegExp('^(ACA-)?' + strippedEscaped + '$', 'i') },
         { trackAthleteId: new RegExp('^' + strippedEscaped + '$', 'i') }
       ]
     });
@@ -90,6 +92,7 @@ async function findTrackAthleteUser(rawId) {
     const Academy = require('../models/Academy');
     const acadDoc = await Academy.findOne({
       $or: [
+        { academyId: exactRegex },
         { _id: (mongoose.Types.ObjectId.isValid(cleanId) && cleanId.length === 24) ? cleanId : null },
         { name: exactRegex }
       ].filter(Boolean)
