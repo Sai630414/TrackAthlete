@@ -49,7 +49,7 @@ export default function FederationDashboard() {
   const [creatingEvent, setCreatingEvent] = useState(false);
 
   // Search & Candidate Match State
-  const [athleteSearchInput, setAthleteSearchInput] = useState('ATH-1B2CD580');
+  const [athleteSearchInput, setAthleteSearchInput] = useState('');
   const [candidateAthlete, setCandidateAthlete] = useState(null);
   const [searchingCandidate, setSearchingCandidate] = useState(false);
   const [candidateError, setCandidateError] = useState('');
@@ -411,7 +411,7 @@ export default function FederationDashboard() {
                 <Search className="w-5 h-5 text-[#194e42]" /> Search Candidate Athlete by Permanent Athlete ID
               </CardTitle>
               <CardDescription>
-                Search and confirm candidate athlete details using their permanent ID (e.g. ATH-1B2CD580) before issuing an official achievement.
+                Search and confirm candidate athlete details using their permanent ID (e.g. ATH-E9C4E023) before issuing an official achievement.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -421,7 +421,7 @@ export default function FederationDashboard() {
                   <Input
                     value={athleteSearchInput}
                     onChange={e => setAthleteSearchInput(e.target.value)}
-                    placeholder="Enter Permanent Athlete ID (e.g. ATH-1B2CD580)…"
+                    placeholder="Enter Permanent Athlete ID (e.g. ATH-E9C4E023)…"
                     className="pl-9 font-mono font-bold uppercase text-xs"
                   />
                 </div>

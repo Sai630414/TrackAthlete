@@ -133,6 +133,9 @@ export default function CoachDashboard() {
               <UserCheck className="w-3.5 h-3.5 text-[#cc694e]" /> Certified Coach
             </span>
             <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono text-[#c5d3ce] border border-white/20">
+              ID: {user?.coachId || user?.trackAthleteId || 'COA-N/A'}
+            </span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono text-[#c5d3ce] border border-white/20">
               {user?.certifications?.[0] || 'Accredited'}
             </span>
           </div>

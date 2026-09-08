@@ -46,9 +46,17 @@ router.get('/my-organized-events', verifyToken, async (req, res) => {
       trackIds.push(user.athleteId);
       trackIds.push(user.athleteId.replace(/^ATH-/i, 'TA-'));
     }
+    if (user.parentId) {
+      trackIds.push(user.parentId);
+      trackIds.push(user.parentId.replace(/^PAR-/i, 'TA-'));
+    }
     if (user.coachId) {
       trackIds.push(user.coachId);
       trackIds.push(user.coachId.replace(/^COA-/i, 'TA-'));
+    }
+    if (user.sponsorId) {
+      trackIds.push(user.sponsorId);
+      trackIds.push(user.sponsorId.replace(/^SPN-/i, 'TA-'));
     }
     if (user.academyId) {
       trackIds.push(user.academyId);
@@ -61,6 +69,9 @@ router.get('/my-organized-events', verifyToken, async (req, res) => {
     const hexSuffix6 = user._id.toString().slice(-6).toUpperCase();
     trackIds.push(`TA-${hexSuffix8}`);
     trackIds.push(`ATH-${hexSuffix8}`);
+    trackIds.push(`PAR-${hexSuffix8}`);
+    trackIds.push(`COA-${hexSuffix8}`);
+    trackIds.push(`SPN-${hexSuffix8}`);
     trackIds.push(`ACA-${hexSuffix8}`);
     trackIds.push(`TA-${hexSuffix6}`);
     trackIds.push(`ATH-${hexSuffix6}`);

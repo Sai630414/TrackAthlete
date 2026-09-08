@@ -73,18 +73,30 @@ router.post('/signup', async (req, res) => {
     if (location) userPayload.location = location;
 
     const user = await User.create(userPayload);
-    const athleteIdStr = `ATH-${user._id.toString().slice(-8).toUpperCase()}`;
-    const coachIdStr = `COA-${user._id.toString().slice(-8).toUpperCase()}`;
-    const academyIdStr = `ACA-${user._id.toString().slice(-8).toUpperCase()}`;
+    const { generateRolePermanentId } = require('../utils/idGenerator');
+
     if (role === 'athlete') {
+      const athleteIdStr = await generateRolePermanentId('athlete', user._id, async (cand) => !(await User.findOne({ $or: [{ athleteId: cand }, { trackAthleteId: cand }] })));
       user.athleteId = athleteIdStr;
       user.trackAthleteId = athleteIdStr;
     }
+    if (role === 'parent') {
+      const parentIdStr = await generateRolePermanentId('parent', user._id, async (cand) => !(await User.findOne({ $or: [{ parentId: cand }, { trackAthleteId: cand }] })));
+      user.parentId = parentIdStr;
+      user.trackAthleteId = parentIdStr;
+    }
     if (role === 'coach') {
+      const coachIdStr = await generateRolePermanentId('coach', user._id, async (cand) => !(await User.findOne({ $or: [{ coachId: cand }, { trackAthleteId: cand }] })));
       user.coachId = coachIdStr;
       user.trackAthleteId = coachIdStr;
     }
+    if (role === 'sponsor') {
+      const sponsorIdStr = await generateRolePermanentId('sponsor', user._id, async (cand) => !(await User.findOne({ $or: [{ sponsorId: cand }, { trackAthleteId: cand }] })));
+      user.sponsorId = sponsorIdStr;
+      user.trackAthleteId = sponsorIdStr;
+    }
     if (role === 'academy') {
+      const academyIdStr = await generateRolePermanentId('academy', user._id, async (cand) => !(await User.findOne({ $or: [{ academyId: cand }, { trackAthleteId: cand }] })));
       user.academyId = academyIdStr;
       user.trackAthleteId = academyIdStr;
       if (req.body.academyName) user.academyName = String(req.body.academyName).trim();
@@ -100,7 +112,7 @@ router.post('/signup', async (req, res) => {
       if (matchCriteria.length > 0) {
         await OfficialAchievement.updateMany(
           { $or: matchCriteria },
-          { $set: { athleteUserId: user._id, athleteId: athleteIdStr } }
+          { $set: { athleteUserId: user._id, athleteId: user.athleteId } }
         ).catch(e => console.error('Historical achievement auto-link error:', e));
       }
     }
@@ -131,7 +143,7 @@ router.post('/signup', async (req, res) => {
 
         const academyDoc = await Academy.create({
           userId: user._id,
-          academyId: academyIdStr,
+          academyId: user.academyId,
           name: String(req.body.academyName || user.name).trim(),
           contactPhone: String(req.body.contactPhone || req.body.phone || '+91 0000000000').trim(),
           email: cleanEmail,
@@ -147,9 +159,9 @@ router.post('/signup', async (req, res) => {
           state: state || req.body.address?.state || '',
           location: {
             type: 'Point',
-            coordinates: [Number(coords[0]) || 80.6480, Number(coords[1]) || 16.5062]
+            coordinates: [Number(req.body.location?.coordinates?.[0]) || 80.6480, Number(req.body.location?.coordinates?.[1]) || 16.5062]
           },
-          sports: normalizedSports,
+          sports: (Array.isArray(req.body.sports) ? req.body.sports.map(s => ({ sportName: String(s.sportName || s).trim().toUpperCase(), addedAt: new Date() })) : []),
           rankingStats: {
             districtPlayers: Number(req.body.rankingStats?.districtPlayers ?? req.body.districtPlayers ?? 0),
             statePlayers: Number(req.body.rankingStats?.statePlayers ?? req.body.statePlayers ?? 0),
@@ -159,42 +171,42 @@ router.post('/signup', async (req, res) => {
           verified: true
         });
 
-        // If sports included coach details, create coach assignments
-        for (const sp of rawSports) {
-          const sName = String(sp.sportName || sp.name || sp).trim().toUpperCase();
-          if (sp.coachName) {
-            let coachUserId = null;
-            let coachId = null;
+        // Add coach assignments if provided
+        for (const sp of (req.body.sports || [])) {
+          let coachId = sp.coachId || sp.coach;
+          if (!coachId && (sp.coachTrackAthleteId || sp.coachAadhaar)) {
+            let coachQuery = [];
             if (sp.coachTrackAthleteId) {
-              const matchedCoach = await User.findOne({
-                role: 'coach',
-                $or: [{ athleteId: sp.coachTrackAthleteId }, { coachId: sp.coachTrackAthleteId }]
-              });
-              if (matchedCoach) {
-                coachUserId = matchedCoach._id;
-                coachId = matchedCoach.coachId || sp.coachTrackAthleteId;
-              }
+              coachQuery.push(
+                { athleteId: sp.coachTrackAthleteId },
+                { coachId: sp.coachTrackAthleteId },
+                { trackAthleteId: sp.coachTrackAthleteId }
+              );
             }
-
-            const cAadhaarHash = sp.coachAadhaar ? hashAadhaar(sp.coachAadhaar) : null;
-
+            if (sp.coachAadhaar) {
+              const ch = hashAadhaar(sp.coachAadhaar);
+              if (ch) coachQuery.push({ aadhaarHash: ch });
+            }
+            const matchedCoach = await User.findOne({ $or: coachQuery, role: 'coach' });
+            if (matchedCoach) {
+              coachId = matchedCoach.coachId || sp.coachTrackAthleteId || matchedCoach._id;
+            }
+          }
+          if (coachId || sp.coachName) {
             await AcademyCoachAssignment.create({
-              academyId: academyDoc._id,
-              sportName: sName,
-              coachUserId,
-              coachId,
-              name: String(sp.coachName).trim(),
-              aadhaarHash: cAadhaarHash,
-              nisId: sp.coachNisId ? String(sp.coachNisId).trim() : null,
-              certificateData: sp.coachCertificateData || null,
-              certificateFileName: sp.coachCertificateFileName || `${sp.coachName}_Certificate.pdf`,
-              isOffline: !coachUserId,
-              role: 'Head Coach'
-            });
+              academyId: academyDoc.academyId,
+              sportName: String(sp.sportName || '').trim().toUpperCase(),
+              coachName: sp.coachName || 'Assigned Coach',
+              coachAadhaarHash: sp.coachAadhaar ? hashAadhaar(sp.coachAadhaar) : null,
+              coachNisId: sp.coachNisId || null,
+              coachCertificateData: sp.coachCertificateData || null,
+              coachCertificateFileName: sp.coachCertificateFileName || null,
+              coachId: coachId || null
+            }).catch(e => console.error('[Coach Assignment Create Warning]', e.message));
           }
         }
       } catch (acadErr) {
-        console.error('[Academy Creation Error on Signup]', acadErr);
+        console.error('[Academy Auto-Create Error]', acadErr);
       }
     }
     
@@ -204,9 +216,13 @@ router.post('/signup', async (req, res) => {
     
     const userObj = withoutAadhaar(user);
     if (userObj.sport) userObj.sport = String(userObj.sport).trim();
+    userObj.trackAthleteId = user.trackAthleteId;
+    if (role === 'athlete') userObj.athleteId = user.athleteId;
+    if (role === 'parent') userObj.parentId = user.parentId;
+    if (role === 'coach') userObj.coachId = user.coachId;
+    if (role === 'sponsor') userObj.sponsorId = user.sponsorId;
     if (role === 'academy') {
-      userObj.academyId = academyIdStr;
-      userObj.trackAthleteId = academyIdStr;
+      userObj.academyId = user.academyId;
       userObj.academyName = String(req.body.academyName || user.name).trim();
     }
     delete userObj.passwordHash;
@@ -414,6 +430,11 @@ router.post('/login', async (req, res) => {
     
     const userObj = withoutAadhaar(user);
     userObj.role = user.role;
+    userObj.trackAthleteId = user.trackAthleteId || user.athleteId || user.coachId || user.academyId || user.parentId || user.sponsorId;
+    if (user.role === 'athlete') userObj.athleteId = user.athleteId;
+    if (user.role === 'parent') userObj.parentId = user.parentId;
+    if (user.role === 'coach') userObj.coachId = user.coachId;
+    if (user.role === 'sponsor') userObj.sponsorId = user.sponsorId;
     if (user.role === 'academy') {
       const Academy = require('../models/Academy');
       const acad = await Academy.findOne({ $or: [{ userId: user._id }, { email: user.email }] });

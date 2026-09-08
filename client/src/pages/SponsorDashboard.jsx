@@ -68,6 +68,9 @@ export default function SponsorDashboard() {
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
               <ShieldCheck className="w-3.5 h-3.5 text-[#cc694e]" /> Verified Corporate Sponsor
             </span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono text-[#c5d3ce] border border-white/20">
+              ID: {user?.sponsorId || user?.trackAthleteId || 'SPN-N/A'}
+            </span>
             <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono text-[#c5d3ce] border border-white/20">{user?.targetSports?.join(', ') || 'All Sports'}</span>
           </div>
           <h1 className="text-3xl font-normal text-white" style={{ fontFamily: 'Georgia, serif' }}>

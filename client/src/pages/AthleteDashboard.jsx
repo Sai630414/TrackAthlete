@@ -651,7 +651,7 @@ export default function AthleteDashboard() {
               <CheckCircle2 className="w-3.5 h-3.5 text-[#cc694e]" /> Verified Athlete Profile
             </span>
             <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono text-[#c5d3ce] border border-white/20">
-              ID: ATH-{user?._id?.slice(-6)?.toUpperCase() || '89201'}
+              ID: {user?.athleteId || user?.trackAthleteId || 'ATH-N/A'}
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-normal text-white" style={{ fontFamily: 'Georgia, serif' }}>

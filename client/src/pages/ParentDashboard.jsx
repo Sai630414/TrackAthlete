@@ -84,7 +84,12 @@ export default function ParentDashboard() {
       {/* HEADER BANNER */}
       <div className="bg-gradient-to-r from-[#173d3c] via-[#123130] to-[#0c292c] border border-[#2f6d5a] p-6 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 text-white shadow-md">
         <div>
-          <p className="eyebrow" style={{ color: '#e9a68e', margin: '0 0 4px' }}>PARENTS & FAMILIES · PATHWAY FINDER</p>
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <p className="eyebrow" style={{ color: '#e9a68e', margin: 0 }}>PARENTS & FAMILIES · PATHWAY FINDER</p>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono text-[#c5d3ce] border border-white/20">
+              ID: {user?.parentId || user?.trackAthleteId || 'PAR-N/A'}
+            </span>
+          </div>
           <h1 className="text-3xl font-normal text-white" style={{ fontFamily: 'Georgia, serif' }}>
             Welcome back, <em style={{ color: '#b9d9bf', fontStyle: 'italic' }}>{user?.name || 'Parent'}</em>
           </h1>

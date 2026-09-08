@@ -48,21 +48,25 @@ async function findTrackAthleteUser(rawId) {
   let user = await User.findOne({
     $or: [
       { athleteId: exactRegex },
+      { parentId: exactRegex },
       { coachId: exactRegex },
+      { sponsorId: exactRegex },
       { academyId: exactRegex },
       { trackAthleteId: exactRegex }
     ]
   });
   if (user) return user;
 
-  // 2. Role prefix variations (ATH, COA, PAR, SPO, ACA, TA)
-  if (/^(ATH|COA|PAR|SPO|ACA|TA)-/i.test(cleanId)) {
-    const stripped = cleanId.replace(/^(ATH|COA|PAR|SPO|ACA|TA)-/i, '');
+  // 2. Role prefix variations (ATH, PAR, COA, SPN, SPO, ACA, ORG, FED, TA)
+  if (/^(ATH|PAR|COA|SPN|SPO|ACA|ORG|FED|TA)-/i.test(cleanId)) {
+    const stripped = cleanId.replace(/^(ATH|PAR|COA|SPN|SPO|ACA|ORG|FED|TA)-/i, '');
     const strippedEscaped = stripped.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
     user = await User.findOne({
       $or: [
         { athleteId: new RegExp('^(ATH-)?' + strippedEscaped + '$', 'i') },
+        { parentId: new RegExp('^(PAR-)?' + strippedEscaped + '$', 'i') },
         { coachId: new RegExp('^(COA-)?' + strippedEscaped + '$', 'i') },
+        { sponsorId: new RegExp('^(SPN-)?' + strippedEscaped + '$', 'i') },
         { academyId: new RegExp('^(ACA-)?' + strippedEscaped + '$', 'i') },
         { trackAthleteId: new RegExp('^' + strippedEscaped + '$', 'i') }
       ]
@@ -129,9 +133,15 @@ router.post('/auth/signup', async (req, res) => {
       verifiedTrackAthleteId = cleanTrackId;
     }
 
+    const { generateRolePermanentId } = require('../utils/idGenerator');
+    const newOrgId = new mongoose.Types.ObjectId();
+    const organizerId = await generateRolePermanentId('organizer', newOrgId, async (cand) => !(await Organizer.findOne({ organizerId: cand })));
+
     const otp = String(Math.floor(100000 + Math.random() * 900000));
     await Organizer.create({
       ...b,
+      _id: newOrgId,
+      organizerId,
       email,
       linkedUserId,
       trackAthleteId: verifiedTrackAthleteId,
@@ -150,7 +160,10 @@ router.post('/auth/verify-email', async (req, res) => {
     const organizer = await Organizer.findOne({ email: cleanEmail(req.body.email) }).select('+emailOTPHash');
     if (!organizer || !req.body.otp || organizer.emailOTPHash !== otpHash(req.body.otp) || organizer.emailOTPExpires <= new Date()) return res.status(400).json({ error: 'Invalid or expired verification code.' });
     organizer.isEmailVerified = true; organizer.accountStatus = 'active'; organizer.emailOTPHash = undefined; organizer.emailOTPExpires = undefined;
-    if (!organizer.organizerId) { const count = await Organizer.countDocuments({ organizerId: { $exists: true } }); organizer.organizerId = `ORG-${String(count + 1).padStart(6, '0')}`; }
+    if (!organizer.organizerId) {
+      const { generateRolePermanentId } = require('../utils/idGenerator');
+      organizer.organizerId = await generateRolePermanentId('organizer', organizer._id, async (cand) => !(await Organizer.findOne({ organizerId: cand })));
+    }
     await organizer.save();
 
     // Link organizer reference back to user if linked
@@ -164,7 +177,18 @@ router.post('/auth/verify-email', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 router.post('/auth/login', async (req, res) => {
-  try { const organizer = await Organizer.findOne({ email: cleanEmail(req.body.email) }).select('+passwordHash'); if (!organizer || !(await bcrypt.compare(req.body.password || '', organizer.passwordHash))) return res.status(401).json({ error: 'Invalid official email or password.' }); if (organizer.accountStatus !== 'active') return res.status(403).json({ error: 'Verify the organizer email before signing in.' }); const token = jwt.sign({ id: organizer._id, role: 'organizer' }, secret(), { expiresIn: req.body.rememberMe ? '30d' : '7d' }); res.json({ token, organizer }); } catch (err) { res.status(500).json({ error: err.message }); }
+  try {
+    const organizer = await Organizer.findOne({ email: cleanEmail(req.body.email) }).select('+passwordHash');
+    if (!organizer || !(await bcrypt.compare(req.body.password || '', organizer.passwordHash))) return res.status(401).json({ error: 'Invalid official email or password.' });
+    if (organizer.accountStatus !== 'active') return res.status(403).json({ error: 'Verify the organizer email before signing in.' });
+    if (!organizer.organizerId) {
+      const { generateRolePermanentId } = require('../utils/idGenerator');
+      organizer.organizerId = await generateRolePermanentId('organizer', organizer._id, async (cand) => !(await Organizer.findOne({ organizerId: cand })));
+      await organizer.save();
+    }
+    const token = jwt.sign({ id: organizer._id, role: 'organizer' }, secret(), { expiresIn: req.body.rememberMe ? '30d' : '7d' });
+    res.json({ token, organizer });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 router.use(verifyToken, requireRoles('organizer'));

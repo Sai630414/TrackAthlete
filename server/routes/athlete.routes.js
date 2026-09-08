@@ -55,6 +55,15 @@ router.put('/:id/profile', async (req, res) => {
     delete updates.aadhaarNumber;
     delete updates.aadhaar;
     delete updates.aadhaarHash;
+    delete updates.athleteId;
+    delete updates.parentId;
+    delete updates.coachId;
+    delete updates.sponsorId;
+    delete updates.academyId;
+    delete updates.trackAthleteId;
+    delete updates.organizerId;
+    delete updates.federationId;
+    delete updates.role;
     if (rawAadhaar) {
       const aadhaarHash = hashAadhaar(rawAadhaar);
       if (!aadhaarHash) return res.status(400).json({ error: 'Aadhaar number must contain exactly 12 digits.' });

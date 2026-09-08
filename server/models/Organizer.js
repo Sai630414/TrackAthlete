@@ -19,5 +19,12 @@ const OrganizerSchema = new mongoose.Schema({
   trackAthleteId: { type: String, trim: true, default: null }
 }, { timestamps: true });
 
+OrganizerSchema.pre('validate', function(next) {
+  if (!this.organizerId) {
+    this.organizerId = `ORG-${this._id.toString().slice(-8).toUpperCase()}`;
+  }
+  next();
+});
+
 OrganizerSchema.set('toJSON', { transform: (_doc, value) => { delete value.passwordHash; delete value.emailOTPHash; return value; } });
 module.exports = mongoose.model('Organizer', OrganizerSchema);

@@ -7,7 +7,7 @@ const UserSchema = new mongoose.Schema({
   role: { type: String, enum: ['athlete', 'parent', 'coach', 'sponsor', 'academy', 'admin', 'federation'], required: true },
 
   // Athlete-specific
-  athleteId: { type: String, trim: true, sparse: true },
+  athleteId: { type: String, trim: true, sparse: true, unique: true },
   aadhaarHash: { type: String, default: null },
   sport: { type: String, trim: true },
   beltRank: String,
@@ -26,12 +26,13 @@ const UserSchema = new mongoose.Schema({
   }],
 
   // Parent-specific
+  parentId: { type: String, trim: true, sparse: true, unique: true },
   childName: String,
   childAge: Number,
   childSport: String,
 
   // Coach-specific
-  coachId: { type: String, trim: true, sparse: true },
+  coachId: { type: String, trim: true, sparse: true, unique: true },
   nisId: { type: String, default: null },
   certifications: [String],
   yearsExperience: Number,
@@ -41,12 +42,13 @@ const UserSchema = new mongoose.Schema({
   bio: { type: String, default: null },
 
   // Sponsor-specific
+  sponsorId: { type: String, trim: true, sparse: true, unique: true },
   organizationName: String,
   budgetRange: String,
   targetSports: [String],
 
   // Academy-specific
-  academyId: { type: String, trim: true, sparse: true },
+  academyId: { type: String, trim: true, sparse: true, unique: true },
   academyName: String,
   sportsOffered: [String],
   contactPhone: String,
