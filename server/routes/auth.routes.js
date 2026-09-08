@@ -297,7 +297,7 @@ router.post('/login', async (req, res) => {
     if (!user || (role === 'academy' && user.role !== 'academy')) {
       const acadUser = await resolveAcademyUser(cleanInput);
       if (acadUser) {
-        user = acadUser;
+        user = acadUser.user || acadUser;
       }
     }
     
@@ -334,6 +334,14 @@ router.post('/login', async (req, res) => {
       } catch {}
     }
 
+    // If role is specified and does not match the account's registered role
+    if (role && effectiveRole !== role && user.role !== role && user.role !== 'admin') {
+      const regRole = (user.role || '').toUpperCase() || 'ANOTHER ROLE';
+      return res.status(403).json({
+        error: `This account is registered as ${regRole}. Please select the ${regRole} tab to sign in.`
+      });
+    }
+
     // Role handling: smoothly direct Academy users to academy workspace
     if (effectiveRole === 'academy') {
       try {
@@ -367,10 +375,6 @@ router.post('/login', async (req, res) => {
       } catch (syncErr) {
         console.error('[Academy Sync Warning]', syncErr.message);
       }
-    } else if (role && user.role !== role && user.role !== 'admin') {
-      return res.status(403).json({
-        error: `This account is registered as ${user.role.toUpperCase()}. Please select the ${user.role.toUpperCase()} tab to sign in.`
-      });
     }
     
     const expiresIn = rememberMe ? '30d' : '7d';

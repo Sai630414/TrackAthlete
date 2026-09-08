@@ -53,28 +53,26 @@ router.get('/my-organized-events', verifyToken, async (req, res) => {
     if (user.trackAthleteId) {
       trackIds.push(user.trackAthleteId);
     }
-    const hexSuffix = user._id.toString().slice(-8).toUpperCase();
-    trackIds.push(`TA-${hexSuffix}`);
-    trackIds.push(`ATH-${hexSuffix}`);
+    const hexSuffix8 = user._id.toString().slice(-8).toUpperCase();
+    const hexSuffix6 = user._id.toString().slice(-6).toUpperCase();
+    trackIds.push(`TA-${hexSuffix8}`);
+    trackIds.push(`ATH-${hexSuffix8}`);
+    trackIds.push(`TA-${hexSuffix6}`);
+    trackIds.push(`ATH-${hexSuffix6}`);
+    trackIds.push(hexSuffix8);
+    trackIds.push(hexSuffix6);
+    trackIds.push(user._id.toString());
 
+    // Identity linking is explicit via linkedUserId, linkedOrganizerId, or TrackAthlete ID
+    // (Email reuse is allowed and does NOT automatically link identities)
     const conditions = [
       { linkedUserId: user._id },
-      { trackAthleteId: { $in: trackIds.map(t => new RegExp('^' + t.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i')) } },
-      { email: String(user.email || '').trim().toLowerCase() }
+      { trackAthleteId: { $in: trackIds.map(t => new RegExp('^' + t.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i')) } }
     ];
 
     if (user.linkedOrganizerId) {
       conditions.push({ _id: user.linkedOrganizerId });
     }
-
-    try {
-      const Academy = require('../models/Academy');
-      const acad = await Academy.findOne({ userId: user._id });
-      if (acad) {
-        if (acad.email) conditions.push({ email: String(acad.email).trim().toLowerCase() });
-        if (acad.name) conditions.push({ organizationName: new RegExp('^' + acad.name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i') });
-      }
-    } catch {}
 
     const organizers = await Organizer.find({ $or: conditions });
 
@@ -83,7 +81,9 @@ router.get('/my-organized-events', verifyToken, async (req, res) => {
     }
 
     const organizerIds = organizers.map(o => o._id);
-    const events = await OrganizerEvent.find({ organizer: { $in: organizerIds } }).sort({ eventDate: -1 });
+    const events = await OrganizerEvent.find({ organizer: { $in: organizerIds } })
+      .populate('organizer', 'name organizationName organizerId mobile email designation officialAddress')
+      .sort({ eventDate: -1 });
 
     res.json({
       hasLinkedOrganizer: true,

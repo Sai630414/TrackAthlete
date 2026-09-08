@@ -54,50 +54,38 @@ async function findTrackAthleteUser(rawId) {
   });
   if (user) return user;
 
-  // 2. TA- prefix variations
-  if (/^TA-/i.test(cleanId)) {
-    const stripped = cleanId.replace(/^TA-/i, '');
+  // 2. Role prefix variations (ATH, COA, PAR, SPO, ACA, TA)
+  if (/^(ATH|COA|PAR|SPO|ACA|TA)-/i.test(cleanId)) {
+    const stripped = cleanId.replace(/^(ATH|COA|PAR|SPO|ACA|TA)-/i, '');
     const strippedEscaped = stripped.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
     user = await User.findOne({
       $or: [
-        { athleteId: new RegExp('^ATH-' + strippedEscaped + '$', 'i') },
-        { coachId: new RegExp('^COA-' + strippedEscaped + '$', 'i') },
+        { athleteId: new RegExp('^(ATH-)?' + strippedEscaped + '$', 'i') },
+        { coachId: new RegExp('^(COA-)?' + strippedEscaped + '$', 'i') },
         { trackAthleteId: new RegExp('^' + strippedEscaped + '$', 'i') }
       ]
     });
     if (user) return user;
 
-    if (/^[0-9a-f]{8}$/i.test(stripped)) {
+    if (/^[0-9a-f]{6,24}$/i.test(stripped)) {
       const all = await User.find({}).select('_id').lean();
       const matched = all.find(u => u._id.toString().toLowerCase().endsWith(stripped.toLowerCase()));
       if (matched) return await User.findById(matched._id);
     }
   }
 
-  // 3. ATH- or COA- prefix variations
-  if (/^(ATH|COA)-/i.test(cleanId)) {
-    const stripped = cleanId.replace(/^(ATH|COA)-/i, '');
-    if (/^[0-9a-f]{8}$/i.test(stripped)) {
-      const all = await User.find({}).select('_id').lean();
-      const matched = all.find(u => u._id.toString().toLowerCase().endsWith(stripped.toLowerCase()));
-      if (matched) return await User.findById(matched._id);
+  // 3. Direct hex string (6 to 24 characters)
+  if (/^[0-9a-f]{6,24}$/i.test(cleanId)) {
+    if (mongoose.Types.ObjectId.isValid(cleanId) && cleanId.length === 24) {
+      user = await User.findById(cleanId);
+      if (user) return user;
     }
-  }
-
-  // 4. Full 24-character ObjectId
-  if (mongoose.Types.ObjectId.isValid(cleanId) && cleanId.length === 24) {
-    user = await User.findById(cleanId);
-    if (user) return user;
-  }
-
-  // 5. 8-character hex suffix of _id
-  if (/^[0-9a-f]{8}$/i.test(cleanId)) {
     const all = await User.find({}).select('_id').lean();
     const matched = all.find(u => u._id.toString().toLowerCase().endsWith(cleanId.toLowerCase()));
     if (matched) return await User.findById(matched._id);
   }
 
-  // 6. Academy collection lookup
+  // 4. Academy collection lookup
   try {
     const Academy = require('../models/Academy');
     const acadDoc = await Academy.findOne({
@@ -131,7 +119,7 @@ router.post('/auth/signup', async (req, res) => {
       const matchedUser = await findTrackAthleteUser(cleanTrackId);
       if (!matchedUser) {
         return res.status(400).json({
-          error: 'The provided TrackAthlete ID was not found. Please verify your ID or leave it blank.'
+          error: 'Invalid TrackAthlete ID. Please enter a valid existing TrackAthlete ID or leave it empty.'
         });
       }
       linkedUserId = matchedUser._id;

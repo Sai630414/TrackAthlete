@@ -130,11 +130,6 @@ router.post(['/login', '/auth/login'], async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
-    // Account must either have role === 'academy' or an associated Academy document
-    if (user.role !== 'academy' && !acadDoc) {
-      return res.status(401).json({ error: 'Invalid email or password.' });
-    }
-
     const bcrypt = require('bcryptjs');
     const jwt = require('jsonwebtoken');
     const { withoutAadhaar } = require('../utils/aadhaar');
@@ -145,6 +140,14 @@ router.post(['/login', '/auth/login'], async (req, res) => {
     }
     if (!match) {
       return res.status(401).json({ error: 'Invalid email or password.' });
+    }
+
+    // Account must either have role === 'academy' or an associated Academy document
+    if (user.role !== 'academy' && !acadDoc) {
+      const regRole = (user.role || '').toUpperCase() || 'ANOTHER ROLE';
+      return res.status(403).json({
+        error: `This account is registered as ${regRole}. Please select the ${regRole} tab to sign in.`
+      });
     }
 
     const expiresIn = rememberMe ? '30d' : '7d';

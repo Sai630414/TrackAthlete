@@ -103,21 +103,31 @@ export default function OrganizedEventsSection({ initialData = null }) {
               ({organizer.organizerType || 'Organizer'})
             </span>
           </div>
-          <h2 className="text-lg font-bold text-[#173235]">
+          <h2 className="text-lg font-bold text-[#173235] mt-1">
             {organizer.organizationName ? `${organizer.organizationName} (${organizer.name})` : organizer.name}
           </h2>
-          <p className="text-xs text-[#697c7c] mt-0.5">
-            This profile is officially linked as an Event Organizer. Below are all tournaments and events organized by you.
+          <p className="text-xs text-[#526668] max-w-2xl leading-relaxed mt-1">
+            Events organized through your linked Organizer account. For complete event management, participants, registrations, results, certificates, and Organizer controls, check the Organizer Dashboard.
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={fetchEvents}
-          className="flex items-center gap-1.5 h-8 px-3 rounded-lg bg-white hover:bg-[#e2eee4] text-[#194e42] text-xs font-bold border border-[#2f6d5a]/40 cursor-pointer shadow-xs self-start sm:self-auto transition-colors"
-        >
-          <RefreshCw className="w-3.5 h-3.5" /> Refresh
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-center shrink-0 flex-wrap">
+          <button
+            type="button"
+            onClick={fetchEvents}
+            className="flex items-center gap-1.5 h-9 px-3 rounded-lg bg-white hover:bg-[#e2eee4] text-[#194e42] text-xs font-bold border border-[#2f6d5a]/40 cursor-pointer shadow-xs transition-colors"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Refresh
+          </button>
+          <a
+            href="/organizer"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 h-9 px-4 rounded-lg bg-[#194e42] hover:bg-[#143d34] text-white text-xs font-bold transition-all shadow-sm cursor-pointer whitespace-nowrap"
+          >
+            <ExternalLink className="w-3.5 h-3.5 text-[#b9d9bf]" /> OPEN ORGANIZER DASHBOARD
+          </a>
+        </div>
       </div>
 
       {/* Events List */}
