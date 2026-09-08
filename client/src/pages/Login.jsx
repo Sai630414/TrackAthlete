@@ -935,8 +935,8 @@ export default function Login({ initialMode }) {
             {error && <div className="login-error"><LockKeyhole size={15} /> {error}</div>}
             {successMsg && <div className="login-success" style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '10px', borderRadius: '8px', background: '#e2eee4', color: '#194e42', fontSize: '11px', border: '1px solid #b7da78' }}><CheckCircle2 size={15} /> {successMsg}</div>}
 
-            {/* Common Sign Up Fields (for non-parent and non-coach roles) */}
-            {mode === 'signup' && role !== 'parent' && role !== 'coach' && (
+            {/* Common Sign Up Fields (for non-parent, non-coach, and non-athlete roles) */}
+            {mode === 'signup' && role !== 'parent' && role !== 'coach' && role !== 'athlete' && (
               <>
                 <label>Full Name
                   <input value={name} onChange={e => setName(e.target.value)} type="text" placeholder="e.g. Rajesh Kumar" required />
