@@ -25,7 +25,7 @@ const roles = [
 export default function Login({ initialMode }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedMode = initialMode || searchParams.get('mode') || 'signin';
-  const { user, login, signup, forgotPassword, resetPassword } = useAuth();
+  const { user, login, academyLogin, signup, forgotPassword, resetPassword } = useAuth();
   const navigate = useNavigate();
 
   const validRoles = ['parent', 'athlete', 'coach', 'sponsor', 'academy'];
@@ -202,7 +202,16 @@ export default function Login({ initialMode }) {
 
     try {
       if (mode === 'signin') {
-        await login({ email: email.trim(), password, role, rememberMe });
+        if (role === 'academy') {
+          await academyLogin({
+            email: email.trim(),
+            identifier: email.trim(),
+            password,
+            rememberMe
+          });
+        } else {
+          await login({ email: email.trim(), password, role, rememberMe });
+        }
       } else if (mode === 'signup') {
         if (!agreeTerms) {
           setError('You must accept the Terms of Service & Privacy Policy to sign up.');

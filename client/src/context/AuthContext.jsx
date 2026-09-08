@@ -5,6 +5,7 @@ const AuthContext = createContext(null);
 const storageKey = 'trackathlete-session';
 const organizerStorageKey = 'trackathlete-organizer-session';
 
+
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(() => {
     try {
@@ -33,6 +34,30 @@ export function AuthProvider({ children }) {
       localStorage.setItem(storageKey, JSON.stringify(next));
       setSession(next);
       return data.user;
+    },
+    async academyLogin(credentials) {
+      const payload = {
+        email: credentials.email || credentials.identifier,
+        identifier: credentials.identifier || credentials.email,
+        password: credentials.password,
+        rememberMe: credentials.rememberMe
+      };
+      let data;
+      try {
+        const res = await api.post('/academy/login', payload);
+        data = res.data;
+      } catch (err) {
+        if (err.response?.status === 404) {
+          const res = await api.post('/auth/academy-login', payload);
+          data = res.data;
+        } else {
+          throw err;
+        }
+      }
+      const next = { token: data.token, user: { ...data.user, role: 'academy' } };
+      localStorage.setItem(storageKey, JSON.stringify(next));
+      setSession(next);
+      return next.user;
     },
     async organizerLogin(credentials) {
       const { data } = await api.post('/organizer/auth/login', credentials);
