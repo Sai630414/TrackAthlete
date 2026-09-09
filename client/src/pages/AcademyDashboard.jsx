@@ -33,6 +33,13 @@ import OrganizedEventsSection from '../components/OrganizedEventsSection';
 function resolveAcademyAchievementLevel(prof, usr) {
   if (prof?.achievementLevel && prof.achievementLevel !== 'UNRANKED') return prof.achievementLevel;
   if (usr?.achievementLevel && usr.achievementLevel !== 'UNRANKED') return usr.achievementLevel;
+  const stats = prof?.rankingStats || usr?.rankingStats;
+  if (stats) {
+    if (Number(stats.internationalPlayers) >= 1) return 'INTERNATIONAL';
+    if (Number(stats.nationalPlayers) >= 2) return 'NATIONAL';
+    if (Number(stats.statePlayers) >= 3) return 'STATE';
+    if (Number(stats.districtPlayers) >= 5) return 'DISTRICT';
+  }
   return 'UNRANKED';
 }
 
@@ -566,7 +573,7 @@ export default function AcademyDashboard() {
         <div>
           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
-              <CheckCircle2 className="w-3.5 h-3.5 text-[#2f6d5a]" /> {profile?.verified ? 'Verified Sports Academy ✓' : 'Academy verification pending'}
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#2f6d5a]" /> {profile?.verified !== false ? 'Verified Sports Academy ✓' : 'Academy verification pending'}
             </span>
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-200 border border-amber-500/40">
               <Trophy className="w-3.5 h-3.5 text-amber-300" /> {(() => {
@@ -583,7 +590,7 @@ export default function AcademyDashboard() {
           </div>
           <h1 className="text-3xl font-normal text-white flex items-center gap-2 flex-wrap" style={{ fontFamily: 'Georgia, serif' }}>
             <span>{profile?.name || user?.name || 'Sports Academy'}</span>
-            {profile?.verified && <span className="inline-flex items-center text-emerald-400 font-bold" title="Verified TrackAthlete Sports Academy">
+            {profile?.verified !== false && <span className="inline-flex items-center text-emerald-400 font-bold" title="Verified TrackAthlete Sports Academy">
               <CheckCircle2 className="w-6 h-6 fill-emerald-500/20 text-emerald-400" />
               <span className="ml-1 text-2xl font-black text-emerald-400">✓</span>
             </span>}

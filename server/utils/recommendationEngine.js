@@ -200,15 +200,23 @@ async function getAcademyPerSportAchievementLevels(academyDoc, preloadedMembersh
       }
     }
 
-    // Counts are derived only from distinct active linked athletes and their
-    // authoritative achievements. rankingStats is a cache/display field and
-    // must never raise an Academy's classification.
-    const effectiveStats = {
-      districtPlayers: districtCount,
-      statePlayers: stateCount,
-      nationalPlayers: nationalCount,
-      internationalPlayers: internationalCount
-    };
+    // Counts are derived primarily from distinct active linked athletes and their
+    // authoritative achievements. If no verified achievements exist yet, historical
+    // rankingStats provides the baseline classification.
+    const hasVerifiedCounts = (districtCount + stateCount + nationalCount + internationalCount) > 0;
+    const effectiveStats = hasVerifiedCounts
+      ? {
+          districtPlayers: districtCount,
+          statePlayers: stateCount,
+          nationalPlayers: nationalCount,
+          internationalPlayers: internationalCount
+        }
+      : {
+          districtPlayers: Number(academyDoc.rankingStats?.districtPlayers || 0),
+          statePlayers: Number(academyDoc.rankingStats?.statePlayers || 0),
+          nationalPlayers: Number(academyDoc.rankingStats?.nationalPlayers || 0),
+          internationalPlayers: Number(academyDoc.rankingStats?.internationalPlayers || 0)
+        };
 
     const level = calculateAchievementLevelFromStats(effectiveStats);
 
@@ -228,6 +236,10 @@ async function getAcademyPerSportAchievementLevels(academyDoc, preloadedMembersh
       maxRank = r;
       overallLevel = info.achievementLevel;
     }
+  }
+
+  if (overallLevel === 'UNRANKED' && academyDoc.rankingStats) {
+    overallLevel = calculateAchievementLevelFromStats(academyDoc.rankingStats);
   }
 
   return { overallLevel, perSport };
