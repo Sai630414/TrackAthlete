@@ -240,11 +240,11 @@ router.get('/my/profile', verifyToken, requireRoles('academy'), async (req, res)
     }
 
     const { getAcademyPerSportAchievementLevels } = require('../utils/recommendationEngine');
-    const { overallLevel, perSport } = await getAcademyPerSportAchievementLevels(academy);
+    const { overallLevel, overallLevelLabel, perSport } = await getAcademyPerSportAchievementLevels(academy);
 
     const serialized = serializeAcademyProfile(academy, 'academy');
     serialized.achievementLevel = overallLevel;
-    serialized.achievementLevelLabel = overallLevel !== 'UNRANKED' ? `Achievement Level: ${overallLevel}` : 'Achievement Level: UNRANKED';
+    serialized.achievementLevelLabel = overallLevelLabel;
     serialized.perSportLevels = perSport;
 
     res.json(serialized);
@@ -1294,12 +1294,10 @@ router.get('/discovery', async (req, res) => {
 
     const { getAcademyPerSportAchievementLevels } = require('../utils/recommendationEngine');
     const serialized = await Promise.all(academies.map(async academy => {
-      const { overallLevel, perSport } = await getAcademyPerSportAchievementLevels(academy);
+      const { overallLevel, overallLevelLabel, perSport } = await getAcademyPerSportAchievementLevels(academy);
       const profile = serializeAcademyProfile(academy, 'public');
       profile.achievementLevel = overallLevel;
-      profile.achievementLevelLabel = overallLevel !== 'UNRANKED'
-        ? `Achievement Level: ${overallLevel}`
-        : 'Achievement Level: UNRANKED';
+      profile.achievementLevelLabel = overallLevelLabel;
       profile.perSportLevels = perSport;
       return profile;
     }));
@@ -1329,11 +1327,11 @@ router.get('/:academyId', async (req, res) => {
     }
 
     const { getAcademyPerSportAchievementLevels } = require('../utils/recommendationEngine');
-    const { overallLevel, perSport } = await getAcademyPerSportAchievementLevels(academy);
+    const { overallLevel, overallLevelLabel, perSport } = await getAcademyPerSportAchievementLevels(academy);
 
     const serialized = serializeAcademyProfile(academy, req.user?.role || 'public');
     serialized.achievementLevel = overallLevel;
-    serialized.achievementLevelLabel = overallLevel !== 'UNRANKED' ? `Achievement Level: ${overallLevel}` : 'Achievement Level: UNRANKED';
+    serialized.achievementLevelLabel = overallLevelLabel;
     serialized.perSportLevels = perSport;
 
     res.json(serialized);

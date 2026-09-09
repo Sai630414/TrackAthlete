@@ -221,8 +221,8 @@ function serializeAcademyProfile(academyDoc, requesterRole = 'public') {
 
   const rankingStats = a.rankingStats || { districtPlayers: 0, statePlayers: 0, nationalPlayers: 0, internationalPlayers: 0 };
   // This serializer deliberately does not derive a level from rankingStats.
-  // Routes attach the authoritative membership/achievement calculation.
-  const achievementLevel = a.achievementLevel || 'UNRANKED';
+  const achievementLevel = a.achievementLevel || 'NOT YET QUALIFIED';
+  const isQualified = achievementLevel !== 'NOT YET QUALIFIED' && achievementLevel !== 'UNRANKED';
 
   const isVerified = a.verified !== false;
 
@@ -242,8 +242,8 @@ function serializeAcademyProfile(academyDoc, requesterRole = 'public') {
     sportsOffered,
     sportsTags: sportsOffered.map(name => `[ ${name} ]`),
     rankingStats,
-    achievementLevel,
-    achievementLevelLabel: achievementLevel !== 'UNRANKED' ? `Achievement Level: ${achievementLevel}` : 'Achievement Level: UNRANKED',
+    achievementLevel: isQualified ? achievementLevel : 'NOT YET QUALIFIED',
+    achievementLevelLabel: isQualified ? `Achievement Level: ${achievementLevel}` : 'Achievement Level: NOT YET QUALIFIED',
     perSportLevels: a.perSportLevels || {},
     verified: isVerified,
     isVerified: isVerified,

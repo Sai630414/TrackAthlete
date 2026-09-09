@@ -45,7 +45,7 @@ function resolveCompetitionLevel(item, event) {
  * - DISTRICT: 5+ district-level players
  */
 function calculateAchievementLevelFromStats(stats) {
-  if (!stats) return 'UNRANKED';
+  if (!stats) return 'NOT YET QUALIFIED';
   const intl = Number(stats.internationalPlayers || 0);
   const natl = Number(stats.nationalPlayers || 0);
   const state = Number(stats.statePlayers || 0);
@@ -53,10 +53,10 @@ function calculateAchievementLevelFromStats(stats) {
 
   if (intl >= ACADEMY_THRESHOLDS.INTERNATIONAL) return 'INTERNATIONAL';
   if (natl >= ACADEMY_THRESHOLDS.NATIONAL) return 'NATIONAL';
-  if (state >= ACADEMY_THRESHOLDS.STATE) return 'STATE';
+  if (state >= ACADEMY_THRESHOLDS.STATE || (state >= 2 && dist >= ACADEMY_THRESHOLDS.DISTRICT)) return 'STATE';
   if (dist >= ACADEMY_THRESHOLDS.DISTRICT) return 'DISTRICT';
 
-  return 'UNRANKED';
+  return 'NOT YET QUALIFIED';
 }
 
 module.exports = {

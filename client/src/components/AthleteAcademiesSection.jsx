@@ -235,16 +235,10 @@ export default function AthleteAcademiesSection({ athleteSport, athleteSports })
                                 {acad.academyId}
                               </span>
                             )}
-                            {acad.achievementLevel && acad.achievementLevel !== 'UNRANKED' ? (
-                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
-                                Achievement Level: {acad.achievementLevel}
-                              </span>
-                            ) : (
-                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-gray-50 text-gray-600 border border-gray-200">
-                                Achievement Level: UNRANKED
-                              </span>
-                            )}
                           </div>
+                          <p className="text-xs font-bold text-[#2f6d5a] flex items-center gap-1 mt-0.5">
+                            Verified Sports Academy
+                          </p>
                           <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
                             <MapPin className="w-3.5 h-3.5 text-[#e07050]" />
                             {acad.city || acad.address?.city || 'India'}, {acad.state || acad.address?.state || ''}
@@ -258,43 +252,25 @@ export default function AthleteAcademiesSection({ athleteSport, athleteSports })
                         </span>
                       </div>
 
-                      {/* Ranking Stats */}
-                      <div className="grid grid-cols-4 gap-1.5 mt-3 pt-3 border-t border-gray-100 text-center">
-                        <div className="bg-gray-50 p-1.5 rounded-lg">
-                          <div className="text-[10px] text-gray-500">District</div>
-                          <div className="text-xs font-bold text-gray-800">{acad.rankingStats?.districtPlayers || 0}</div>
-                        </div>
-                        <div className="bg-gray-50 p-1.5 rounded-lg">
-                          <div className="text-[10px] text-gray-500">State</div>
-                          <div className="text-xs font-bold text-gray-800">{acad.rankingStats?.statePlayers || 0}</div>
-                        </div>
-                        <div className="bg-gray-50 p-1.5 rounded-lg">
-                          <div className="text-[10px] text-gray-500">National</div>
-                          <div className="text-xs font-bold text-gray-800">{acad.rankingStats?.nationalPlayers || 0}</div>
-                        </div>
-                        <div className="bg-gray-50 p-1.5 rounded-lg">
-                          <div className="text-[10px] text-gray-500">Int'l</div>
-                          <div className="text-xs font-bold text-gray-800">{acad.rankingStats?.internationalPlayers || 0}</div>
-                        </div>
-                      </div>
-
-                      {/* Sports badges */}
-                      <div className="mt-3 flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase">Disciplines:</span>
+                      {/* Per-Sport Dynamic Achievement Levels */}
+                      <div className="mt-3 space-y-2 pt-3 border-t border-gray-100">
                         {acad.sports?.map((sp, idx) => {
-                          const sName = (typeof sp === 'string' ? sp : sp.sportName || '').toUpperCase();
-                          const isMatch = (Array.isArray(athleteSports) && athleteSports.some(as => as.toUpperCase() === sName)) || athleteSport?.toUpperCase() === sName;
+                          const spName = (typeof sp === 'string' ? sp : sp.sportName || '').toUpperCase();
+                          const spData = acad.perSportLevels?.[spName] || {};
+                          const spLevel = spData.achievementLevel || (acad.sportAchievementLevels?.[spName]) || 'NOT YET QUALIFIED';
+                          const isQualified = spLevel !== 'NOT YET QUALIFIED' && spLevel !== 'UNRANKED';
+
                           return (
-                            <span
-                              key={idx}
-                              className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase border ${
-                                isMatch
-                                  ? 'bg-[#e2eee4] text-[#194e42] border-[#2f6d5a]'
-                                  : 'bg-gray-50 text-gray-700 border-gray-200'
-                              }`}
-                            >
-                              [ {sName} ]
-                            </span>
+                            <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-gray-50 border border-gray-200">
+                              <span className="font-extrabold text-xs text-[#173235] uppercase">{spName}</span>
+                              <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border ${
+                                isQualified
+                                  ? 'bg-amber-50 text-amber-900 border-amber-300'
+                                  : 'bg-gray-100 text-gray-600 border-gray-200'
+                              }`}>
+                                Achievement Level: {isQualified ? spLevel : 'NOT YET QUALIFIED'}
+                              </span>
+                            </div>
                           );
                         })}
                       </div>

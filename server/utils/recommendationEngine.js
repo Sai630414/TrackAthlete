@@ -144,12 +144,11 @@ async function getAthleteHighestVerifiedLevelPerSport(athleteUserId, athleteId =
  */
 async function getAcademyPerSportAchievementLevels(academyDoc, preloadedMemberships = null) {
   if (!academyDoc) {
-    return { overallLevel: 'UNRANKED', perSport: {} };
+    return { overallLevel: 'NOT YET QUALIFIED', overallLevelLabel: 'Achievement Level: NOT YET QUALIFIED', perSport: {} };
   }
 
-  const academyId = academyDoc._id;
   const memberships = preloadedMemberships || await AcademyAthleteMembership.find({
-    academyId,
+    academyId: academyDoc._id,
     status: 'ACTIVE'
   }).lean();
 
@@ -166,9 +165,14 @@ async function getAcademyPerSportAchievementLevels(academyDoc, preloadedMembersh
     // Group by unique athlete identity
     const uniqueAthletesMap = new Map();
     for (const m of sportMembers) {
-      const key = m.athleteUserId ? String(m.athleteUserId) : (m.athleteId ? String(m.athleteId) : null);
+      const key = m.athleteUserId ? String(m.athleteUserId) : (m.athleteId ? String(m.athleteId) : (m.mobile || m.aadhaarHash));
       if (key && !uniqueAthletesMap.has(key)) {
-        uniqueAthletesMap.set(key, { athleteUserId: m.athleteUserId, athleteId: m.athleteId });
+        uniqueAthletesMap.set(key, {
+          athleteUserId: m.athleteUserId,
+          athleteId: m.athleteId,
+          mobile: m.mobile,
+          aadhaarHash: m.aadhaarHash
+        });
       }
     }
 
@@ -178,7 +182,22 @@ async function getAcademyPerSportAchievementLevels(academyDoc, preloadedMembersh
     let internationalCount = 0;
 
     for (const ath of uniqueAthletesMap.values()) {
-      const athAchs = await getAthleteHighestVerifiedLevelPerSport(ath.athleteUserId, ath.athleteId);
+      let athleteUserId = ath.athleteUserId;
+      let athleteId = ath.athleteId;
+
+      if (!athleteUserId && !athleteId && (ath.mobile || ath.aadhaarHash)) {
+        const User = require('../models/User');
+        const query = [];
+        if (ath.mobile) query.push({ phone: ath.mobile }, { mobile: ath.mobile });
+        if (ath.aadhaarHash) query.push({ aadhaarHash: ath.aadhaarHash });
+        const foundUser = await User.findOne({ $or: query }).select('_id athleteId').lean();
+        if (foundUser) {
+          athleteUserId = foundUser._id;
+          athleteId = foundUser.athleteId;
+        }
+      }
+
+      const athAchs = await getAthleteHighestVerifiedLevelPerSport(athleteUserId, athleteId);
       const sportAch = athAchs[sport];
       if (sportAch) {
         const r = sportAch.highestLevelRank;
@@ -200,36 +219,30 @@ async function getAcademyPerSportAchievementLevels(academyDoc, preloadedMembersh
       }
     }
 
-    // Counts are derived primarily from distinct active linked athletes and their
-    // authoritative achievements. If no verified achievements exist yet, historical
-    // rankingStats provides the baseline classification.
-    const hasVerifiedCounts = (districtCount + stateCount + nationalCount + internationalCount) > 0;
-    const effectiveStats = hasVerifiedCounts
-      ? {
-          districtPlayers: districtCount,
-          statePlayers: stateCount,
-          nationalPlayers: nationalCount,
-          internationalPlayers: internationalCount
-        }
-      : {
-          districtPlayers: Number(academyDoc.rankingStats?.districtPlayers || 0),
-          statePlayers: Number(academyDoc.rankingStats?.statePlayers || 0),
-          nationalPlayers: Number(academyDoc.rankingStats?.nationalPlayers || 0),
-          internationalPlayers: Number(academyDoc.rankingStats?.internationalPlayers || 0)
-        };
+    // STRICT: Effective stats are derived SOLELY from actual linked athletes with verified achievements.
+    // DO NOT use manually entered rankingStats as an independent source.
+    const effectiveStats = {
+      districtPlayers: districtCount,
+      statePlayers: stateCount,
+      nationalPlayers: nationalCount,
+      internationalPlayers: internationalCount
+    };
 
     const level = calculateAchievementLevelFromStats(effectiveStats);
 
     perSport[sport] = {
       sport,
       rankingStats: effectiveStats,
-      achievementLevel: level
+      achievementLevel: level,
+      achievementLevelLabel: level !== 'NOT YET QUALIFIED' && level !== 'UNRANKED'
+        ? `Achievement Level: ${level}`
+        : 'Achievement Level: NOT YET QUALIFIED'
     };
   }
 
-  // Calculate overall level as the highest level across all sports
+  // Calculate overall level as the highest qualifying level across all sports
   let maxRank = 0;
-  let overallLevel = 'UNRANKED';
+  let overallLevel = 'NOT YET QUALIFIED';
   for (const info of Object.values(perSport)) {
     const r = getCompetitionRank(info.achievementLevel);
     if (r > maxRank) {
@@ -238,11 +251,11 @@ async function getAcademyPerSportAchievementLevels(academyDoc, preloadedMembersh
     }
   }
 
-  if (overallLevel === 'UNRANKED' && academyDoc.rankingStats) {
-    overallLevel = calculateAchievementLevelFromStats(academyDoc.rankingStats);
-  }
+  const overallLevelLabel = overallLevel !== 'NOT YET QUALIFIED' && overallLevel !== 'UNRANKED'
+    ? `Achievement Level: ${overallLevel}`
+    : 'Achievement Level: NOT YET QUALIFIED';
 
-  return { overallLevel, perSport };
+  return { overallLevel, overallLevelLabel, perSport };
 }
 
 /**
@@ -283,7 +296,7 @@ async function generateAthleteRecommendations(athleteUserId) {
       const { perSport } = await getAcademyPerSportAchievementLevels(academy);
       const acadSportInfo = perSport[sport];
 
-      if (!acadSportInfo || acadSportInfo.achievementLevel === 'UNRANKED') {
+      if (!acadSportInfo || acadSportInfo.achievementLevel === 'UNRANKED' || acadSportInfo.achievementLevel === 'NOT YET QUALIFIED') {
         continue;
       }
 

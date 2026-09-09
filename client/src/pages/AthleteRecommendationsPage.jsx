@@ -283,6 +283,9 @@ export default function AthleteRecommendationsPage() {
                       <CheckCircle2 className="w-4 h-4 text-[#2f6d5a] shrink-0 inline" title="Verified TrackAthlete Sports Academy" />
                       <span className="text-xs font-bold text-[#2f6d5a]">✓</span>
                     </h3>
+                    <p className="text-xs font-bold text-[#2f6d5a] flex items-center gap-1 mt-0.5">
+                      Verified Sports Academy
+                    </p>
                     {(academy.city || academy.state) && (
                       <p className="text-xs text-[#526668] flex items-center gap-1 mt-0.5">
                         <MapPin className="w-3 h-3 text-[#2f6d5a]" />
@@ -367,7 +370,9 @@ export default function AthleteRecommendationsPage() {
                 {/* Achievement Classification */}
                 <div className="bg-[#eef5f0] border border-[#2f6d5a]/40 rounded-xl p-3.5 text-[#194e42]">
                   <div className="font-extrabold text-sm uppercase">
-                    {academyDetails.achievementLevelLabel || `Achievement Level: ${academyDetails.achievementLevel || 'VERIFIED'}`}
+                    {academyDetails.achievementLevelLabel || (academyDetails.achievementLevel && academyDetails.achievementLevel !== 'UNRANKED' && academyDetails.achievementLevel !== 'NOT YET QUALIFIED'
+                      ? `Achievement Level: ${academyDetails.achievementLevel}`
+                      : 'Achievement Level: NOT YET QUALIFIED')}
                   </div>
                   <p className="text-[11px] text-[#526668] mt-0.5">
                     Dynamic classification determined by authoritative verified athlete achievements.

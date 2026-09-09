@@ -31,16 +31,13 @@ import CoachProfileModal from '../components/CoachProfileModal';
 import OrganizedEventsSection from '../components/OrganizedEventsSection';
 
 function resolveAcademyAchievementLevel(prof, usr) {
-  if (prof?.achievementLevel && prof.achievementLevel !== 'UNRANKED') return prof.achievementLevel;
-  if (usr?.achievementLevel && usr.achievementLevel !== 'UNRANKED') return usr.achievementLevel;
-  const stats = prof?.rankingStats || usr?.rankingStats;
-  if (stats) {
-    if (Number(stats.internationalPlayers) >= 1) return 'INTERNATIONAL';
-    if (Number(stats.nationalPlayers) >= 2) return 'NATIONAL';
-    if (Number(stats.statePlayers) >= 3) return 'STATE';
-    if (Number(stats.districtPlayers) >= 5) return 'DISTRICT';
+  if (prof?.achievementLevel && prof.achievementLevel !== 'UNRANKED' && prof.achievementLevel !== 'NOT YET QUALIFIED') {
+    return prof.achievementLevel;
   }
-  return 'UNRANKED';
+  if (usr?.achievementLevel && usr.achievementLevel !== 'UNRANKED' && usr.achievementLevel !== 'NOT YET QUALIFIED') {
+    return usr.achievementLevel;
+  }
+  return 'NOT YET QUALIFIED';
 }
 
 export default function AcademyDashboard() {
@@ -578,7 +575,7 @@ export default function AcademyDashboard() {
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-200 border border-amber-500/40">
               <Trophy className="w-3.5 h-3.5 text-amber-300" /> {(() => {
                 const lvl = resolveAcademyAchievementLevel(profile, user);
-                return lvl !== 'UNRANKED' ? `Achievement Level: ${lvl}` : 'Achievement Level: UNRANKED';
+                return lvl !== 'NOT YET QUALIFIED' && lvl !== 'UNRANKED' ? `Achievement Level: ${lvl}` : 'Achievement Level: NOT YET QUALIFIED';
               })()}
             </span>
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#0f2928] text-[#b9d9bf] border border-[#2f6d5a] tracking-wider">
@@ -1496,7 +1493,7 @@ export default function AcademyDashboard() {
                 <Award className="w-4 h-4 text-amber-600" />
                 <span>{(() => {
                   const lvl = resolveAcademyAchievementLevel(profile, user);
-                  return lvl !== 'UNRANKED' ? `Achievement Level: ${lvl}` : 'Achievement Level: UNRANKED';
+                  return lvl !== 'NOT YET QUALIFIED' && lvl !== 'UNRANKED' ? `Achievement Level: ${lvl}` : 'Achievement Level: NOT YET QUALIFIED';
                 })()}</span>
               </div>
             </div>
@@ -1576,19 +1573,20 @@ export default function AcademyDashboard() {
                   {sports.map(s => {
                     const spName = (s.sportName || s).toUpperCase();
                     const spData = profile?.perSportLevels?.[spName] || profile?.perSportLevels?.[s.sportName] || {};
-                    const spLevel = spData.achievementLevel || 'UNRANKED';
-                    const spStats = spData.rankingStats || profileForm;
+                    const spLevel = spData.achievementLevel || 'NOT YET QUALIFIED';
+                    const isQualified = spLevel !== 'NOT YET QUALIFIED' && spLevel !== 'UNRANKED';
+                    const spStats = spData.rankingStats || { districtPlayers: 0, statePlayers: 0, nationalPlayers: 0, internationalPlayers: 0 };
 
                     return (
                       <div key={spName} className="p-3.5 rounded-xl border border-gray-200 bg-[#fbfdfa] flex flex-col justify-between space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-black text-[#173235] tracking-wide">[ {spName} ]</span>
                           <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border ${
-                            spLevel !== 'UNRANKED'
+                            isQualified
                               ? 'bg-amber-50 text-amber-900 border-amber-300'
                               : 'bg-gray-100 text-gray-600 border-gray-300'
                           }`}>
-                            Achievement Level: {spLevel}
+                            Achievement Level: {isQualified ? spLevel : 'NOT YET QUALIFIED'}
                           </span>
                         </div>
                         <div className="grid grid-cols-4 gap-2 text-center text-[10px] text-gray-600 bg-white p-2 rounded-lg border border-gray-100">
