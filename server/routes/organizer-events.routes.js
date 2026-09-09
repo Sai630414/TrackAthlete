@@ -781,9 +781,11 @@ router.get('/my/registrations', async (req, res) => {
 });
 router.get('/my/achievements', async (req, res) => {
   try {
-    const achievements = await OrganizerAchievement.find({ athlete: req.user._id })
+    const query = [{ athlete: req.user?._id }];
+    if (req.user?.athleteId) query.push({ athleteId: req.user.athleteId });
+    const achievements = await OrganizerAchievement.find({ $or: query })
       .populate('athlete', 'name athleteId email sport')
-      .populate('event', 'eventName eventDate venue')
+      .populate('event', 'eventName eventDate venue sports competitionLevel')
       .populate('organizer', 'name organizationName organizerId')
       .sort({ createdAt: -1 });
     res.json({ achievements });

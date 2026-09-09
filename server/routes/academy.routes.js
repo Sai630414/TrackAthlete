@@ -1119,20 +1119,25 @@ router.get('/athletes/:athleteUserId/full-portfolio', verifyToken, requireRoles(
       matchCriteria.push({ athleteId: athleteUser.athleteId });
     }
 
+    const orgCriteria = [{ athlete: athleteUser._id }];
+    if (athleteUser.athleteId) {
+      orgCriteria.push({ athleteId: athleteUser.athleteId });
+    }
+
     const federationAchievements = await OfficialAchievement.find({
       $or: matchCriteria,
       verificationStatus: { $in: ['FROZEN', 'VERIFIED'] }
     })
       .select('-aadhaarHash -athleteIdentityReference')
       .populate('federation', 'name federationId sport state officialEmail')
-      .populate('event', 'eventName eventId tournamentDate location submissionDeadline isFrozen')
+      .populate('event', 'eventName eventId tournamentDate location submissionDeadline isFrozen competitionLevel')
       .sort({ createdAt: -1 });
 
     const organizerAchievements = await OrganizerAchievement.find({
-      $or: matchCriteria
+      $or: orgCriteria
     })
       .populate('organizer', 'name organizationName organizerId mobile email officialAddress')
-      .populate('event', 'eventName eventDate venue sports')
+      .populate('event', 'eventName eventDate venue sports competitionLevel')
       .sort({ createdAt: -1 });
 
     const unifiedAchievements = serializeUnifiedAchievements(

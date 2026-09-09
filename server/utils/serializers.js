@@ -282,6 +282,7 @@ function serializeOrganizerProfile(organizerDoc, requesterRole = 'public') {
 
 function serializeUnifiedAchievements(officialAchs = [], organizerAchs = [], tournaments = [], athleteName = 'Athlete') {
   const unified = [];
+  const seenKeys = new Set();
 
   for (const ach of officialAchs) {
     const rawDate = ach.eventDate || ach.event?.tournamentDate || ach.createdAt;
@@ -292,12 +293,18 @@ function serializeUnifiedAchievements(officialAchs = [], organizerAchs = [], tou
       : (ach.rank ? `Rank ${ach.rank}` : (ach.achievementType || 'Verified Result'));
     const certData = ach.certificateData || ach.certificatePdf || null;
     const sport = (ach.sport || 'SPORTS').toUpperCase();
+    const compLevel = ach.competitionLevel || ach.event?.competitionLevel || null;
+    const achId = ach.officialRecordId || String(ach._id);
+    const dedupKey = `FEDERATION_RECOGNIZED_${achId}`;
+
+    if (seenKeys.has(dedupKey)) continue;
+    seenKeys.add(dedupKey);
 
     unified.push({
       _id: String(ach._id),
-      achievementId: ach.officialRecordId || String(ach._id),
-      sourceType: 'FEDERATION',
-      sourceLabel: 'FEDERATION RECOGNIZED',
+      achievementId: achId,
+      sourceType: 'FEDERATION_RECOGNIZED',
+      sourceLabel: '[FEDERATION RECOGNIZED]',
       isVerified: true,
       sport,
       sportsTag: `[ ${sport} ]`,
@@ -305,11 +312,14 @@ function serializeUnifiedAchievements(officialAchs = [], organizerAchs = [], tou
       eventName: title,
       title,
       result,
+      resultType: ach.medal ? 'medals' : 'positions',
+      resultValue: ach.medal || ach.rank || ach.position || result,
       outcome: result,
       medal: ach.medal || null,
       rank: ach.rank || null,
       position: ach.position || ach.rank || (ach.medal ? `${ach.medal} Medal` : null),
       category: ach.category || '',
+      competitionLevel: compLevel,
       isTeam: Boolean(ach.teamName || ach.isTeam),
       teamName: ach.teamName || null,
       eventDate: rawDate,
@@ -319,26 +329,34 @@ function serializeUnifiedAchievements(officialAchs = [], organizerAchs = [], tou
       organization: ach.federation?.name || 'Recognized Sports Federation',
       venue: ach.event?.location || '',
       hasCertificate: Boolean(certData),
+      certificate: certData,
       certificateFileName: ach.certificateFileName || `${athleteName}_Federation_Certificate.pdf`,
       certificateFileSize: ach.certificateFileSize || 0,
       certificateData: certData,
-      verificationStatus: ach.verificationStatus || 'VERIFIED'
+      verificationStatus: ach.verificationStatus || 'VERIFIED',
+      eventId: ach.event?._id ? String(ach.event._id) : (ach.event?.eventId || null)
     });
   }
 
   for (const ach of organizerAchs) {
     const rawDate = ach.event?.eventDate || ach.createdAt;
     const year = rawDate ? new Date(rawDate).getFullYear() : '';
-    const title = ach.event?.eventName || 'Organizer Tournament';
+    const title = ach.event?.eventName || ach.tournamentName || 'Organizer Tournament';
     const result = ach.outcome || (ach.medal ? `${ach.medal} Medal` : (ach.position ? `${ach.position} Place` : 'Verified Podium'));
     const certData = ach.certificateData || null;
     const sport = (ach.sportName || ach.sport || 'SPORTS').toUpperCase();
+    const compLevel = ach.competitionLevel || ach.event?.competitionLevel || null;
+    const achId = String(ach._id);
+    const dedupKey = `ORGANIZER_VERIFIED_${achId}`;
+
+    if (seenKeys.has(dedupKey)) continue;
+    seenKeys.add(dedupKey);
 
     unified.push({
-      _id: String(ach._id),
-      achievementId: String(ach._id),
-      sourceType: 'ORGANIZER',
-      sourceLabel: 'ORGANIZER VERIFIED',
+      _id: achId,
+      achievementId: achId,
+      sourceType: 'ORGANIZER_VERIFIED',
+      sourceLabel: '[ORGANIZER VERIFIED]',
       isVerified: true,
       sport,
       sportsTag: `[ ${sport} ]`,
@@ -346,10 +364,13 @@ function serializeUnifiedAchievements(officialAchs = [], organizerAchs = [], tou
       eventName: title,
       title,
       result,
+      resultType: ach.medal ? 'medals' : 'positions',
+      resultValue: ach.medal || ach.position || ach.outcome || result,
       outcome: result,
       medal: ach.medal || null,
       position: ach.position || null,
       category: '',
+      competitionLevel: compLevel,
       isTeam: Boolean(ach.isTeam || ach.teamName),
       teamName: ach.teamName || null,
       eventDate: rawDate,
@@ -359,10 +380,12 @@ function serializeUnifiedAchievements(officialAchs = [], organizerAchs = [], tou
       organization: ach.organizer?.organizationName || ach.organizer?.name || 'Verified Event Organizer',
       venue: ach.event?.venue || '',
       hasCertificate: Boolean(certData),
+      certificate: certData,
       certificateFileName: ach.certificateFileName || `${athleteName}_Organizer_Certificate.pdf`,
       certificateFileSize: ach.certificateFileSize || 0,
       certificateData: certData,
-      verificationStatus: 'ORGANIZER_VERIFIED'
+      verificationStatus: 'ORGANIZER_VERIFIED',
+      eventId: ach.event?._id ? String(ach.event._id) : null
     });
   }
 
@@ -374,12 +397,17 @@ function serializeUnifiedAchievements(officialAchs = [], organizerAchs = [], tou
       const result = t.position || 'Participant';
       const certData = t.certificateData || null;
       const sport = (t.sport || 'SPORTS').toUpperCase();
+      const achId = String(t._id || `self_${idx}`);
+      const dedupKey = `SELF_UPLOADED_${achId}`;
+
+      if (seenKeys.has(dedupKey)) return;
+      seenKeys.add(dedupKey);
 
       unified.push({
-        _id: String(t._id || `self_${idx}`),
-        achievementId: String(t._id || `self_${idx}`),
+        _id: achId,
+        achievementId: achId,
         sourceType: 'SELF_UPLOADED',
-        sourceLabel: 'SELF-UPLOADED',
+        sourceLabel: '[SELF-UPLOADED — NOT VERIFIED]',
         isVerified: false,
         sport,
         sportsTag: `[ ${sport} ]`,
@@ -387,10 +415,13 @@ function serializeUnifiedAchievements(officialAchs = [], organizerAchs = [], tou
         eventName: title,
         title,
         result,
+        resultType: 'positions',
+        resultValue: t.position || result,
         outcome: result,
         medal: null,
         position: t.position || null,
         category: t.category || '',
+        competitionLevel: t.competitionLevel || null,
         isTeam: false,
         teamName: null,
         eventDate: rawDate,
@@ -400,10 +431,12 @@ function serializeUnifiedAchievements(officialAchs = [], organizerAchs = [], tou
         organization: 'Self-Declared Record',
         venue: '',
         hasCertificate: Boolean(certData),
+        certificate: certData,
         certificateFileName: t.certificateFileName || `${athleteName}_Tournament_Certificate.pdf`,
         certificateFileSize: t.certificateFileSize || 0,
         certificateData: certData,
-        verificationStatus: 'SELF_DECLARED'
+        verificationStatus: 'SELF_DECLARED',
+        eventId: null
       });
     });
   }

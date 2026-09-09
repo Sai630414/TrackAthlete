@@ -1107,7 +1107,7 @@ export default function AthleteDashboard() {
         <TabsContent value="achievements" className="space-y-6">
           <ErrorBoundary title="Failed to load Achievements Timeline">
             <AthleteAchievementsTimeline
-              athleteUserId={user?._id}
+              athleteUserId={user?._id || user?.athleteId}
               athleteName={profile.name || user?.name}
               isOwner={true}
             />

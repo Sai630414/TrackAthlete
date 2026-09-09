@@ -463,14 +463,23 @@ router.post('/events/:id/results/:sportId/freeze', async (req, res) => {
     }
 
     // Secure Athlete Matching & Achievement Awarding
+    const objectIds = [];
     const hashes = [];
     const athleteIds = [];
     const emails = [];
+    const mobiles = [];
 
     const gather = (p) => {
+      if (!p) return;
+      if (p.athlete && mongoose.isValidObjectId(p.athlete)) objectIds.push(new mongoose.Types.ObjectId(p.athlete));
       if (p.aadhaarHash) hashes.push(p.aadhaarHash);
-      if (p.athleteId) athleteIds.push(p.athleteId);
-      if (p.email) emails.push(p.email.toLowerCase());
+      if (p.athleteId && String(p.athleteId).trim()) athleteIds.push(String(p.athleteId).trim());
+      if (p.trackAthleteId && String(p.trackAthleteId).trim()) athleteIds.push(String(p.trackAthleteId).trim());
+      if (p.email && String(p.email).trim()) emails.push(String(p.email).toLowerCase().trim());
+      if (p.mobile && String(p.mobile).trim()) {
+        const cl = String(p.mobile).replace(/\D/g, '');
+        if (cl.length >= 10) mobiles.push(cl.slice(-10));
+      }
     };
 
     for (const entry of result.entries) {
@@ -482,25 +491,55 @@ router.post('/events/:id/results/:sportId/freeze', async (req, res) => {
     }
 
     const matchQueries = [];
+    if (objectIds.length) matchQueries.push({ _id: { $in: objectIds } });
     if (hashes.length) matchQueries.push({ aadhaarHash: { $in: hashes } });
-    if (athleteIds.length) matchQueries.push({ athleteId: { $in: athleteIds } });
+    if (athleteIds.length) {
+      matchQueries.push({ athleteId: { $in: athleteIds } });
+      matchQueries.push({ trackAthleteId: { $in: athleteIds } });
+    }
     if (emails.length) matchQueries.push({ email: { $in: emails } });
+    if (mobiles.length) {
+      const mobRegexes = mobiles.map(m => new RegExp(m + '$'));
+      matchQueries.push({ mobile: { $in: mobRegexes } });
+      matchQueries.push({ phone: { $in: mobRegexes } });
+    }
 
     let matchedAthletes = [];
     if (matchQueries.length) {
-      matchedAthletes = await User.find({ role: 'athlete', $or: matchQueries }).select('_id name athleteId email aadhaarHash');
+      matchedAthletes = await User.find({ role: 'athlete', $or: matchQueries })
+        .select('_id name athleteId trackAthleteId email mobile phone aadhaarHash');
     }
 
+    const athleteByObjectId = new Map(matchedAthletes.map(a => [String(a._id), a]));
     const athleteByHash = new Map(matchedAthletes.filter(a => a.aadhaarHash).map(a => [a.aadhaarHash, a]));
-    const athleteById = new Map(matchedAthletes.filter(a => a.athleteId).map(a => [a.athleteId, a]));
-    const athleteByEmail = new Map(matchedAthletes.filter(a => a.email).map(a => [a.email.toLowerCase(), a]));
+    const athleteById = new Map();
+    for (const a of matchedAthletes) {
+      if (a.athleteId) athleteById.set(a.athleteId.trim().toUpperCase(), a);
+      if (a.trackAthleteId) athleteById.set(a.trackAthleteId.trim().toUpperCase(), a);
+    }
+    const athleteByEmail = new Map(matchedAthletes.filter(a => a.email).map(a => [a.email.toLowerCase().trim(), a]));
+    const athleteByMobile = new Map();
+    for (const a of matchedAthletes) {
+      const m = String(a.mobile || a.phone || '').replace(/\D/g, '');
+      if (m.length >= 10) athleteByMobile.set(m.slice(-10), a);
+    }
 
     const findMatch = (p) => {
+      if (!p) return null;
+      if (p.athlete && athleteByObjectId.has(String(p.athlete))) return athleteByObjectId.get(String(p.athlete));
+      if (p.athleteId && athleteById.has(String(p.athleteId).trim().toUpperCase())) return athleteById.get(String(p.athleteId).trim().toUpperCase());
+      if (p.trackAthleteId && athleteById.has(String(p.trackAthleteId).trim().toUpperCase())) return athleteById.get(String(p.trackAthleteId).trim().toUpperCase());
       if (p.aadhaarHash && athleteByHash.has(p.aadhaarHash)) return athleteByHash.get(p.aadhaarHash);
-      if (p.athleteId && athleteById.has(p.athleteId)) return athleteById.get(p.athleteId);
-      if (p.email && athleteByEmail.has(p.email.toLowerCase())) return athleteByEmail.get(p.email.toLowerCase());
+      if (p.email && athleteByEmail.has(String(p.email).toLowerCase().trim())) return athleteByEmail.get(String(p.email).toLowerCase().trim());
+      if (p.mobile) {
+        const cl = String(p.mobile).replace(/\D/g, '');
+        if (cl.length >= 10 && athleteByMobile.has(cl.slice(-10))) return athleteByMobile.get(cl.slice(-10));
+      }
       return null;
     };
+
+    // Clean up any existing achievements for this sport result before re-freezing to ensure 100% duplicate prevention (Rules 17 & 18)
+    await OrganizerAchievement.deleteMany({ result: result._id });
 
     let matchedCount = 0;
     const matchedAthleteUserIds = new Set();
@@ -515,32 +554,29 @@ router.post('/events/:id/results/:sportId/freeze', async (req, res) => {
             matchedAthleteUserIds.add(String(matched._id));
             member.participantType = 'registered';
             member.athlete = matched._id;
-            member.athleteId = matched.athleteId;
+            member.athleteId = matched.athleteId || matched.trackAthleteId;
 
-            await OrganizerAchievement.findOneAndUpdate(
-              { athlete: matched._id, result: result._id, outcome: entry.outcome },
-              {
-                $set: {
-                  athlete: matched._id,
-                  organizer: req.user._id,
-                  event: event._id,
-                  result: result._id,
-                  sportConfigId: sport._id,
-                  sportName: sport.sportName,
-                  competitionLevel: eventCompLevel,
-                  team: entry.team || undefined,
-                  teamName: entry.teamName,
-                  position: entry.position,
-                  medal: entry.medal,
-                  outcome: entry.outcome,
-                  achievementType: 'Organizer Verified',
-                  certificateData: member.certificateData,
-                  certificateFileName: member.certificateFileName || `${member.name}_Certificate.pdf`,
-                  certificateFileSize: member.certificateFileSize || 0
-                }
-              },
-              { upsert: true, new: true }
-            );
+            await OrganizerAchievement.create({
+              athlete: matched._id,
+              athleteId: matched.athleteId || matched.trackAthleteId || undefined,
+              organizer: req.user._id,
+              event: event._id,
+              result: result._id,
+              sportConfigId: sport._id,
+              sportName: sport.sportName,
+              competitionLevel: eventCompLevel,
+              team: entry.team || undefined,
+              teamName: entry.teamName,
+              position: entry.position,
+              medal: entry.medal,
+              outcome: entry.outcome,
+              achievementType: 'Organizer Verified',
+              sourceType: 'ORGANIZER_VERIFIED',
+              sourceLabel: '[ORGANIZER VERIFIED]',
+              certificateData: member.certificateData,
+              certificateFileName: member.certificateFileName || `${member.name}_Certificate.pdf`,
+              certificateFileSize: member.certificateFileSize || 0
+            });
           } else {
             member.participantType = 'offline';
             member.athlete = undefined;
@@ -554,30 +590,27 @@ router.post('/events/:id/results/:sportId/freeze', async (req, res) => {
           matchedAthleteUserIds.add(String(matched._id));
           entry.participantType = 'registered';
           entry.athlete = matched._id;
-          entry.athleteId = matched.athleteId;
+          entry.athleteId = matched.athleteId || matched.trackAthleteId;
 
-          await OrganizerAchievement.findOneAndUpdate(
-            { athlete: matched._id, result: result._id, outcome: entry.outcome },
-            {
-              $set: {
-                athlete: matched._id,
-                organizer: req.user._id,
-                event: event._id,
-                result: result._id,
-                sportConfigId: sport._id,
-                sportName: sport.sportName,
-                competitionLevel: eventCompLevel,
-                position: entry.position,
-                medal: entry.medal,
-                outcome: entry.outcome,
-                achievementType: 'Organizer Verified',
-                certificateData: entry.certificateData,
-                certificateFileName: entry.certificateFileName || `${entry.name}_Certificate.pdf`,
-                certificateFileSize: entry.certificateFileSize || 0
-              }
-            },
-            { upsert: true, new: true }
-          );
+          await OrganizerAchievement.create({
+            athlete: matched._id,
+            athleteId: matched.athleteId || matched.trackAthleteId || undefined,
+            organizer: req.user._id,
+            event: event._id,
+            result: result._id,
+            sportConfigId: sport._id,
+            sportName: sport.sportName,
+            competitionLevel: eventCompLevel,
+            position: entry.position,
+            medal: entry.medal,
+            outcome: entry.outcome,
+            achievementType: 'Organizer Verified',
+            sourceType: 'ORGANIZER_VERIFIED',
+            sourceLabel: '[ORGANIZER VERIFIED]',
+            certificateData: entry.certificateData,
+            certificateFileName: entry.certificateFileName || `${entry.name}_Certificate.pdf`,
+            certificateFileSize: entry.certificateFileSize || 0
+          });
         } else {
           entry.participantType = 'offline';
           entry.athlete = undefined;

@@ -71,13 +71,27 @@ export default function AthleteAchievementsTimeline({
   });
 
   const fetchAchievements = useCallback(async () => {
-    if (!athleteUserId) return;
+    if (!athleteUserId || athleteUserId === 'undefined') {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
       const res = await api.get(`/athlete/${athleteUserId}/achievements`);
-      setAchievements(res.data.achievements || []);
-      setCounts(res.data.counts || { total: 0, federation: 0, organizer: 0, selfUploaded: 0 });
+      const achList = res.data.achievements || [];
+      setAchievements(achList);
+
+      const fedCount = achList.filter(a => a.sourceType === 'FEDERATION_RECOGNIZED' || a.sourceType === 'FEDERATION').length;
+      const orgCount = achList.filter(a => a.sourceType === 'ORGANIZER_VERIFIED' || a.sourceType === 'ORGANIZER').length;
+      const selfCount = achList.filter(a => a.sourceType === 'SELF_UPLOADED').length;
+
+      setCounts({
+        total: res.data.counts?.total ?? achList.length,
+        federation: res.data.counts?.federation ?? fedCount,
+        organizer: res.data.counts?.organizer ?? orgCount,
+        selfUploaded: res.data.counts?.selfUploaded ?? selfCount
+      });
     } catch (err) {
       console.error('Error fetching unified achievements:', err);
       setError(err.response?.data?.error || err.message || 'Failed to load achievements');
@@ -163,66 +177,78 @@ export default function AthleteAchievementsTimeline({
 
   const filtered = sourceFilter === 'ALL'
     ? achievements
-    : achievements.filter(a => a.sourceType === sourceFilter);
+    : achievements.filter(a => {
+        const s = (a.sourceType || '').toUpperCase();
+        const f = sourceFilter.toUpperCase();
+        if (f === 'FEDERATION' || f === 'FEDERATION_RECOGNIZED') {
+          return s === 'FEDERATION' || s === 'FEDERATION_RECOGNIZED';
+        }
+        if (f === 'ORGANIZER' || f === 'ORGANIZER_VERIFIED') {
+          return s === 'ORGANIZER' || s === 'ORGANIZER_VERIFIED';
+        }
+        if (f === 'SELF_UPLOADED') {
+          return s === 'SELF_UPLOADED';
+        }
+        return s === f;
+      });
 
   const getSourceBadge = (sourceType) => {
-    switch (sourceType) {
-      case 'FEDERATION':
-        return (
-          <span style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 5,
-            padding: '3px 10px',
-            borderRadius: 20,
-            background: '#e2eee4',
-            color: '#194e42',
-            border: '1px solid #2f6d5a',
-            fontSize: 11,
-            fontWeight: 800,
-            letterSpacing: '0.03em'
-          }}>
-            <Shield size={12} color="#194e42" /> FEDERATION RECOGNIZED
-          </span>
-        );
-      case 'ORGANIZER':
-        return (
-          <span style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 5,
-            padding: '3px 10px',
-            borderRadius: 20,
-            background: '#eef2ff',
-            color: '#2d3748',
-            border: '1px solid #94a3b8',
-            fontSize: 11,
-            fontWeight: 800,
-            letterSpacing: '0.03em'
-          }}>
-            <Award size={12} color="#4338ca" /> ORGANIZER VERIFIED
-          </span>
-        );
-      case 'SELF_UPLOADED':
-      default:
-        return (
-          <span style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 5,
-            padding: '3px 10px',
-            borderRadius: 20,
-            background: '#fef9e7',
-            color: '#9a6c00',
-            border: '1px solid #f0d060',
-            fontSize: 11,
-            fontWeight: 800,
-            letterSpacing: '0.03em'
-          }}>
-            <FileText size={12} color="#9a6c00" /> SELF-UPLOADED
-          </span>
-        );
+    const s = (sourceType || '').toUpperCase();
+    if (s === 'FEDERATION' || s === 'FEDERATION_RECOGNIZED') {
+      return (
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 5,
+          padding: '3px 10px',
+          borderRadius: 20,
+          background: '#e2eee4',
+          color: '#194e42',
+          border: '1px solid #2f6d5a',
+          fontSize: 11,
+          fontWeight: 800,
+          letterSpacing: '0.03em'
+        }}>
+          <Shield size={12} color="#194e42" /> [FEDERATION RECOGNIZED]
+        </span>
+      );
     }
+    if (s === 'ORGANIZER' || s === 'ORGANIZER_VERIFIED') {
+      return (
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 5,
+          padding: '3px 10px',
+          borderRadius: 20,
+          background: '#eef2ff',
+          color: '#2d3748',
+          border: '1px solid #94a3b8',
+          fontSize: 11,
+          fontWeight: 800,
+          letterSpacing: '0.03em'
+        }}>
+          <Award size={12} color="#4338ca" /> [ORGANIZER VERIFIED]
+        </span>
+      );
+    }
+    return (
+      <span style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 5,
+        padding: '3px 10px',
+        borderRadius: 20,
+        background: '#fef9e7',
+        color: '#9a6c00',
+        border: '1px solid #f0d060',
+        fontSize: 11,
+        fontWeight: 800,
+        letterSpacing: '0.03em'
+      }}>
+        <FileText size={12} color="#9a6c00" /> [SELF-UPLOADED — NOT VERIFIED]
+      </span>
+    );
   };
 
   return (
@@ -303,10 +329,10 @@ export default function AthleteAchievementsTimeline({
           border: '1px solid #d8ded5'
         }}>
           {[
-            { key: 'ALL', label: `[ ALL (${counts.total}) ]` },
-            { key: 'FEDERATION', label: `[ FEDERATION RECOGNIZED (${counts.federation}) ]` },
-            { key: 'ORGANIZER', label: `[ ORGANIZER VERIFIED (${counts.organizer}) ]` },
-            { key: 'SELF_UPLOADED', label: `[ SELF-UPLOADED (${counts.selfUploaded}) ]` }
+            { key: 'ALL', label: `[ ALL (${counts.total || achievements.length}) ]` },
+            { key: 'FEDERATION_RECOGNIZED', label: `[ FEDERATION RECOGNIZED (${counts.federation || 0}) ]` },
+            { key: 'ORGANIZER_VERIFIED', label: `[ ORGANIZER VERIFIED (${counts.organizer || 0}) ]` },
+            { key: 'SELF_UPLOADED', label: `[ SELF-UPLOADED (${counts.selfUploaded || 0}) ]` }
           ].map(tab => (
             <button
               key={tab.key}
@@ -361,9 +387,9 @@ export default function AthleteAchievementsTimeline({
           <div style={{ fontSize: 15, fontWeight: 800, color: '#173235' }}>
             {sourceFilter === 'ALL'
               ? 'No Achievements Recorded Yet'
-              : sourceFilter === 'FEDERATION'
+              : (sourceFilter === 'FEDERATION' || sourceFilter === 'FEDERATION_RECOGNIZED')
               ? 'No Federation Recognized Achievements'
-              : sourceFilter === 'ORGANIZER'
+              : (sourceFilter === 'ORGANIZER' || sourceFilter === 'ORGANIZER_VERIFIED')
               ? 'No Organizer Verified Achievements'
               : 'No Self-Uploaded Achievements'}
           </div>
