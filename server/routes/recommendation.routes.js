@@ -16,10 +16,18 @@ const {
  */
 router.get('/', verifyToken, requireRoles('athlete'), async (req, res) => {
   try {
-    const recommendations = await Recommendation.find({ athleteId: req.user._id })
+    let recommendations = await Recommendation.find({ athleteId: req.user._id })
       .populate('academyId')
       .sort({ createdAt: -1 })
       .lean();
+
+    if (recommendations.length === 0) {
+      await generateAthleteRecommendations(req.user._id);
+      recommendations = await Recommendation.find({ athleteId: req.user._id })
+        .populate('academyId')
+        .sort({ createdAt: -1 })
+        .lean();
+    }
 
     const formatted = await Promise.all(recommendations.map(async rec => {
       const academyData = rec.academyId ? serializeAcademyProfile(rec.academyId, 'athlete') : null;
@@ -62,10 +70,20 @@ router.get('/', verifyToken, requireRoles('athlete'), async (req, res) => {
  */
 router.get('/unread-count', verifyToken, requireRoles('athlete'), async (req, res) => {
   try {
-    const count = await Recommendation.countDocuments({
+    let count = await Recommendation.countDocuments({
       athleteId: req.user._id,
       status: 'UNREAD'
     });
+    if (count === 0) {
+      const totalRecs = await Recommendation.countDocuments({ athleteId: req.user._id });
+      if (totalRecs === 0) {
+        await generateAthleteRecommendations(req.user._id);
+        count = await Recommendation.countDocuments({
+          athleteId: req.user._id,
+          status: 'UNREAD'
+        });
+      }
+    }
     res.json({ count });
   } catch (err) {
     console.error('Error counting unread recommendations:', err);

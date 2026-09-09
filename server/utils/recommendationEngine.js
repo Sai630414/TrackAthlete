@@ -45,7 +45,7 @@ async function getAthleteHighestVerifiedLevelPerSport(athleteUserId, athleteId =
 
   const userObjId = typeof athleteUserId === 'string' ? new mongoose.Types.ObjectId(athleteUserId) : athleteUserId;
 
-  // 1. Authoritative Federation Recognized Achievements
+  // 1. Authoritative Federation Recognized Achievements ONLY
   const officialQuery = {
     $or: [
       { athleteUserId: userObjId },
@@ -58,21 +58,9 @@ async function getAthleteHighestVerifiedLevelPerSport(athleteUserId, athleteId =
     .populate('event')
     .lean();
 
-  // 2. Authoritative Organizer Verified Achievements
-  const organizerQuery = {
-    $or: [
-      { athlete: userObjId },
-      ...(athleteId ? [{ athleteId: String(athleteId).trim() }] : [])
-    ]
-  };
-
-  const organizerAchs = await OrganizerAchievement.find(organizerQuery)
-    .populate('event')
-    .lean();
-
   const perSport = {};
 
-  // Process Federation achievements
+  // Process Federation achievements ONLY
   for (const ach of officialAchs) {
     const sport = normalizeSport(ach.sport || ach.event?.sport);
     if (!sport) continue;
@@ -100,38 +88,6 @@ async function getAthleteHighestVerifiedLevelPerSport(athleteUserId, athleteId =
         tournamentName: ach.tournamentName || ach.event?.eventName || 'Official Federation Tournament',
         sourceType: 'FEDERATION_RECOGNIZED',
         sourceAchievementId: ach.officialRecordId || String(ach._id)
-      };
-    }
-  }
-
-  // Process Organizer Verified achievements
-  for (const ach of organizerAchs) {
-    const sport = normalizeSport(ach.sportName || ach.event?.sports?.[0]?.sportName);
-    if (!sport) continue;
-
-    const compLevel = resolveCompetitionLevel(ach, ach.event);
-    if (!compLevel) continue;
-
-    const rank = getCompetitionRank(compLevel);
-    if (!rank) continue;
-
-    const outcome = ach.medal || (ach.position ? `Position ${ach.position}` : (ach.outcome || 'Verified'));
-    const medalPriority = getMedalPriority(ach.medal);
-
-    if (
-      !perSport[sport] ||
-      rank > perSport[sport].highestLevelRank ||
-      (rank === perSport[sport].highestLevelRank && medalPriority > perSport[sport].medalPriority)
-    ) {
-      perSport[sport] = {
-        sport,
-        highestLevel: compLevel,
-        highestLevelRank: rank,
-        outcome: String(outcome).toUpperCase(),
-        medalPriority,
-        tournamentName: ach.event?.eventName || 'Organizer Tournament',
-        sourceType: 'ORGANIZER_VERIFIED',
-        sourceAchievementId: String(ach._id)
       };
     }
   }
@@ -315,7 +271,7 @@ async function generateAthleteRecommendations(athleteUserId) {
           athleteAchievementLevel: athLevel,
           academyAchievementLevel: acadLevel,
           basedOnAchievementId: athSportInfo.sourceAchievementId,
-          basedOnAchievementSource: athSportInfo.sourceType === 'ORGANIZER_VERIFIED' ? 'ORGANIZER' : 'FEDERATION',
+          basedOnAchievementSource: 'FEDERATION',
           reason
         });
       }
@@ -348,9 +304,23 @@ async function generateAthleteRecommendations(athleteUserId) {
         await existing.save();
       }
     } else {
-      await Recommendation.create({
-        ...validData,
-        status: 'UNREAD'
+      await Recommendation.findOneAndUpdate(
+        { athleteId: validData.athleteId, academyId: validData.academyId, sport: validData.sport },
+        {
+          $set: {
+            athleteAchievementLevel: validData.athleteAchievementLevel,
+            academyAchievementLevel: validData.academyAchievementLevel,
+            reason: validData.reason,
+            basedOnAchievementId: validData.basedOnAchievementId,
+            basedOnAchievementSource: validData.basedOnAchievementSource
+          },
+          $setOnInsert: {
+            status: 'UNREAD'
+          }
+        },
+        { upsert: true, new: true }
+      ).catch(e => {
+        if (!e.message.includes('E11000')) throw e;
       });
     }
   }

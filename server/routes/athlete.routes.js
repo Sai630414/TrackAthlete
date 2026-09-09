@@ -33,17 +33,23 @@ async function findAthleteUser(id) {
 
 async function linkHistoricalAchievements(user) {
   if (user.role !== 'athlete') return;
+  let linked = false;
   if (user.aadhaarHash) {
-    await OfficialAchievement.updateMany(
+    const res = await OfficialAchievement.updateMany(
       { aadhaarHash: user.aadhaarHash, athleteUserId: { $ne: user._id } },
       { $set: { athleteUserId: user._id, athleteId: user.athleteId } }
     ).catch(e => console.error('Historical federation achievement link error:', e.message));
+    if (res?.modifiedCount > 0) linked = true;
   }
   if (user.athleteId) {
     await OrganizerAchievement.updateMany(
       { athleteId: user.athleteId, athlete: { $ne: user._id } },
       { $set: { athlete: user._id } }
     ).catch(e => console.error('Historical organizer achievement link error:', e.message));
+  }
+  if (linked) {
+    const { generateAthleteRecommendations } = require('../utils/recommendationEngine');
+    await generateAthleteRecommendations(user._id).catch(() => {});
   }
 }
 

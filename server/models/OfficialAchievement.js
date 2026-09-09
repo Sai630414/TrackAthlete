@@ -43,6 +43,19 @@ OfficialAchievementSchema.pre('save', function (next) {
   next();
 });
 
+OfficialAchievementSchema.post('save', function (doc) {
+  if (doc.athleteUserId) {
+    try {
+      const { generateAthleteRecommendations } = require('../utils/recommendationEngine');
+      generateAthleteRecommendations(doc.athleteUserId).catch(err => {
+        console.error('Error recalculating recommendations in OfficialAchievement post-save:', err.message);
+      });
+    } catch (e) {
+      // Ignore background errors
+    }
+  }
+});
+
 OfficialAchievementSchema.set('toJSON', {
   transform: (_doc, value) => {
     delete value.aadhaarHash;
