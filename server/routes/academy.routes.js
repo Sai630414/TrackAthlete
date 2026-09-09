@@ -1259,7 +1259,7 @@ router.get('/coaches/:coachUserId/full-profile', verifyToken, requireRoles('acad
  * GET /api/academy/discovery
  * Discover academies filtered by sport, city, search term, or coordinates
  */
-router.get('/discovery', async (req, res) => {
+router.get(['/discovery', '/discover'], async (req, res) => {
   try {
     const { sport, sports, city, search, lat, lng } = req.query;
     const filter = {};
