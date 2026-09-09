@@ -10,6 +10,7 @@ const {
   serializeCoachProfile,
   serializeUnifiedAchievements
 } = require('../utils/serializers');
+const { getAthleteHighestVerifiedLevelPerSport } = require('../utils/recommendationEngine');
 
 const mongoose = require('mongoose');
 
@@ -107,6 +108,20 @@ router.get('/:id/profile', async (req, res) => {
     ]);
 
     serialized.unifiedAchievements = serializeUnifiedAchievements(officialAchs, organizerAchs, user.tournaments || [], user.name);
+    const highestVerifiedBySport = await getAthleteHighestVerifiedLevelPerSport(user._id, user.athleteId);
+    serialized.perSportHighestVerifiedAchievement = Object.values(highestVerifiedBySport).map(item => ({
+      sport: item.sport,
+      level: item.highestLevel,
+      outcome: item.outcome,
+      sourceType: item.sourceType,
+      sourceAchievementId: item.sourceAchievementId
+    }));
+    serialized.highestVerifiedAchievement = serialized.perSportHighestVerifiedAchievement.length
+      ? serialized.perSportHighestVerifiedAchievement.reduce((highest, item) => {
+          const ranks = { DISTRICT: 1, STATE: 2, NATIONAL: 3, INTERNATIONAL: 4 };
+          return !highest || ranks[item.level] > ranks[highest.level] ? item : highest;
+        }, null)
+      : null;
     res.json(serialized);
   } catch (err) {
     res.status(500).json({ error: err.message });

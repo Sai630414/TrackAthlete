@@ -562,6 +562,9 @@ export default function AthleteDashboard() {
       if (unreadRecsRes?.data?.count !== undefined) setUnreadRecCount(unreadRecsRes.data.count);
       if (profileRes.data) {
         const d = profileRes.data;
+        if ((!summaryRes?.data || !Array.isArray(summaryRes.data)) && Array.isArray(d.perSportHighestVerifiedAchievement)) {
+          setVerifiedSummary(d.perSportHighestVerifiedAchievement);
+        }
         const dSports = Array.isArray(d.sports) && d.sports.length > 0 ? d.sports : (d.sport ? [d.sport] : []);
         setProfile(prev => ({
           ...prev,
@@ -776,19 +779,19 @@ export default function AthleteDashboard() {
             </span>
           </div>
 
-          {verifiedSummary.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5 pt-1">
-              <span className="text-xs font-semibold text-[#b9d9bf]">Highest Verified:</span>
-              {verifiedSummary.map((vs, idx) => (
-                <span key={idx} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold uppercase bg-[#2f6d5a] text-[#e2eee4] border border-[#488e78]">
-                  <span>[{vs.sport}]</span>
-                  <span className="text-[#ffd0b0]">[{vs.level}]</span>
-                  <span>·</span>
-                  <span className="text-white">{vs.outcome}</span>
-                </span>
-              ))}
-            </div>
-          )}
+          <div className="flex flex-wrap items-center gap-1.5 pt-1" aria-label="Highest Verified Achievement">
+            <span className="text-xs font-semibold text-[#b9d9bf]">HIGHEST VERIFIED ACHIEVEMENT:</span>
+            {verifiedSummary.length > 0 ? verifiedSummary.map((vs, idx) => (
+              <span key={idx} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold uppercase bg-[#2f6d5a] text-[#e2eee4] border border-[#488e78]">
+                <span>[{vs.sport}]</span>
+                <span className="text-[#ffd0b0]">[{vs.level}]</span>
+                <span>·</span>
+                <span className="text-white">{vs.outcome}</span>
+              </span>
+            )) : (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-extrabold uppercase bg-white/10 text-[#c5d3ce] border border-white/25">NOT YET VERIFIED</span>
+            )}
+          </div>
         </div>
 
         <div className="flex shrink-0">
