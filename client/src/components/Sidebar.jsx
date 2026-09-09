@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { Building2, ChevronRight, HeartHandshake, LayoutGrid, LogOut, Menu, Trophy, UserRound, UsersRound, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
@@ -10,6 +10,7 @@ import api from '../services/api';
 const links = [
   { to: '/parent', role: 'parent', label: 'Pathway finder', icon: LayoutGrid, caption: 'Parent workspace' },
   { to: '/athlete', role: 'athlete', label: 'Athlete profile', icon: UserRound, caption: 'Training & growth' },
+  { to: '/athlete?tab=eligible', role: 'athlete', label: 'Eligible for you', icon: Trophy, caption: 'Upcoming tournaments' },
   { to: '/athlete/recommendations', role: 'athlete', label: 'Recommendations', icon: Trophy, caption: 'Verified academy matches' },
   { to: '/coach', role: 'coach', label: 'Coach desk', icon: UsersRound, caption: 'Athlete relationships' },
   { to: '/sponsor', role: 'sponsor', label: 'Impact studio', icon: HeartHandshake, caption: 'Support & reports' },
@@ -18,18 +19,28 @@ const links = [
 
 function Navigation({ close }) {
   const { user, logout } = useAuth();
+  const location = useLocation();
   const { notifCount, totalUnreadMessages } = useSocket();
   const activeRole = user?.role;
   const [unreadRecCount, setUnreadRecCount] = useState(0);
+  const [unreadEligibleCount, setUnreadEligibleCount] = useState(0);
 
   useEffect(() => {
     if (activeRole !== 'athlete') return;
     let isMounted = true;
     const fetchUnread = async () => {
       try {
-        const { data } = await api.get('/recommendations/unread-count');
-        if (isMounted && typeof data?.count === 'number') {
-          setUnreadRecCount(data.count);
+        const [recRes, elRes] = await Promise.all([
+          api.get('/recommendations/unread-count').catch(() => ({ data: { count: 0 } })),
+          api.get('/tournaments/eligible/unread-count').catch(() => ({ data: { count: 0 } }))
+        ]);
+        if (isMounted) {
+          if (typeof recRes.data?.count === 'number') {
+            setUnreadRecCount(recRes.data.count);
+          }
+          if (typeof elRes.data?.count === 'number') {
+            setUnreadEligibleCount(elRes.data.count);
+          }
         }
       } catch (err) {
         // Silently ignore network errors
@@ -54,18 +65,27 @@ function Navigation({ close }) {
           badgeCount = notifCount + totalUnreadMessages;
         } else if (to === '/athlete/recommendations') {
           badgeCount = unreadRecCount;
-        } else if (linkRole === 'athlete') {
+        } else if (to === '/athlete?tab=eligible') {
+          badgeCount = unreadEligibleCount;
+        } else if (linkRole === 'athlete' && to === '/athlete') {
           badgeCount = totalUnreadMessages;
         }
 
-        const isPulse = to === '/athlete/recommendations' && unreadRecCount > 0;
+        const isPulse = (to === '/athlete/recommendations' && unreadRecCount > 0) ||
+                        (to === '/athlete?tab=eligible' && unreadEligibleCount > 0);
+
+        const isActiveLink = to === '/athlete?tab=eligible'
+          ? (location.pathname === '/athlete' && location.search.includes('tab=eligible'))
+          : to === '/athlete'
+          ? (location.pathname === '/athlete' && !location.search.includes('tab=eligible'))
+          : location.pathname === to;
 
         return (
           <NavLink
             key={to}
             to={to}
             onClick={close}
-            className={({ isActive }) => ['nav-link', isActive && 'is-active', isPulse && 'animate-pulse ring-1 ring-[#e07050]/40'].filter(Boolean).join(' ')}
+            className={['nav-link', isActiveLink && 'is-active', isPulse && 'animate-pulse ring-1 ring-[#e07050]/40'].filter(Boolean).join(' ')}
           >
             <Icon size={17} strokeWidth={1.8} className={isPulse ? 'text-[#e07050]' : ''} />
             <span>

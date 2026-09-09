@@ -434,7 +434,7 @@ export default function OfficialTournamentsSection({ athleteSport, athleteSports
 
           {eligibleEvents.length === 0 ? (
             <div className="p-8 text-center text-xs text-[#697c7c] bg-white rounded-xl border border-dashed border-[#d8ded5]">
-              No upcoming tournaments currently matching your registered sport ({sportsDisplayLabel}).
+              No eligible tournaments available.
             </div>
           ) : (
             <div ref={eligibleRail} className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-2 pr-1">
@@ -660,7 +660,7 @@ export default function OfficialTournamentsSection({ athleteSport, athleteSports
 
               {eligibleEvents.length === 0 ? (
                 <div className="p-4 text-center text-xs text-[#697c7c] bg-white rounded-lg border border-dashed border-[#d8ded5]">
-                  No upcoming tournaments currently matching your registered sport ({sportsDisplayLabel}). View all tournaments below.
+                  No eligible tournaments available.
                 </div>
               ) : (
                 <div ref={eligibleRail} className="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-2 pr-1">

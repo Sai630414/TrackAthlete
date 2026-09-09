@@ -147,7 +147,7 @@ exports.search = async (req, res) => {
       .map((a) => ({
         ...a,
         verified: a.verified !== false,
-        achievementLevel: a.achievementLevel || 'STATE',
+        achievementLevel: (a.achievementLevel && a.achievementLevel !== 'UNRANKED') ? a.achievementLevel : 'NOT YET QUALIFIED',
         distanceKm: Math.round(haversineKm(cityCoords, a.location?.coordinates || [cityData.lng, cityData.lat]))
       }))
       .filter((a) => (radius ? a.distanceKm <= radius : true))

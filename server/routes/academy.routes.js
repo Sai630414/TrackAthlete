@@ -725,9 +725,17 @@ router.post('/my/sports/:sportName/athletes', verifyToken, requireRoles('academy
       if (aadhaarHash) existingMembership.aadhaarHash = aadhaarHash;
       await existingMembership.save();
 
+      const { syncAcademyAchievementLevels } = require('../utils/recommendationEngine');
+      const syncRes = await syncAcademyAchievementLevels(academy);
+
       const resObj = existingMembership.toObject();
       delete resObj.aadhaarHash;
-      return res.status(200).json(resObj);
+      return res.status(200).json({
+        ...resObj,
+        overallLevel: syncRes?.overallLevel,
+        perSportLevels: syncRes?.perSport,
+        rankingStats: syncRes?.rankingStats
+      });
     }
 
     const membership = await AcademyAthleteMembership.create({
@@ -744,12 +752,138 @@ router.post('/my/sports/:sportName/athletes', verifyToken, requireRoles('academy
       negotiatedPayment: negotiatedPayment ? String(negotiatedPayment).trim() : 'Negotiated During Joining'
     });
 
+    const { syncAcademyAchievementLevels } = require('../utils/recommendationEngine');
+    const syncRes = await syncAcademyAchievementLevels(academy);
+
     const resObj = membership.toObject();
     delete resObj.aadhaarHash;
-    res.status(201).json(resObj);
+    res.status(201).json({
+      ...resObj,
+      overallLevel: syncRes?.overallLevel,
+      perSportLevels: syncRes?.perSport,
+      rankingStats: syncRes?.rankingStats
+    });
   } catch (err) {
     console.error('Error adding athlete:', err);
     res.status(500).json({ error: 'Failed to add athlete: ' + err.message });
+  }
+});
+
+/**
+ * DELETE /api/academy/my/sports/:sport/athletes/:membershipId
+ * Remove athlete from academy sport roster and recalculate levels
+ */
+router.delete('/my/sports/:sport/athletes/:membershipId', verifyToken, requireRoles('academy'), async (req, res) => {
+  try {
+    const academy = await getAcademyForUser(req.user._id);
+    if (!academy) {
+      return res.status(404).json({ error: 'Academy profile not found.' });
+    }
+
+    const deleted = await AcademyAthleteMembership.findOneAndDelete({
+      _id: req.params.membershipId,
+      academyId: academy._id
+    });
+
+    if (!deleted) {
+      return res.status(404).json({ error: 'Athlete membership record not found.' });
+    }
+
+    const { syncAcademyAchievementLevels } = require('../utils/recommendationEngine');
+    const syncRes = await syncAcademyAchievementLevels(academy);
+
+    res.json({
+      success: true,
+      message: 'Athlete removed from academy roster.',
+      overallLevel: syncRes?.overallLevel,
+      perSportLevels: syncRes?.perSport,
+      rankingStats: syncRes?.rankingStats
+    });
+  } catch (err) {
+    console.error('Error removing athlete from academy:', err);
+    res.status(500).json({ error: 'Failed to remove athlete: ' + err.message });
+  }
+});
+
+/**
+ * PATCH /api/academy/my/sports/:sport/athletes/:membershipId/status
+ * Toggle or update active membership status and recalculate levels
+ */
+router.patch('/my/sports/:sport/athletes/:membershipId/status', verifyToken, requireRoles('academy'), async (req, res) => {
+  try {
+    const academy = await getAcademyForUser(req.user._id);
+    if (!academy) {
+      return res.status(404).json({ error: 'Academy profile not found.' });
+    }
+
+    const membership = await AcademyAthleteMembership.findOne({
+      _id: req.params.membershipId,
+      academyId: academy._id
+    });
+
+    if (!membership) {
+      return res.status(404).json({ error: 'Athlete membership record not found.' });
+    }
+
+    const newStatus = req.body.status || (membership.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE');
+    membership.status = newStatus;
+    await membership.save();
+
+    const { syncAcademyAchievementLevels } = require('../utils/recommendationEngine');
+    const syncRes = await syncAcademyAchievementLevels(academy);
+
+    res.json({
+      success: true,
+      membership,
+      overallLevel: syncRes?.overallLevel,
+      perSportLevels: syncRes?.perSport,
+      rankingStats: syncRes?.rankingStats
+    });
+  } catch (err) {
+    console.error('Error updating athlete membership status:', err);
+    res.status(500).json({ error: 'Failed to update athlete status: ' + err.message });
+  }
+});
+
+/**
+ * PUT /api/academy/my/sports/:sport/athletes/:membershipId
+ * Update athlete membership data (joining terms, contact, name)
+ */
+router.put('/my/sports/:sport/athletes/:membershipId', verifyToken, requireRoles('academy'), async (req, res) => {
+  try {
+    const academy = await getAcademyForUser(req.user._id);
+    if (!academy) {
+      return res.status(404).json({ error: 'Academy profile not found.' });
+    }
+
+    const membership = await AcademyAthleteMembership.findOne({
+      _id: req.params.membershipId,
+      academyId: academy._id
+    });
+
+    if (!membership) {
+      return res.status(404).json({ error: 'Athlete membership record not found.' });
+    }
+
+    if (req.body.name) membership.name = String(req.body.name).trim();
+    if (req.body.mobile) membership.mobile = String(req.body.mobile).trim();
+    if (req.body.negotiatedPayment) membership.negotiatedPayment = String(req.body.negotiatedPayment).trim();
+    if (req.body.status) membership.status = req.body.status;
+    await membership.save();
+
+    const { syncAcademyAchievementLevels } = require('../utils/recommendationEngine');
+    const syncRes = await syncAcademyAchievementLevels(academy);
+
+    res.json({
+      success: true,
+      membership,
+      overallLevel: syncRes?.overallLevel,
+      perSportLevels: syncRes?.perSport,
+      rankingStats: syncRes?.rankingStats
+    });
+  } catch (err) {
+    console.error('Error updating athlete membership details:', err);
+    res.status(500).json({ error: 'Failed to update athlete details: ' + err.message });
   }
 });
 
@@ -968,13 +1102,19 @@ router.post('/my/athlete-requests/:id/accept', verifyToken, requireRoles('academ
       });
     }
 
+    const { syncAcademyAchievementLevels } = require('../utils/recommendationEngine');
+    const syncRes = await syncAcademyAchievementLevels(academy);
+
     const resMembership = membership.toObject();
     delete resMembership.aadhaarHash;
 
     res.json({
       success: true,
       message: 'Athlete join request accepted.',
-      membership: resMembership
+      membership: resMembership,
+      overallLevel: syncRes?.overallLevel,
+      perSportLevels: syncRes?.perSport,
+      rankingStats: syncRes?.rankingStats
     });
   } catch (err) {
     console.error('Error accepting athlete request:', err);
@@ -1005,7 +1145,16 @@ router.post('/my/athlete-requests/:id/reject', verifyToken, requireRoles('academ
     request.status = 'REJECTED';
     await request.save();
 
-    res.json({ success: true, message: 'Athlete request rejected.' });
+    const { syncAcademyAchievementLevels } = require('../utils/recommendationEngine');
+    const syncRes = await syncAcademyAchievementLevels(academy);
+
+    res.json({
+      success: true,
+      message: 'Athlete request rejected.',
+      overallLevel: syncRes?.overallLevel,
+      perSportLevels: syncRes?.perSport,
+      rankingStats: syncRes?.rankingStats
+    });
   } catch (err) {
     console.error('Error rejecting athlete request:', err);
     res.status(500).json({ error: 'Failed to reject athlete request: ' + err.message });

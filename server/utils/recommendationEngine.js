@@ -370,8 +370,74 @@ async function generateAthleteRecommendations(athleteUserId) {
   return Recommendation.find({ athleteId: user._id }).sort({ createdAt: -1 }).lean();
 }
 
+/**
+ * Synchronizes Academy Achievement Level, perSportLevels, rankingStats cache,
+ * updates User document, and recalculates recommendations for connected athletes.
+ */
+async function syncAcademyAchievementLevels(academyDoc) {
+  if (!academyDoc) return null;
+  const Academy = require('../models/Academy');
+  const User = require('../models/User');
+
+  const { overallLevel, overallLevelLabel, perSport } = await getAcademyPerSportAchievementLevels(academyDoc);
+
+  let maxDist = 0, maxState = 0, maxNatl = 0, maxIntl = 0;
+  for (const info of Object.values(perSport)) {
+    if (info.rankingStats) {
+      if (info.rankingStats.districtPlayers > maxDist) maxDist = info.rankingStats.districtPlayers;
+      if (info.rankingStats.statePlayers > maxState) maxState = info.rankingStats.statePlayers;
+      if (info.rankingStats.nationalPlayers > maxNatl) maxNatl = info.rankingStats.nationalPlayers;
+      if (info.rankingStats.internationalPlayers > maxIntl) maxIntl = info.rankingStats.internationalPlayers;
+    }
+  }
+
+  const updatedStats = {
+    districtPlayers: maxDist,
+    statePlayers: maxState,
+    nationalPlayers: maxNatl,
+    internationalPlayers: maxIntl
+  };
+
+  await Academy.updateOne({ _id: academyDoc._id }, {
+    $set: {
+      achievementLevel: overallLevel,
+      achievementLevelLabel: overallLevelLabel,
+      rankingStats: updatedStats
+    }
+  });
+
+  if (academyDoc.userId) {
+    await User.updateOne({ _id: academyDoc.userId }, {
+      $set: {
+        achievementLevel: overallLevel,
+        achievementLevelLabel: overallLevelLabel,
+        rankingStats: updatedStats
+      }
+    });
+  }
+
+  // Recalculate recommendations for any athletes who have matching sports
+  const sportsOffered = (academyDoc.sports || []).map(s => (s.sportName || s).trim().toUpperCase()).filter(Boolean);
+  if (sportsOffered.length > 0) {
+    const athletes = await User.find({
+      role: 'athlete',
+      $or: [
+        { sport: { $in: sportsOffered } },
+        { sports: { $in: sportsOffered } }
+      ]
+    }).select('_id athleteId sport sports');
+
+    for (const ath of athletes) {
+      await generateAthleteRecommendations(ath).catch(() => {});
+    }
+  }
+
+  return { overallLevel, overallLevelLabel, perSport, rankingStats: updatedStats };
+}
+
 module.exports = {
   getAthleteHighestVerifiedLevelPerSport,
   getAcademyPerSportAchievementLevels,
-  generateAthleteRecommendations
+  generateAthleteRecommendations,
+  syncAcademyAchievementLevels
 };

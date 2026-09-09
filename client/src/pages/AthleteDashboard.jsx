@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Card,
   CardHeader,
@@ -434,11 +435,38 @@ export default function AthleteDashboard() {
   const { toast } = useToast();
   const { socket, unreadByConnection, totalUnreadMessages, openChatForConnection, closeChat } = useSocket();
 
+  const [searchParams, setSearchParams] = useSearchParams();
   const [optInSponsorship, setOptInSponsorship] = useState(user?.seekingSponsorship ?? true);
   const [relocationFlexible, setRelocationFlexible] = useState(user?.relocationFlexible ?? true);
-  const [activeTab, setActiveTab] = useState('eligible');
+  const initialTab = searchParams.get('tab') || 'eligible';
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [unreadEligibleCount, setUnreadEligibleCount] = useState(0);
   const [myOrganizedData, setMyOrganizedData] = useState(null);
   const [verifiedSummary, setVerifiedSummary] = useState([]);
+
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab');
+    if (tabFromUrl && tabFromUrl !== activeTab) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (val) => {
+    setActiveTab(val);
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', val);
+      return next;
+    }, { replace: true });
+  };
+
+  useEffect(() => {
+    if (activeTab === 'eligible') {
+      api.post('/tournaments/eligible/mark-viewed')
+        .then(() => setUnreadEligibleCount(0))
+        .catch(() => {});
+    }
+  }, [activeTab]);
   const [profile, setProfile] = useState({
     name: user?.name || '',
     sport: user?.sport || '',
@@ -547,19 +575,26 @@ export default function AthleteDashboard() {
     try {
       const sportsList = Array.isArray(user?.sports) && user.sports.length > 0 ? user.sports : (user?.sport ? [user.sport] : []);
       const sportsQuery = sportsList.length > 0 ? `?sports=${encodeURIComponent(sportsList.join(','))}` : '';
-      const [coachesRes, connsRes, profileRes, orgEventsRes, summaryRes, unreadRecsRes] = await Promise.all([
+      const [coachesRes, connsRes, profileRes, orgEventsRes, summaryRes, unreadRecsRes, unreadEligibleRes] = await Promise.all([
         api.get(`/athlete/coaches/list${sportsQuery}`),
         api.get(`/athlete/${user._id}/connections`),
         api.get(`/athlete/${user._id}/profile`),
         api.get('/organizer-events/my-organized-events').catch(() => ({ data: { hasLinkedOrganizer: false, events: [] } })),
         api.get('/recommendations/athlete-summary').catch(() => ({ data: [] })),
-        api.get('/recommendations/unread-count').catch(() => ({ data: { count: 0 } }))
+        api.get('/recommendations/unread-count').catch(() => ({ data: { count: 0 } })),
+        api.get('/tournaments/eligible/unread-count').catch(() => ({ data: { count: 0 } }))
       ]);
       setCoaches(coachesRes.data || []);
       setConnections(connsRes.data || []);
       if (orgEventsRes?.data) setMyOrganizedData(orgEventsRes.data);
       if (summaryRes?.data) setVerifiedSummary(Array.isArray(summaryRes.data) ? summaryRes.data : []);
       if (unreadRecsRes?.data?.count !== undefined) setUnreadRecCount(unreadRecsRes.data.count);
+      if (unreadEligibleRes?.data?.count !== undefined) {
+        setUnreadEligibleCount(unreadEligibleRes.data.count);
+        if (activeTab === 'eligible' && unreadEligibleRes.data.count > 0) {
+          api.post('/tournaments/eligible/mark-viewed').then(() => setUnreadEligibleCount(0)).catch(() => {});
+        }
+      }
       if (profileRes.data) {
         const d = profileRes.data;
         if ((!summaryRes?.data || !Array.isArray(summaryRes.data)) && Array.isArray(d.perSportHighestVerifiedAchievement)) {
@@ -764,7 +799,7 @@ export default function AthleteDashboard() {
             ))}
             {profile.athleteLevel && (
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold uppercase bg-[#e07050]/20 text-[#ffb09c] border border-[#e07050]/40">
-                {profile.athleteLevel}
+                ATHLETE LEVEL: {profile.athleteLevel || 'BEGINNER'}
               </span>
             )}
             {profile.currentlyActive !== undefined && (
@@ -789,7 +824,7 @@ export default function AthleteDashboard() {
                 <span className="text-white">{vs.outcome}</span>
               </span>
             )) : (
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-extrabold uppercase bg-white/10 text-[#c5d3ce] border border-white/25">NOT YET VERIFIED</span>
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium text-[#c5d3ce] border border-white/25">No verified achievement yet</span>
             )}
           </div>
         </div>
@@ -812,10 +847,15 @@ export default function AthleteDashboard() {
         </AlertDescription>
       </Alert>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList>
           <TabsTrigger value="eligible">
             <Trophy className="w-4 h-4 mr-1.5" /> Eligible For You
+            {unreadEligibleCount > 0 && (
+              <span style={{ marginLeft: 6, minWidth: 18, height: 18, borderRadius: 9, background: '#e07050', color: '#fff', fontSize: 10, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }} className="animate-pulse">
+                {unreadEligibleCount}
+              </span>
+            )}
           </TabsTrigger>
           <TabsTrigger value="achievements">
             <Award className="w-4 h-4 mr-1.5" /> Personal Achievements

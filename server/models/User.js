@@ -45,6 +45,7 @@ const UserSchema = new mongoose.Schema({
     sourceType: { type: String, default: 'SELF_UPLOADED' },
     uploadedAt: { type: Date, default: Date.now }
   }],
+  viewedTournamentIds: [{ type: String }],
 
   // Parent-specific
   parentId: { type: String, trim: true, sparse: true, unique: true },

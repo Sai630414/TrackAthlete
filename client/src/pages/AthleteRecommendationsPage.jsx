@@ -235,7 +235,7 @@ export default function AthleteRecommendationsPage() {
         /* Genuine Empty State (Rules 36 & 54) */
         <Card className="text-center py-12 px-4 border border-dashed border-[#d8ded5] bg-white">
           <Building2 className="w-12 h-12 mx-auto mb-3 text-[#526668]/40" />
-          <h3 className="text-base font-bold text-[#173235]">No Academy Recommendations Yet</h3>
+          <h3 className="text-base font-bold text-[#173235]">No academy recommendations yet.</h3>
           <p className="text-xs text-[#526668] max-w-md mx-auto mt-1 mb-4">
             Recommendations require matching academies offering your sport at an Achievement Level equal to or higher than your verified competition achievements.
           </p>

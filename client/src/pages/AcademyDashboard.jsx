@@ -396,9 +396,56 @@ export default function AcademyDashboard() {
       });
       fetchSportDetails(selectedSport);
       fetchSports();
+      fetchProfile();
     } catch (err) {
       console.error('Error adding athlete:', err);
       showNotification(err.response?.data?.error || 'Failed to add athlete.', 'error');
+    }
+  };
+
+  // Toggle Athlete Membership Active Status
+  const handleToggleAthleteStatus = async (athlete) => {
+    try {
+      const newStatus = athlete.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+      const res = await api.patch(`/academy/my/sports/${encodeURIComponent(selectedSport)}/athletes/${athlete._id}/status`, { status: newStatus });
+      showNotification(`Athlete status updated to ${newStatus}. Academy statistics & levels recalculated!`);
+      if (res.data?.rankingStats) {
+        setProfileForm(prev => ({
+          ...prev,
+          districtPlayers: res.data.rankingStats.districtPlayers ?? prev.districtPlayers,
+          statePlayers: res.data.rankingStats.statePlayers ?? prev.statePlayers,
+          nationalPlayers: res.data.rankingStats.nationalPlayers ?? prev.nationalPlayers,
+          internationalPlayers: res.data.rankingStats.internationalPlayers ?? prev.internationalPlayers
+        }));
+      }
+      fetchSportDetails(selectedSport);
+      fetchProfile();
+    } catch (err) {
+      console.error('Error updating athlete status:', err);
+      showNotification(err.response?.data?.error || 'Failed to update athlete status', 'error');
+    }
+  };
+
+  // Remove Athlete from Sport Roster
+  const handleRemoveAthlete = async (athlete) => {
+    if (!window.confirm(`Are you sure you want to remove ${athlete.name} from ${selectedSport}? This will instantly recalculate qualifying player counts and achievement levels.`)) return;
+    try {
+      const res = await api.delete(`/academy/my/sports/${encodeURIComponent(selectedSport)}/athletes/${athlete._id}`);
+      showNotification(`Athlete removed from ${selectedSport}. Statistics and achievement levels recalculated!`);
+      if (res.data?.rankingStats) {
+        setProfileForm(prev => ({
+          ...prev,
+          districtPlayers: res.data.rankingStats.districtPlayers ?? prev.districtPlayers,
+          statePlayers: res.data.rankingStats.statePlayers ?? prev.statePlayers,
+          nationalPlayers: res.data.rankingStats.nationalPlayers ?? prev.nationalPlayers,
+          internationalPlayers: res.data.rankingStats.internationalPlayers ?? prev.internationalPlayers
+        }));
+      }
+      fetchSportDetails(selectedSport);
+      fetchProfile();
+    } catch (err) {
+      console.error('Error removing athlete:', err);
+      showNotification(err.response?.data?.error || 'Failed to remove athlete', 'error');
     }
   };
 
@@ -905,8 +952,9 @@ export default function AcademyDashboard() {
                           <th className="py-2.5 px-3">TrackAthlete ID</th>
                           <th className="py-2.5 px-3">Contact</th>
                           <th className="py-2.5 px-3">Enrolled Source</th>
+                          <th className="py-2.5 px-3">Status</th>
                           <th className="py-2.5 px-3">Joining Terms</th>
-                          <th className="py-2.5 px-3 text-right">Portfolio</th>
+                          <th className="py-2.5 px-3 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
@@ -926,19 +974,43 @@ export default function AcademyDashboard() {
                                 {a.athleteUserId || a.athleteId ? 'Linked' : 'Offline'}
                               </span>
                             </td>
+                            <td className="py-3 px-3">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleAthleteStatus(a)}
+                                title="Click to toggle Active / Inactive status"
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition-all border ${
+                                  a.status === 'INACTIVE'
+                                    ? 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
+                                    : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                                }`}
+                              >
+                                {a.status === 'INACTIVE' ? '○ INACTIVE' : '● ACTIVE'}
+                              </button>
+                            </td>
                             <td className="py-3 px-3 text-gray-600">{a.negotiatedPayment || 'Negotiated'}</td>
                             <td className="py-3 px-3 text-right">
-                              {a.athleteUserId ? (
+                              <div className="inline-flex items-center gap-1.5 justify-end">
+                                {a.athleteUserId ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleReviewAthlete({ athleteUserId: a.athleteUserId, name: a.name, sportName: selectedSport })}
+                                    className="px-2 py-1 rounded bg-[#2f6d5a] hover:bg-[#235344] text-white text-[11px] font-bold cursor-pointer"
+                                  >
+                                    Portfolio
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] text-gray-400 italic">Offline</span>
+                                )}
                                 <button
                                   type="button"
-                                  onClick={() => handleReviewAthlete({ athleteUserId: a.athleteUserId, name: a.name, sportName: selectedSport })}
-                                  className="px-2.5 py-1 rounded bg-[#2f6d5a] hover:bg-[#235344] text-white text-[11px] font-bold cursor-pointer"
+                                  onClick={() => handleRemoveAthlete(a)}
+                                  title="Remove athlete from sport roster"
+                                  className="p-1 rounded text-rose-500 hover:text-rose-700 hover:bg-rose-50 cursor-pointer transition-colors"
                                 >
-                                  View Portfolio
+                                  <Trash2 className="w-4 h-4" />
                                 </button>
-                              ) : (
-                                <span className="text-[11px] text-gray-400 italic">Offline Record</span>
-                              )}
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -1500,6 +1572,15 @@ export default function AcademyDashboard() {
                 <p className="text-xs text-gray-500">
                   Derived from active athlete memberships and verified competition achievements; these values cannot be edited manually.
                 </p>
+                <div className="mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setActiveNav('sports')}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[#2f6d5a] hover:underline cursor-pointer"
+                  >
+                    <Users className="w-3.5 h-3.5" /> Manage Enrolled Athletes & Sports Roster →
+                  </button>
+                </div>
               </div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-extrabold self-start sm:self-auto">
                 <Award className="w-4 h-4 text-amber-600" />
