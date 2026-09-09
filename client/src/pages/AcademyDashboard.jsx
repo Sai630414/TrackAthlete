@@ -33,13 +33,6 @@ import OrganizedEventsSection from '../components/OrganizedEventsSection';
 function resolveAcademyAchievementLevel(prof, usr) {
   if (prof?.achievementLevel && prof.achievementLevel !== 'UNRANKED') return prof.achievementLevel;
   if (usr?.achievementLevel && usr.achievementLevel !== 'UNRANKED') return usr.achievementLevel;
-  const stats = prof?.rankingStats || usr?.rankingStats;
-  if (stats) {
-    if (Number(stats.internationalPlayers) >= 1) return 'INTERNATIONAL';
-    if (Number(stats.nationalPlayers) >= 2) return 'NATIONAL';
-    if (Number(stats.statePlayers) >= 3) return 'STATE';
-    if (Number(stats.districtPlayers) >= 5) return 'DISTRICT';
-  }
   return 'UNRANKED';
 }
 
@@ -269,12 +262,6 @@ export default function AcademyDashboard() {
           type: 'Point',
           coordinates: [Number(profileForm.longitude) || 80.6480, Number(profileForm.latitude) || 16.5062]
         },
-        rankingStats: {
-          districtPlayers: Number(profileForm.districtPlayers) || 0,
-          statePlayers: Number(profileForm.statePlayers) || 0,
-          nationalPlayers: Number(profileForm.nationalPlayers) || 0,
-          internationalPlayers: Number(profileForm.internationalPlayers) || 0
-        }
       };
 
       const res = await api.put('/academy/my/profile', payload);
@@ -579,7 +566,7 @@ export default function AcademyDashboard() {
         <div>
           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
-              <CheckCircle2 className="w-3.5 h-3.5 text-[#2f6d5a]" /> Verified Sports Academy ✓
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#2f6d5a]" /> {profile?.verified ? 'Verified Sports Academy ✓' : 'Academy verification pending'}
             </span>
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-200 border border-amber-500/40">
               <Trophy className="w-3.5 h-3.5 text-amber-300" /> {(() => {
@@ -596,10 +583,10 @@ export default function AcademyDashboard() {
           </div>
           <h1 className="text-3xl font-normal text-white flex items-center gap-2 flex-wrap" style={{ fontFamily: 'Georgia, serif' }}>
             <span>{profile?.name || user?.name || 'Sports Academy'}</span>
-            <span className="inline-flex items-center text-emerald-400 font-bold" title="Verified TrackAthlete Sports Academy">
+            {profile?.verified && <span className="inline-flex items-center text-emerald-400 font-bold" title="Verified TrackAthlete Sports Academy">
               <CheckCircle2 className="w-6 h-6 fill-emerald-500/20 text-emerald-400" />
               <span className="ml-1 text-2xl font-black text-emerald-400">✓</span>
-            </span>
+            </span>}
             <em style={{ color: '#b9d9bf', fontStyle: 'italic' }}>Portal</em>
           </h1>
           <p className="text-xs text-[#c5d3ce] mt-1.5 flex items-center gap-2 flex-wrap">
@@ -1495,7 +1482,7 @@ export default function AcademyDashboard() {
                   Academy Ranking & Representation Statistics
                 </h2>
                 <p className="text-xs text-gray-500">
-                  Number of players trained at your facility who achieved competitive representation.
+                  Derived from active athlete memberships and verified competition achievements; these values cannot be edited manually.
                 </p>
               </div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-extrabold self-start sm:self-auto">
@@ -1516,7 +1503,7 @@ export default function AcademyDashboard() {
                   type="number"
                   min="0"
                   value={profileForm.districtPlayers}
-                  onChange={(e) => setProfileForm({ ...profileForm, districtPlayers: e.target.value })}
+                  disabled
                   className="w-full text-center py-1.5 text-base font-bold border border-gray-300 rounded-lg focus:outline-none focus:border-[#2f6d5a]"
                 />
               </div>
@@ -1529,7 +1516,7 @@ export default function AcademyDashboard() {
                   type="number"
                   min="0"
                   value={profileForm.statePlayers}
-                  onChange={(e) => setProfileForm({ ...profileForm, statePlayers: e.target.value })}
+                  disabled
                   className="w-full text-center py-1.5 text-base font-bold border border-gray-300 rounded-lg focus:outline-none focus:border-[#2f6d5a]"
                 />
               </div>
@@ -1542,7 +1529,7 @@ export default function AcademyDashboard() {
                   type="number"
                   min="0"
                   value={profileForm.nationalPlayers}
-                  onChange={(e) => setProfileForm({ ...profileForm, nationalPlayers: e.target.value })}
+                  disabled
                   className="w-full text-center py-1.5 text-base font-bold border border-gray-300 rounded-lg focus:outline-none focus:border-[#2f6d5a]"
                 />
               </div>
@@ -1555,7 +1542,7 @@ export default function AcademyDashboard() {
                   type="number"
                   min="0"
                   value={profileForm.internationalPlayers}
-                  onChange={(e) => setProfileForm({ ...profileForm, internationalPlayers: e.target.value })}
+                  disabled
                   className="w-full text-center py-1.5 text-base font-bold border border-gray-300 rounded-lg focus:outline-none focus:border-[#2f6d5a]"
                 />
               </div>
@@ -1582,7 +1569,7 @@ export default function AcademyDashboard() {
                   {sports.map(s => {
                     const spName = (s.sportName || s).toUpperCase();
                     const spData = profile?.perSportLevels?.[spName] || profile?.perSportLevels?.[s.sportName] || {};
-                    const spLevel = spData.achievementLevel || (profile?.achievementLevel && profile?.achievementLevel !== 'UNRANKED' ? profile.achievementLevel : 'UNRANKED');
+                    const spLevel = spData.achievementLevel || 'UNRANKED';
                     const spStats = spData.rankingStats || profileForm;
 
                     return (

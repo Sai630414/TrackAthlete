@@ -220,11 +220,9 @@ function serializeAcademyProfile(academyDoc, requesterRole = 'public') {
     : [];
 
   const rankingStats = a.rankingStats || { districtPlayers: 0, statePlayers: 0, nationalPlayers: 0, internationalPlayers: 0 };
-  let achievementLevel = a.achievementLevel;
-  if (!achievementLevel || achievementLevel === 'UNRANKED') {
-    const { calculateAchievementLevelFromStats } = require('./academyRanking');
-    achievementLevel = calculateAchievementLevelFromStats(rankingStats);
-  }
+  // This serializer deliberately does not derive a level from rankingStats.
+  // Routes attach the authoritative membership/achievement calculation.
+  const achievementLevel = a.achievementLevel || 'UNRANKED';
 
   const isVerified = a.verified !== false;
 

@@ -556,7 +556,9 @@ router.post('/achievements', verifyToken, requireRoles('federation'), async (req
       tournamentName: event.eventName,
       sport: event.sport,
       category: event.category,
-      competitionLevel: event.competitionLevel || 'STATE',
+      // New events require this value. A legacy event with no declared level
+      // must remain unranked instead of being silently promoted to STATE.
+      competitionLevel: event.competitionLevel || null,
       achievementType,
       medal: achievementType === 'medal' ? (medal || 'Gold') : undefined,
       rank: achievementType === 'ranking' ? Number(rank || 1) : undefined,

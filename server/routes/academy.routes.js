@@ -272,8 +272,7 @@ router.put('/my/profile', verifyToken, requireRoles('academy'), async (req, res)
       address,
       city,
       state,
-      location,
-      rankingStats
+      location
     } = req.body;
 
     if (name) academy.name = String(name).trim();
@@ -298,15 +297,6 @@ router.put('/my/profile', verifyToken, requireRoles('academy'), async (req, res)
       academy.location = {
         type: 'Point',
         coordinates: [Number(location.coordinates[0]), Number(location.coordinates[1])]
-      };
-    }
-
-    if (rankingStats) {
-      academy.rankingStats = {
-        districtPlayers: Number(rankingStats.districtPlayers ?? academy.rankingStats?.districtPlayers ?? 0),
-        statePlayers: Number(rankingStats.statePlayers ?? academy.rankingStats?.statePlayers ?? 0),
-        nationalPlayers: Number(rankingStats.nationalPlayers ?? academy.rankingStats?.nationalPlayers ?? 0),
-        internationalPlayers: Number(rankingStats.internationalPlayers ?? academy.rankingStats?.internationalPlayers ?? 0)
       };
     }
 
@@ -1302,7 +1292,17 @@ router.get('/discovery', async (req, res) => {
       }).sort((a, b) => (a.distanceKm ?? 99999) - (b.distanceKm ?? 99999));
     }
 
-    const serialized = academies.map(a => serializeAcademyProfile(a, 'public'));
+    const { getAcademyPerSportAchievementLevels } = require('../utils/recommendationEngine');
+    const serialized = await Promise.all(academies.map(async academy => {
+      const { overallLevel, perSport } = await getAcademyPerSportAchievementLevels(academy);
+      const profile = serializeAcademyProfile(academy, 'public');
+      profile.achievementLevel = overallLevel;
+      profile.achievementLevelLabel = overallLevel !== 'UNRANKED'
+        ? `Achievement Level: ${overallLevel}`
+        : 'Achievement Level: UNRANKED';
+      profile.perSportLevels = perSport;
+      return profile;
+    }));
     res.json(serialized);
   } catch (err) {
     console.error('Error discovering academies:', err);

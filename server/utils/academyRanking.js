@@ -30,28 +30,9 @@ function resolveCompetitionLevel(item, event) {
     return String(event.competitionLevel).trim().toUpperCase();
   }
 
-  // Reliable text pattern fallback for legacy records
-  const text = [
-    item?.tournamentName || '',
-    item?.eventName || '',
-    item?.category || '',
-    event?.eventName || '',
-    event?.category || ''
-  ].join(' ').toLowerCase();
-
-  if (/inter[- ]?national|world|asian|olympic|commonwealth|asia\b/i.test(text)) {
-    return 'INTERNATIONAL';
-  }
-  if (/national|all[- ]?india/i.test(text)) {
-    return 'NATIONAL';
-  }
-  if (/\bstate\b|inter[- ]?district/i.test(text)) {
-    return 'STATE';
-  }
-  if (/\bdistrict\b|divisional|zonal/i.test(text)) {
-    return 'DISTRICT';
-  }
-
+  // Never infer a competition level from titles, categories, or other text.
+  // For historical records the persisted parent event is authoritative; if it
+  // has no declared level, the achievement remains unranked.
   return null;
 }
 

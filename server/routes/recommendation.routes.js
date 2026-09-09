@@ -5,7 +5,8 @@ const { verifyToken, requireRoles } = require('../middleware/auth.middleware');
 const { serializeAcademyProfile } = require('../utils/serializers');
 const {
   getAthleteHighestVerifiedLevelPerSport,
-  generateAthleteRecommendations
+  generateAthleteRecommendations,
+  getAcademyPerSportAchievementLevels
 } = require('../utils/recommendationEngine');
 
 /**
@@ -20,8 +21,16 @@ router.get('/', verifyToken, requireRoles('athlete'), async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    const formatted = recommendations.map(rec => {
+    const formatted = await Promise.all(recommendations.map(async rec => {
       const academyData = rec.academyId ? serializeAcademyProfile(rec.academyId, 'athlete') : null;
+      if (academyData && rec.academyId) {
+        const { overallLevel, perSport } = await getAcademyPerSportAchievementLevels(rec.academyId);
+        academyData.achievementLevel = overallLevel;
+        academyData.achievementLevelLabel = overallLevel !== 'UNRANKED'
+          ? `Achievement Level: ${overallLevel}`
+          : 'Achievement Level: UNRANKED';
+        academyData.perSportLevels = perSport;
+      }
 
       return {
         id: rec._id,
@@ -38,7 +47,7 @@ router.get('/', verifyToken, requireRoles('athlete'), async (req, res) => {
         viewedAt: rec.viewedAt,
         createdAt: rec.createdAt
       };
-    });
+    }));
 
     res.json(formatted);
   } catch (err) {

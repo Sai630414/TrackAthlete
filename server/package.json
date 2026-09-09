@@ -8,7 +8,8 @@
     "start": "node server.js",
     "seed": "node seed/seed.js",
     "seed:federation": "node seedFederation.js",
-    "seed:organizations": "node seedOrganizations.js"
+    "seed:organizations": "node seedOrganizations.js",
+    "migrate:verified-data": "node scripts/migrateVerifiedData.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

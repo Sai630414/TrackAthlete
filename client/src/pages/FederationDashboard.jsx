@@ -40,7 +40,7 @@ export default function FederationDashboard() {
     eventName: '',
     sport: '',
     category: 'Senior Championship',
-    competitionLevel: 'STATE',
+    competitionLevel: '',
     location: '',
     tournamentDate: '',
     startDate: '',
@@ -152,7 +152,7 @@ export default function FederationDashboard() {
         eventName: '',
         sport: federation?.sport || 'Taekwondo',
         category: 'Senior Championship',
-        competitionLevel: 'STATE',
+        competitionLevel: '',
         location: '',
         tournamentDate: '',
         startDate: '',
@@ -767,6 +767,7 @@ export default function FederationDashboard() {
                   className="w-full h-10 px-3 rounded-lg border border-[#2f6d5a] bg-white text-xs font-extrabold mt-1 text-[#173235]"
                   required
                 >
+                  <option value="" disabled>Select tournament level</option>
                   <option value="DISTRICT">DISTRICT</option>
                   <option value="STATE">STATE</option>
                   <option value="NATIONAL">NATIONAL</option>
@@ -876,7 +877,7 @@ export default function FederationDashboard() {
                   if (!ev) return null;
                   return (
                     <div className="mt-1.5 p-2 rounded-lg bg-[#e2eee4] border border-[#2f6d5a]/40 flex items-center justify-between text-xs text-[#194e42]">
-                      <span>Inherited Tournament Level: <strong className="font-extrabold uppercase">{ev.competitionLevel || 'STATE'}</strong></span>
+                      <span>Inherited Tournament Level: <strong className="font-extrabold uppercase">{ev.competitionLevel || 'UNRANKED'}</strong></span>
                       <span className="font-mono text-[10px] text-[#2f6d5a]">{ev.sport}</span>
                     </div>
                   );
