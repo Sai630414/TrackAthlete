@@ -64,19 +64,30 @@ async function getAcademyForUser(userId) {
     }
   }
 
-  // Ensure academy and user have permanent academyId assigned (self-heal once without overwriting)
+  // Ensure academy and user have permanent academyId assigned and verified set (self-heal once without overwriting)
   if (academy) {
+    const updateFields = {};
     if (!academy.academyId) {
       const baseId = academy.userId || academy._id;
       academy.academyId = `ACA-${baseId.toString().slice(-8).toUpperCase()}`;
-      await Academy.updateOne({ _id: academy._id }, { $set: { academyId: academy.academyId } });
+      updateFields.academyId = academy.academyId;
+    }
+    if (academy.verified !== true) {
+      academy.verified = true;
+      updateFields.verified = true;
+    }
+    if (Object.keys(updateFields).length > 0) {
+      await Academy.updateOne({ _id: academy._id }, { $set: updateFields });
     }
     if (academy.userId) {
       const u = await User.findById(academy.userId);
-      if (u && (!u.academyId || !u.trackAthleteId)) {
+      if (u && (!u.academyId || !u.trackAthleteId || u.verified !== true || u.isVerified !== true)) {
         u.academyId = u.academyId || academy.academyId;
         u.trackAthleteId = u.trackAthleteId || academy.academyId;
-        await User.updateOne({ _id: u._id }, { $set: { academyId: u.academyId, trackAthleteId: u.trackAthleteId } });
+        await User.updateOne(
+          { _id: u._id },
+          { $set: { academyId: u.academyId, trackAthleteId: u.trackAthleteId, verified: true, isVerified: true } }
+        );
       }
     }
   }
@@ -219,7 +230,7 @@ router.post(['/login', '/auth/login'], async (req, res) => {
 
 /**
  * GET /api/academy/my/profile
- * Retrieve academy profile including address, location, ranking stats, and sports
+ * Retrieve academy profile including address, location, ranking stats, dynamic achievement levels, and sports
  */
 router.get('/my/profile', verifyToken, requireRoles('academy'), async (req, res) => {
   try {
@@ -227,7 +238,16 @@ router.get('/my/profile', verifyToken, requireRoles('academy'), async (req, res)
     if (!academy) {
       return res.status(404).json({ error: 'Academy profile not found for this account.' });
     }
-    res.json(academy);
+
+    const { getAcademyPerSportAchievementLevels } = require('../utils/recommendationEngine');
+    const { overallLevel, perSport } = await getAcademyPerSportAchievementLevels(academy);
+
+    const serialized = serializeAcademyProfile(academy, 'academy');
+    serialized.achievementLevel = overallLevel;
+    serialized.achievementLevelLabel = overallLevel !== 'UNRANKED' ? `Achievement Level: ${overallLevel}` : 'Achievement Level: UNRANKED';
+    serialized.perSportLevels = perSport;
+
+    res.json(serialized);
   } catch (err) {
     console.error('Error fetching academy profile:', err);
     res.status(500).json({ error: 'Failed to fetch academy profile: ' + err.message });
@@ -236,7 +256,7 @@ router.get('/my/profile', verifyToken, requireRoles('academy'), async (req, res)
 
 /**
  * PUT /api/academy/my/profile
- * Update academy profile
+ * Update academy profile and dynamically recalculate achievement level
  */
 router.put('/my/profile', verifyToken, requireRoles('academy'), async (req, res) => {
   try {
@@ -290,10 +310,21 @@ router.put('/my/profile', verifyToken, requireRoles('academy'), async (req, res)
       };
     }
 
+    // Dynamic achievement level calculation
+    const { getAcademyPerSportAchievementLevels } = require('../utils/recommendationEngine');
+    const { overallLevel, perSport } = await getAcademyPerSportAchievementLevels(academy);
+    academy.achievementLevel = overallLevel;
+    academy.achievementLevelLabel = overallLevel !== 'UNRANKED' ? `Achievement Level: ${overallLevel}` : 'Achievement Level: UNRANKED';
+    academy.verified = true;
     academy.updatedAt = new Date();
     await academy.save();
 
-    res.json(academy);
+    const serialized = serializeAcademyProfile(academy, 'academy');
+    serialized.achievementLevel = overallLevel;
+    serialized.achievementLevelLabel = academy.achievementLevelLabel;
+    serialized.perSportLevels = perSport;
+
+    res.json(serialized);
   } catch (err) {
     console.error('Error updating academy profile:', err);
     res.status(500).json({ error: 'Failed to update academy profile: ' + err.message });

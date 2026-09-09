@@ -566,7 +566,10 @@ export default function AcademyDashboard() {
         <div>
           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#e2eee4] text-[#194e42] border border-[#2f6d5a]">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#cc694e]" /> Verified Sports Academy
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#2f6d5a]" /> Verified Sports Academy ✓
+            </span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-200 border border-amber-500/40">
+              <Trophy className="w-3.5 h-3.5 text-amber-300" /> {profile?.achievementLevelLabel || (profile?.achievementLevel && profile?.achievementLevel !== 'UNRANKED' ? `Achievement Level: ${profile.achievementLevel}` : 'Achievement Level: UNRANKED')}
             </span>
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#0f2928] text-[#b9d9bf] border border-[#2f6d5a] tracking-wider">
               ID: {profile?.academyId || user?.academyId || user?.trackAthleteId || 'ACA-N/A'}
@@ -575,8 +578,12 @@ export default function AcademyDashboard() {
               TrackAthlete Facility
             </span>
           </div>
-          <h1 className="text-3xl font-normal text-white" style={{ fontFamily: 'Georgia, serif' }}>
-            {profile?.name || user?.name || 'Sports Academy'} <em style={{ color: '#b9d9bf', fontStyle: 'italic' }}>Portal</em>
+          <h1 className="text-3xl font-normal text-white flex items-center gap-2 flex-wrap" style={{ fontFamily: 'Georgia, serif' }}>
+            <span>{profile?.name || user?.name || 'Sports Academy'}</span>
+            <span className="inline-flex items-center text-emerald-400" title="Verified TrackAthlete Sports Academy">
+              <CheckCircle2 className="w-6 h-6 fill-emerald-500/20 text-emerald-400" />
+            </span>
+            <em style={{ color: '#b9d9bf', fontStyle: 'italic' }}>Portal</em>
           </h1>
           <p className="text-xs text-[#c5d3ce] mt-1.5 flex items-center gap-2 flex-wrap">
             <span className="flex items-center gap-1">
@@ -1260,17 +1267,27 @@ export default function AcademyDashboard() {
               </p>
             </div>
 
-            <div className="bg-[#f0fdf4] border border-[#bbf7d0] rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <span className="text-[11px] font-bold text-[#166534] uppercase tracking-wider block">
-                  Permanent TrackAthlete / Academy ID
-                </span>
-                <span className="text-sm font-mono font-bold text-[#14532d]">
-                  {profile?.academyId || user?.academyId || user?.trackAthleteId || 'ACA-N/A'}
-                </span>
+            <div className="bg-[#f0fdf4] border border-[#bbf7d0] rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#dcfce7] border border-[#86efac] flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-6 h-6 text-[#16a34a]" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold text-[#166534] uppercase tracking-wider block">
+                      Permanent TrackAthlete / Academy ID
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[#dcfce7] text-[#15803d] border border-[#86efac]">
+                      <CheckCircle2 className="w-3 h-3 text-[#16a34a]" /> VERIFIED ✓
+                    </span>
+                  </div>
+                  <span className="text-base font-mono font-bold text-[#14532d]">
+                    {profile?.academyId || user?.academyId || user?.trackAthleteId || 'ACA-N/A'}
+                  </span>
+                </div>
               </div>
-              <span className="text-xs text-[#15803d]">
-                Official platform identifier permanently registered in MongoDB
+              <span className="text-xs text-[#15803d] font-medium sm:text-right">
+                Official verified platform identifier permanently registered in MongoDB
               </span>
             </div>
 
@@ -1454,14 +1471,20 @@ export default function AcademyDashboard() {
 
           {/* Ranking Statistics */}
           <div className="bg-white border border-[#e2e8f0] rounded-2xl p-6 shadow-sm space-y-5">
-            <div className="border-b border-gray-200 pb-3">
-              <h2 className="text-base font-bold text-[#173235] uppercase tracking-wider flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-[#cc694e]" />
-                Academy Ranking & Representation Statistics
-              </h2>
-              <p className="text-xs text-gray-500">
-                Number of players trained at your facility who achieved competitive representation.
-              </p>
+            <div className="border-b border-gray-200 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 className="text-base font-bold text-[#173235] uppercase tracking-wider flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-[#cc694e]" />
+                  Academy Ranking & Representation Statistics
+                </h2>
+                <p className="text-xs text-gray-500">
+                  Number of players trained at your facility who achieved competitive representation.
+                </p>
+              </div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-extrabold self-start sm:self-auto">
+                <Award className="w-4 h-4 text-amber-600" />
+                <span>{profile?.achievementLevelLabel || (profile?.achievementLevel && profile?.achievementLevel !== 'UNRANKED' ? `Achievement Level: ${profile.achievementLevel}` : 'Achievement Level: UNRANKED')}</span>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

@@ -40,6 +40,7 @@ export default function FederationDashboard() {
     eventName: '',
     sport: '',
     category: 'Senior Championship',
+    competitionLevel: 'STATE',
     location: '',
     tournamentDate: '',
     startDate: '',
@@ -151,6 +152,7 @@ export default function FederationDashboard() {
         eventName: '',
         sport: federation?.sport || 'Taekwondo',
         category: 'Senior Championship',
+        competitionLevel: 'STATE',
         location: '',
         tournamentDate: '',
         startDate: '',
@@ -752,6 +754,27 @@ export default function FederationDashboard() {
                     required
                   />
                 </div>
+              </div>
+
+              {/* Tournament Competition Level * */}
+              <div>
+                <Label required className="font-bold text-xs text-[#194e42] flex items-center gap-1.5">
+                  <Trophy className="w-3.5 h-3.5 text-[#194e42]" /> TOURNAMENT LEVEL *
+                </Label>
+                <select
+                  value={eventForm.competitionLevel}
+                  onChange={e => setEventForm({ ...eventForm, competitionLevel: e.target.value })}
+                  className="w-full h-10 px-3 rounded-lg border border-[#2f6d5a] bg-white text-xs font-extrabold mt-1 text-[#173235]"
+                  required
+                >
+                  <option value="DISTRICT">DISTRICT</option>
+                  <option value="STATE">STATE</option>
+                  <option value="NATIONAL">NATIONAL</option>
+                  <option value="INTERNATIONAL">INTERNATIONAL</option>
+                </select>
+                <p className="text-[10px] text-[#4d6b63] mt-0.5 font-medium">
+                  Results awarded in this championship will officially inherit this competition level.
+                </p>
               </div>
 
               {/* 4. TOURNAMENT DATE * (Prominently styled date picker) */}

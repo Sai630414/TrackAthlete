@@ -130,7 +130,12 @@ exports.search = async (req, res) => {
 
     let academies = [];
     try {
-      academies = await Academy.find({ sports: sport }).lean();
+      academies = await Academy.find({
+        $or: [
+          { 'sports.sportName': new RegExp(`^${sport}$`, 'i') },
+          { sports: new RegExp(`^${sport}$`, 'i') }
+        ]
+      }).lean();
     } catch (dbErr) {
       console.warn('Mongo Academy query failed, using JSON fallback:', dbErr.message);
     }
@@ -141,6 +146,8 @@ exports.search = async (req, res) => {
     const academiesWithDistance = academies
       .map((a) => ({
         ...a,
+        verified: a.verified !== false,
+        achievementLevel: a.achievementLevel || 'STATE',
         distanceKm: Math.round(haversineKm(cityCoords, a.location?.coordinates || [cityData.lng, cityData.lat]))
       }))
       .filter((a) => (radius ? a.distanceKm <= radius : true))

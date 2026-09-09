@@ -216,12 +216,15 @@ export default function ParentDashboard() {
             {searchResult.academies.map((a) => (
               <div key={a._id || a.name} className="bg-white border border-[#d8ded5] rounded-xl p-4 mb-2.5 flex justify-between items-center shadow-xs">
                 <div>
-                  <div className="font-bold text-sm text-[#173235]">{a.name}</div>
+                  <div className="font-bold text-sm text-[#173235] flex items-center gap-1.5">
+                    <span>{a.name}</span>
+                    <span className="text-emerald-600 font-bold text-xs" title="Verified TrackAthlete Academy">✓</span>
+                  </div>
                   <div className="text-xs text-[#526668] mt-0.5">{a.city}, {a.state}</div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${a.verified ? 'bg-[#e2eee4] text-[#194e42] border-[#2f6d5a]' : 'bg-[#fff3f0] text-[#a44e3d] border-[#efcbc3]'}`}>
-                    {a.verified ? 'Verified' : 'Unverified'}
+                  <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${a.verified !== false ? 'bg-[#e2eee4] text-[#194e42] border-[#2f6d5a]' : 'bg-[#fff3f0] text-[#a44e3d] border-[#efcbc3]'}`}>
+                    {a.verified !== false ? 'Verified ✓' : 'Unverified'}
                   </span>
                   <span className="text-xs font-extrabold text-[#194e42] bg-[#e2eee4] px-3 py-1 rounded-full border border-[#2f6d5a]/30">{a.distanceKm} km</span>
                 </div>

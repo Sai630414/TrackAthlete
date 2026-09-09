@@ -225,10 +225,18 @@ export default function AthleteAcademiesSection({ athleteSport, athleteSports })
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-bold text-base text-[#173235]">{acad.name}</h3>
+                            <h3 className="font-bold text-base text-[#173235] flex items-center gap-1.5">
+                              <span>{acad.name}</span>
+                              <CheckCircle2 className="w-4 h-4 text-[#2f6d5a] shrink-0 inline" title="Verified TrackAthlete Sports Academy" />
+                            </h3>
                             {acad.academyId && (
                               <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-[#526668] border border-gray-200">
                                 {acad.academyId}
+                              </span>
+                            )}
+                            {acad.achievementLevel && acad.achievementLevel !== 'UNRANKED' && (
+                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                                {acad.achievementLevel}
                               </span>
                             )}
                           </div>
@@ -240,8 +248,8 @@ export default function AthleteAcademiesSection({ athleteSport, athleteSports })
                             )}
                           </p>
                         </div>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#eef6f2] text-[#2f6d5a] border border-[#b9d9bf] shrink-0">
-                          Verified
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#eef6f2] text-[#2f6d5a] border border-[#b9d9bf] shrink-0 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-[#2f6d5a]" /> Verified ✓
                         </span>
                       </div>
 

@@ -4,6 +4,8 @@ const Academy = require('../models/Academy');
 const AcademyAthleteMembership = require('../models/AcademyAthleteMembership');
 const OfficialAchievement = require('../models/OfficialAchievement');
 const OrganizerAchievement = require('../models/OrganizerAchievement');
+require('../models/OfficialEvent');
+require('../models/OrganizerEvent');
 const Recommendation = require('../models/Recommendation');
 const {
   LEVEL_RANKS,

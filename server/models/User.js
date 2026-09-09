@@ -105,6 +105,10 @@ const UserSchema = new mongoose.Schema({
   trackAthleteId: { type: String, trim: true, sparse: true },
   linkedOrganizerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organizer', default: null, index: true },
 
+  // Verification status
+  verified: { type: Boolean, default: true },
+  isVerified: { type: Boolean, default: true },
+
   createdAt: { type: Date, default: Date.now }
 });
 
