@@ -1275,6 +1275,39 @@ router.get('/discovery', async (req, res) => {
 });
 
 /**
+ * GET /api/academy/:academyId
+ * Authoritative Academy profile with per-sport achievement levels (Rules 37, 39, 40, 41)
+ */
+router.get('/:academyId', async (req, res) => {
+  try {
+    const searchId = req.params.academyId;
+    const isObjectId = typeof searchId === 'string' && searchId.match(/^[0-9a-fA-F]{24}$/);
+    const academy = await Academy.findOne({
+      $or: [
+        { academyId: searchId },
+        ...(isObjectId ? [{ _id: searchId }] : [])
+      ]
+    });
+    if (!academy) {
+      return res.status(404).json({ error: 'Academy not found.' });
+    }
+
+    const { getAcademyPerSportAchievementLevels } = require('../utils/recommendationEngine');
+    const { overallLevel, perSport } = await getAcademyPerSportAchievementLevels(academy);
+
+    const serialized = serializeAcademyProfile(academy, req.user?.role || 'public');
+    serialized.achievementLevel = overallLevel;
+    serialized.achievementLevelLabel = overallLevel !== 'UNRANKED' ? `Achievement Level: ${overallLevel}` : 'Achievement Level: UNRANKED';
+    serialized.perSportLevels = perSport;
+
+    res.json(serialized);
+  } catch (err) {
+    console.error('Error fetching academy profile:', err);
+    res.status(500).json({ error: 'Failed to fetch academy profile: ' + err.message });
+  }
+});
+
+/**
  * POST /api/academy/:academyId/request-join
  * Athlete sends a join request to an academy
  */

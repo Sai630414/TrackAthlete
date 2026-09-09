@@ -30,6 +30,7 @@ import AthleteAcademiesSection from '../components/AthleteAcademiesSection';
 import OrganizedEventsSection from '../components/OrganizedEventsSection';
 import AthleteAchievementsTimeline from '../components/AthleteAchievementsTimeline';
 import ErrorBoundary from '../components/ErrorBoundary';
+import AthleteRecommendationsPage from './AthleteRecommendationsPage';
 import {
   Shield,
   User,
@@ -437,6 +438,7 @@ export default function AthleteDashboard() {
   const [relocationFlexible, setRelocationFlexible] = useState(user?.relocationFlexible ?? true);
   const [activeTab, setActiveTab] = useState('eligible');
   const [myOrganizedData, setMyOrganizedData] = useState(null);
+  const [verifiedSummary, setVerifiedSummary] = useState([]);
   const [profile, setProfile] = useState({
     name: user?.name || '',
     sport: user?.sport || '',
@@ -544,15 +546,17 @@ export default function AthleteDashboard() {
     try {
       const sportsList = Array.isArray(user?.sports) && user.sports.length > 0 ? user.sports : (user?.sport ? [user.sport] : []);
       const sportsQuery = sportsList.length > 0 ? `?sports=${encodeURIComponent(sportsList.join(','))}` : '';
-      const [coachesRes, connsRes, profileRes, orgEventsRes] = await Promise.all([
+      const [coachesRes, connsRes, profileRes, orgEventsRes, summaryRes] = await Promise.all([
         api.get(`/athlete/coaches/list${sportsQuery}`),
         api.get(`/athlete/${user._id}/connections`),
         api.get(`/athlete/${user._id}/profile`),
-        api.get('/organizer-events/my-organized-events').catch(() => ({ data: { hasLinkedOrganizer: false, events: [] } }))
+        api.get('/organizer-events/my-organized-events').catch(() => ({ data: { hasLinkedOrganizer: false, events: [] } })),
+        api.get('/recommendations/athlete-summary').catch(() => ({ data: [] }))
       ]);
       setCoaches(coachesRes.data || []);
       setConnections(connsRes.data || []);
       if (orgEventsRes?.data) setMyOrganizedData(orgEventsRes.data);
+      if (summaryRes?.data) setVerifiedSummary(Array.isArray(summaryRes.data) ? summaryRes.data : []);
       if (profileRes.data) {
         const d = profileRes.data;
         const dSports = Array.isArray(d.sports) && d.sports.length > 0 ? d.sports : (d.sport ? [d.sport] : []);
@@ -768,6 +772,20 @@ export default function AthleteDashboard() {
               {profile.level ? ` · ${profile.level}` : ''}
             </span>
           </div>
+
+          {verifiedSummary.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              <span className="text-xs font-semibold text-[#b9d9bf]">Highest Verified:</span>
+              {verifiedSummary.map((vs, idx) => (
+                <span key={idx} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-extrabold uppercase bg-[#2f6d5a] text-[#e2eee4] border border-[#488e78]">
+                  <span>[{vs.sport}]</span>
+                  <span className="text-[#ffd0b0]">[{vs.level}]</span>
+                  <span>·</span>
+                  <span className="text-white">{vs.outcome}</span>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex shrink-0">
@@ -817,6 +835,9 @@ export default function AthleteDashboard() {
               </span>
             ) : null}
           </TabsTrigger>
+          <TabsTrigger value="recommendations">
+            <Trophy className="w-4 h-4 mr-1.5 text-[#e07050]" /> Recommendations
+          </TabsTrigger>
           <TabsTrigger value="federation-lists">
             <Shield className="w-4 h-4 mr-1.5" /> Federation Lists
           </TabsTrigger>
@@ -827,6 +848,11 @@ export default function AthleteDashboard() {
             <User className="w-4 h-4 mr-1.5" /> Profile & Preferences
           </TabsTrigger>
         </TabsList>
+
+        {/* ── RECOMMENDATIONS TAB ──────────────────────────────────── */}
+        <TabsContent value="recommendations" className="space-y-4">
+          <AthleteRecommendationsPage />
+        </TabsContent>
 
         {/* ── PROFILE & PREFERENCES TAB ──────────────────────────────── */}
         <TabsContent value="profile" className="space-y-4">

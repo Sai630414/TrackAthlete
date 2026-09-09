@@ -13,6 +13,7 @@ const OrganizerAchievementSchema = new mongoose.Schema({
   achievementType: { type: String, default: 'Organizer Verified' },
   sourceType: { type: String, default: 'ORGANIZER' },
   sourceLabel: { type: String, default: 'ORGANIZER VERIFIED' },
+  competitionLevel: { type: String, enum: ['DISTRICT', 'STATE', 'NATIONAL', 'INTERNATIONAL'], trim: true, uppercase: true, default: null },
   athleteId: { type: String, trim: true },
   outcome: String,
   certificateData: String,

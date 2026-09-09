@@ -11,6 +11,7 @@ const address = new mongoose.Schema({ line1: String, city: String, state: String
 const OrganizerEventSchema = new mongoose.Schema({
   organizer: { type: mongoose.Schema.Types.ObjectId, ref: 'Organizer', required: true, index: true },
   eventName: { type: String, required: true, trim: true }, description: String, eventDate: { type: Date, required: true },
+  competitionLevel: { type: String, enum: ['DISTRICT', 'STATE', 'NATIONAL', 'INTERNATIONAL'], trim: true, uppercase: true, default: null },
   registrationDeadline: { type: Date, required: true }, teamFormationDeadline: Date, resultSubmissionDeadline: { type: Date, required: true },
   venue: { type: String, required: true }, venueAddress: address, rules: String,
   organizerContact: { name: String, mobile: String, email: String }, sports: { type: [sportSchema], validate: v => v?.length > 0 },

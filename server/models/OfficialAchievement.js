@@ -14,6 +14,7 @@ const OfficialAchievementSchema = new mongoose.Schema({
   tournamentName: { type: String, required: true },
   sport: { type: String, required: true },
   category: { type: String, required: true },
+  competitionLevel: { type: String, enum: ['DISTRICT', 'STATE', 'NATIONAL', 'INTERNATIONAL'], trim: true, uppercase: true, default: null },
   
   achievementType: { type: String, enum: ['medal', 'ranking'], required: true },
   medal: { type: String, enum: ['Gold', 'Silver', 'Bronze', 'Participation'] },

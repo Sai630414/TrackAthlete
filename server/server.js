@@ -20,6 +20,7 @@ const federationRoutes = require('./routes/federation.routes');
 const verificationRoutes = require('./routes/verification.routes');
 const organizerRoutes = require('./routes/organizer.routes');
 const organizerEventRoutes = require('./routes/organizer-events.routes');
+const recommendationRoutes = require('./routes/recommendation.routes');
 
 const Federation = require('./models/Federation');
 const OfficialAssociation = require('./models/OfficialAssociation');
@@ -126,6 +127,7 @@ app.use('/api/federation', federationRoutes);
 app.use('/api/verify', verificationRoutes);
 app.use('/api/organizer', organizerRoutes);
 app.use('/api/organizer-events', organizerEventRoutes);
+app.use('/api/recommendations', recommendationRoutes);
 
 initSocket(io);
 

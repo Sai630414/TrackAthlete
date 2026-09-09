@@ -6,6 +6,7 @@ import { useAuth } from './context/AuthContext';
 import Sidebar from './components/Sidebar';
 import ParentDashboard from './pages/ParentDashboard';
 import AthleteDashboard from './pages/AthleteDashboard';
+import AthleteRecommendationsPage from './pages/AthleteRecommendationsPage';
 import CoachDashboard from './pages/CoachDashboard';
 import SponsorDashboard from './pages/SponsorDashboard';
 import AcademyDashboard from './pages/AcademyDashboard';
@@ -46,6 +47,7 @@ function ProtectedApp() {
         <Routes>
           <Route path="/parent" element={user.role === 'parent' ? <ParentDashboard /> : <Navigate to={destination} replace />} />
           <Route path="/athlete" element={user.role === 'athlete' ? <AthleteDashboard /> : <Navigate to={destination} replace />} />
+          <Route path="/athlete/recommendations" element={user.role === 'athlete' ? <AthleteRecommendationsPage /> : <Navigate to={destination} replace />} />
           <Route path="/coach" element={user.role === 'coach' ? <CoachDashboard /> : <Navigate to={destination} replace />} />
           <Route path="/sponsor" element={user.role === 'sponsor' ? <SponsorDashboard /> : <Navigate to={destination} replace />} />
           <Route path="/academy" element={['academy', 'admin'].includes(user.role) ? <AcademyDashboard /> : <Navigate to={destination} replace />} />

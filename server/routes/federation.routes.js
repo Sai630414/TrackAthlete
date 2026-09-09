@@ -10,6 +10,8 @@ const { hashAadhaar, normalizeAadhaar, withoutAadhaar } = require('../utils/aadh
 const User = require('../models/User');
 const { verifyToken, requireRoles } = require('../middleware/auth.middleware');
 const { sendBrevoEmail } = require('../utils/mailer');
+const { resolveCompetitionLevel } = require('../utils/academyRanking');
+const { generateAthleteRecommendations } = require('../utils/recommendationEngine');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'trackathlete_sih_secret_2026';
 
@@ -379,7 +381,7 @@ router.get('/profile', verifyToken, requireRoles('federation'), async (req, res)
 // POST /api/federation/events — Create Official Federation Event
 router.post('/events', verifyToken, requireRoles('federation'), async (req, res) => {
   try {
-    const { eventName, sport, category, location, tournamentDate, startDate, endDate, submissionDeadline } = req.body;
+    const { eventName, sport, category, location, tournamentDate, startDate, endDate, submissionDeadline, competitionLevel } = req.body;
     if (!eventName || !sport || !category || !tournamentDate || !submissionDeadline) {
       return res.status(400).json({ error: 'Event name, sport, category, tournament date, and submission deadline are required.' });
     }
@@ -394,6 +396,10 @@ router.post('/events', verifyToken, requireRoles('federation'), async (req, res)
       return res.status(400).json({ error: 'Tournament date and submission deadline must be valid dates.' });
     }
 
+    const resolvedLevel = (competitionLevel && ['DISTRICT', 'STATE', 'NATIONAL', 'INTERNATIONAL'].includes(String(competitionLevel).trim().toUpperCase()))
+      ? String(competitionLevel).trim().toUpperCase()
+      : resolveCompetitionLevel({ eventName, category });
+
     const event = await OfficialEvent.create({
       eventId,
       federation: fed._id,
@@ -402,6 +408,7 @@ router.post('/events', verifyToken, requireRoles('federation'), async (req, res)
       eventName: String(eventName).trim(),
       sport: String(sport).trim(),
       category: String(category).trim(),
+      competitionLevel: resolvedLevel || null,
       location: location ? String(location).trim() : '',
       tournamentDate: tourneyDate,
       startDate: startDate ? new Date(startDate) : tourneyDate,
@@ -547,6 +554,7 @@ router.post('/achievements', verifyToken, requireRoles('federation'), async (req
       tournamentName: event.eventName,
       sport: event.sport,
       category: event.category,
+      competitionLevel: event.competitionLevel || resolveCompetitionLevel(event) || null,
       achievementType,
       medal: achievementType === 'medal' ? (medal || 'Gold') : undefined,
       rank: achievementType === 'ranking' ? Number(rank || 1) : undefined,
@@ -564,6 +572,13 @@ router.post('/achievements', verifyToken, requireRoles('federation'), async (req
     // A submitted result is immutable; the event remains open for other valid winners until its deadline.
     event.status = 'COMPLETED';
     await event.save();
+
+    // Re-evaluate recommendations for this athlete asynchronously (Rule 27 & 66)
+    if (matchedUserId) {
+      generateAthleteRecommendations(matchedUserId).catch(err => {
+        console.error('Error generating athlete recommendations on federation result:', err.message);
+      });
+    }
 
     res.status(201).json(withoutAadhaar(achievement));
   } catch (err) {

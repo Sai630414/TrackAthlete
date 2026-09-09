@@ -1,14 +1,16 @@
 import { NavLink } from 'react-router-dom';
 import { Building2, ChevronRight, HeartHandshake, LayoutGrid, LogOut, Menu, Trophy, UserRound, UsersRound, X } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
+import api from '../services/api';
 
 const links = [
   { to: '/parent', role: 'parent', label: 'Pathway finder', icon: LayoutGrid, caption: 'Parent workspace' },
   { to: '/athlete', role: 'athlete', label: 'Athlete profile', icon: UserRound, caption: 'Training & growth' },
+  { to: '/athlete/recommendations', role: 'athlete', label: 'Recommendations', icon: Trophy, caption: 'Verified academy matches' },
   { to: '/coach', role: 'coach', label: 'Coach desk', icon: UsersRound, caption: 'Athlete relationships' },
   { to: '/sponsor', role: 'sponsor', label: 'Impact studio', icon: HeartHandshake, caption: 'Support & reports' },
   { to: '/academy', role: 'academy', label: 'Academy hub', icon: Building2, caption: 'Listing & verification' },
@@ -18,6 +20,28 @@ function Navigation({ close }) {
   const { user, logout } = useAuth();
   const { notifCount, totalUnreadMessages } = useSocket();
   const activeRole = user?.role;
+  const [unreadRecCount, setUnreadRecCount] = useState(0);
+
+  useEffect(() => {
+    if (activeRole !== 'athlete') return;
+    let isMounted = true;
+    const fetchUnread = async () => {
+      try {
+        const { data } = await api.get('/recommendations/unread-count');
+        if (isMounted && typeof data?.count === 'number') {
+          setUnreadRecCount(data.count);
+        }
+      } catch (err) {
+        // Silently ignore network errors
+      }
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 15000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [activeRole]);
 
   const visibleLinks = links.filter(({ role: linkRole }) => activeRole ? activeRole === linkRole : linkRole === 'parent');
 
@@ -25,20 +49,27 @@ function Navigation({ close }) {
     <nav className="navigation" aria-label="Primary navigation">
       <p className="nav-label">Your Workspace</p>
       {visibleLinks.map(({ to, label, icon: Icon, caption, role: linkRole }) => {
-        const badgeCount = linkRole === 'coach'
-          ? (notifCount + totalUnreadMessages)
-          : (linkRole === 'athlete' ? totalUnreadMessages : 0);
+        let badgeCount = 0;
+        if (linkRole === 'coach') {
+          badgeCount = notifCount + totalUnreadMessages;
+        } else if (to === '/athlete/recommendations') {
+          badgeCount = unreadRecCount;
+        } else if (linkRole === 'athlete') {
+          badgeCount = totalUnreadMessages;
+        }
+
+        const isPulse = to === '/athlete/recommendations' && unreadRecCount > 0;
 
         return (
           <NavLink
             key={to}
             to={to}
             onClick={close}
-            className={({ isActive }) => ['nav-link', isActive && 'is-active'].filter(Boolean).join(' ')}
+            className={({ isActive }) => ['nav-link', isActive && 'is-active', isPulse && 'animate-pulse ring-1 ring-[#e07050]/40'].filter(Boolean).join(' ')}
           >
-            <Icon size={17} strokeWidth={1.8} />
+            <Icon size={17} strokeWidth={1.8} className={isPulse ? 'text-[#e07050]' : ''} />
             <span>
-              <b>{label}</b>
+              <b className={isPulse ? 'text-[#e07050]' : ''}>{label}</b>
               <small>{caption}</small>
             </span>
             {/* Notification badge */}
@@ -56,6 +87,7 @@ function Navigation({ close }) {
                 fontWeight: 800,
                 padding: '0 5px',
                 lineHeight: 1,
+                boxShadow: isPulse ? '0 0 10px rgba(224, 112, 80, 0.7)' : 'none'
               }}>
                 {badgeCount > 99 ? '99+' : badgeCount}
               </span>

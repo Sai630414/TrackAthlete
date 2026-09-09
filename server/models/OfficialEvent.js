@@ -9,6 +9,7 @@ const OfficialEventSchema = new mongoose.Schema({
   eventName: { type: String, required: true },
   sport: { type: String, required: true },
   category: { type: String, required: true },
+  competitionLevel: { type: String, enum: ['DISTRICT', 'STATE', 'NATIONAL', 'INTERNATIONAL'], trim: true, uppercase: true, default: null },
   location: { type: String, default: '' },
   tournamentDate: { type: Date, required: true },
   startDate: { type: Date },

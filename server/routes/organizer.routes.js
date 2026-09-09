@@ -13,6 +13,8 @@ const User = require('../models/User');
 const { verifyToken, requireRoles } = require('../middleware/auth.middleware');
 const { hashAadhaar } = require('../utils/aadhaar');
 const { sendBrevoEmail } = require('../utils/mailer');
+const { resolveCompetitionLevel } = require('../utils/academyRanking');
+const { generateAthleteRecommendations } = require('../utils/recommendationEngine');
 const router = express.Router();
 const secret = () => process.env.JWT_SECRET || 'trackathlete_sih_secret_2026';
 const organizationTypes = new Set(['Private University', 'Government University', 'College', 'School', 'Sports Academy', 'Sports Club', 'Sports Association', 'Company / Private Organization', 'NGO']);
@@ -501,6 +503,8 @@ router.post('/events/:id/results/:sportId/freeze', async (req, res) => {
     };
 
     let matchedCount = 0;
+    const matchedAthleteUserIds = new Set();
+    const eventCompLevel = event.competitionLevel || resolveCompetitionLevel(event) || null;
 
     for (const entry of result.entries) {
       if (isTeam) {
@@ -508,6 +512,7 @@ router.post('/events/:id/results/:sportId/freeze', async (req, res) => {
           const matched = findMatch(member);
           if (matched) {
             matchedCount++;
+            matchedAthleteUserIds.add(String(matched._id));
             member.participantType = 'registered';
             member.athlete = matched._id;
             member.athleteId = matched.athleteId;
@@ -522,6 +527,7 @@ router.post('/events/:id/results/:sportId/freeze', async (req, res) => {
                   result: result._id,
                   sportConfigId: sport._id,
                   sportName: sport.sportName,
+                  competitionLevel: eventCompLevel,
                   team: entry.team || undefined,
                   teamName: entry.teamName,
                   position: entry.position,
@@ -545,6 +551,7 @@ router.post('/events/:id/results/:sportId/freeze', async (req, res) => {
         const matched = findMatch(entry);
         if (matched) {
           matchedCount++;
+          matchedAthleteUserIds.add(String(matched._id));
           entry.participantType = 'registered';
           entry.athlete = matched._id;
           entry.athleteId = matched.athleteId;
@@ -559,6 +566,7 @@ router.post('/events/:id/results/:sportId/freeze', async (req, res) => {
                 result: result._id,
                 sportConfigId: sport._id,
                 sportName: sport.sportName,
+                competitionLevel: eventCompLevel,
                 position: entry.position,
                 medal: entry.medal,
                 outcome: entry.outcome,
@@ -584,6 +592,13 @@ router.post('/events/:id/results/:sportId/freeze', async (req, res) => {
 
     sport.resultStatus = 'frozen';
     await event.save();
+
+    // Re-evaluate recommendations for matched athletes asynchronously (Rule 27 & 66)
+    for (const athId of matchedAthleteUserIds) {
+      generateAthleteRecommendations(athId).catch(err => {
+        console.error('Error generating athlete recommendations on organizer result:', err.message);
+      });
+    }
 
     res.json({ result, matchedAthletes: matchedCount });
   } catch (err) { res.status(500).json({ error: err.message }); }

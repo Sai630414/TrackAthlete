@@ -219,6 +219,13 @@ function serializeAcademyProfile(academyDoc, requesterRole = 'public') {
     ? a.sports.map(s => (typeof s === 'string' ? s.toUpperCase() : (s.sportName || '').toUpperCase())).filter(Boolean)
     : [];
 
+  const rankingStats = a.rankingStats || { districtPlayers: 0, statePlayers: 0, nationalPlayers: 0, internationalPlayers: 0 };
+  let achievementLevel = a.achievementLevel;
+  if (!achievementLevel) {
+    const { calculateAchievementLevelFromStats } = require('./academyRanking');
+    achievementLevel = calculateAchievementLevelFromStats(rankingStats);
+  }
+
   return {
     _id: a._id,
     academyId: a.academyId || null,
@@ -234,7 +241,9 @@ function serializeAcademyProfile(academyDoc, requesterRole = 'public') {
     sports: sportsOffered.map(name => ({ sportName: name })),
     sportsOffered,
     sportsTags: sportsOffered.map(name => `[ ${name} ]`),
-    rankingStats: a.rankingStats || { districtPlayers: 0, statePlayers: 0, nationalPlayers: 0, internationalPlayers: 0 },
+    rankingStats,
+    achievementLevel,
+    achievementLevelLabel: achievementLevel !== 'UNRANKED' ? `Achievement Level: ${achievementLevel}` : 'Achievement Level: UNRANKED',
     verified: Boolean(a.verified),
     distanceKm: a.distanceKm !== undefined ? a.distanceKm : undefined,
     createdAt: a.createdAt
