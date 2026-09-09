@@ -30,6 +30,19 @@ import AthleteProfileModal from '../components/AthleteProfileModal';
 import CoachProfileModal from '../components/CoachProfileModal';
 import OrganizedEventsSection from '../components/OrganizedEventsSection';
 
+function resolveAcademyAchievementLevel(prof, usr) {
+  if (prof?.achievementLevel && prof.achievementLevel !== 'UNRANKED') return prof.achievementLevel;
+  if (usr?.achievementLevel && usr.achievementLevel !== 'UNRANKED') return usr.achievementLevel;
+  const stats = prof?.rankingStats || usr?.rankingStats;
+  if (stats) {
+    if (Number(stats.internationalPlayers) >= 1) return 'INTERNATIONAL';
+    if (Number(stats.nationalPlayers) >= 2) return 'NATIONAL';
+    if (Number(stats.statePlayers) >= 3) return 'STATE';
+    if (Number(stats.districtPlayers) >= 5) return 'DISTRICT';
+  }
+  return 'UNRANKED';
+}
+
 export default function AcademyDashboard() {
   const { user } = useAuth();
 
@@ -569,7 +582,10 @@ export default function AcademyDashboard() {
               <CheckCircle2 className="w-3.5 h-3.5 text-[#2f6d5a]" /> Verified Sports Academy ✓
             </span>
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-200 border border-amber-500/40">
-              <Trophy className="w-3.5 h-3.5 text-amber-300" /> {profile?.achievementLevelLabel || (profile?.achievementLevel && profile?.achievementLevel !== 'UNRANKED' ? `Achievement Level: ${profile.achievementLevel}` : 'Achievement Level: UNRANKED')}
+              <Trophy className="w-3.5 h-3.5 text-amber-300" /> {(() => {
+                const lvl = resolveAcademyAchievementLevel(profile, user);
+                return lvl !== 'UNRANKED' ? `Achievement Level: ${lvl}` : 'Achievement Level: UNRANKED';
+              })()}
             </span>
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#0f2928] text-[#b9d9bf] border border-[#2f6d5a] tracking-wider">
               ID: {profile?.academyId || user?.academyId || user?.trackAthleteId || 'ACA-N/A'}
@@ -580,8 +596,9 @@ export default function AcademyDashboard() {
           </div>
           <h1 className="text-3xl font-normal text-white flex items-center gap-2 flex-wrap" style={{ fontFamily: 'Georgia, serif' }}>
             <span>{profile?.name || user?.name || 'Sports Academy'}</span>
-            <span className="inline-flex items-center text-emerald-400" title="Verified TrackAthlete Sports Academy">
+            <span className="inline-flex items-center text-emerald-400 font-bold" title="Verified TrackAthlete Sports Academy">
               <CheckCircle2 className="w-6 h-6 fill-emerald-500/20 text-emerald-400" />
+              <span className="ml-1 text-2xl font-black text-emerald-400">✓</span>
             </span>
             <em style={{ color: '#b9d9bf', fontStyle: 'italic' }}>Portal</em>
           </h1>
@@ -1483,7 +1500,10 @@ export default function AcademyDashboard() {
               </div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-extrabold self-start sm:self-auto">
                 <Award className="w-4 h-4 text-amber-600" />
-                <span>{profile?.achievementLevelLabel || (profile?.achievementLevel && profile?.achievementLevel !== 'UNRANKED' ? `Achievement Level: ${profile.achievementLevel}` : 'Achievement Level: UNRANKED')}</span>
+                <span>{(() => {
+                  const lvl = resolveAcademyAchievementLevel(profile, user);
+                  return lvl !== 'UNRANKED' ? `Achievement Level: ${lvl}` : 'Achievement Level: UNRANKED';
+                })()}</span>
               </div>
             </div>
 
@@ -1539,6 +1559,55 @@ export default function AcademyDashboard() {
                   className="w-full text-center py-1.5 text-base font-bold border border-gray-300 rounded-lg focus:outline-none focus:border-[#2f6d5a]"
                 />
               </div>
+            </div>
+
+            {/* Per-Sport Dynamic Achievement Levels */}
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-bold text-[#173235] uppercase tracking-wider flex items-center gap-1.5">
+                  <Award className="w-4 h-4 text-[#2f6d5a]" />
+                  Dynamic Per-Sport Classification
+                </h3>
+                <span className="text-[11px] text-gray-500 italic">
+                  Derived from active athlete memberships & verified competition achievements
+                </span>
+              </div>
+
+              {sports.length === 0 ? (
+                <div className="text-xs text-gray-500 italic p-3 bg-gray-50 rounded-xl border border-gray-200 text-center">
+                  No sports disciplines registered yet. Add a sport above to see dynamic classification.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {sports.map(s => {
+                    const spName = (s.sportName || s).toUpperCase();
+                    const spData = profile?.perSportLevels?.[spName] || profile?.perSportLevels?.[s.sportName] || {};
+                    const spLevel = spData.achievementLevel || (profile?.achievementLevel && profile?.achievementLevel !== 'UNRANKED' ? profile.achievementLevel : 'UNRANKED');
+                    const spStats = spData.rankingStats || profileForm;
+
+                    return (
+                      <div key={spName} className="p-3.5 rounded-xl border border-gray-200 bg-[#fbfdfa] flex flex-col justify-between space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black text-[#173235] tracking-wide">[ {spName} ]</span>
+                          <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border ${
+                            spLevel !== 'UNRANKED'
+                              ? 'bg-amber-50 text-amber-900 border-amber-300'
+                              : 'bg-gray-100 text-gray-600 border-gray-300'
+                          }`}>
+                            Achievement Level: {spLevel}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-2 text-center text-[10px] text-gray-600 bg-white p-2 rounded-lg border border-gray-100">
+                          <div><span className="block font-bold text-[#173235] text-xs">{spStats?.districtPlayers ?? 0}</span>Dist</div>
+                          <div><span className="block font-bold text-[#173235] text-xs">{spStats?.statePlayers ?? 0}</span>State</div>
+                          <div><span className="block font-bold text-[#173235] text-xs">{spStats?.nationalPlayers ?? 0}</span>Natl</div>
+                          <div><span className="block font-bold text-[#173235] text-xs">{spStats?.internationalPlayers ?? 0}</span>Intl</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 

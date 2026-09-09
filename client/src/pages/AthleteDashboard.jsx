@@ -526,6 +526,7 @@ export default function AthleteDashboard() {
   const [loadingCoaches, setLoadingCoaches] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSport, setSelectedSport] = useState('all');
+  const [unreadRecCount, setUnreadRecCount] = useState(0);
 
   // Request modal / state
   const [requestCoach, setRequestCoach] = useState(null);
@@ -546,17 +547,19 @@ export default function AthleteDashboard() {
     try {
       const sportsList = Array.isArray(user?.sports) && user.sports.length > 0 ? user.sports : (user?.sport ? [user.sport] : []);
       const sportsQuery = sportsList.length > 0 ? `?sports=${encodeURIComponent(sportsList.join(','))}` : '';
-      const [coachesRes, connsRes, profileRes, orgEventsRes, summaryRes] = await Promise.all([
+      const [coachesRes, connsRes, profileRes, orgEventsRes, summaryRes, unreadRecsRes] = await Promise.all([
         api.get(`/athlete/coaches/list${sportsQuery}`),
         api.get(`/athlete/${user._id}/connections`),
         api.get(`/athlete/${user._id}/profile`),
         api.get('/organizer-events/my-organized-events').catch(() => ({ data: { hasLinkedOrganizer: false, events: [] } })),
-        api.get('/recommendations/athlete-summary').catch(() => ({ data: [] }))
+        api.get('/recommendations/athlete-summary').catch(() => ({ data: [] })),
+        api.get('/recommendations/unread-count').catch(() => ({ data: { count: 0 } }))
       ]);
       setCoaches(coachesRes.data || []);
       setConnections(connsRes.data || []);
       if (orgEventsRes?.data) setMyOrganizedData(orgEventsRes.data);
       if (summaryRes?.data) setVerifiedSummary(Array.isArray(summaryRes.data) ? summaryRes.data : []);
+      if (unreadRecsRes?.data?.count !== undefined) setUnreadRecCount(unreadRecsRes.data.count);
       if (profileRes.data) {
         const d = profileRes.data;
         const dSports = Array.isArray(d.sports) && d.sports.length > 0 ? d.sports : (d.sport ? [d.sport] : []);
@@ -837,6 +840,11 @@ export default function AthleteDashboard() {
           </TabsTrigger>
           <TabsTrigger value="recommendations">
             <Trophy className="w-4 h-4 mr-1.5 text-[#e07050]" /> Recommendations
+            {unreadRecCount > 0 && (
+              <span style={{ marginLeft: 6, minWidth: 18, height: 18, borderRadius: 9, background: '#e07050', color: '#fff', fontSize: 10, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>
+                {unreadRecCount}
+              </span>
+            )}
           </TabsTrigger>
           <TabsTrigger value="federation-lists">
             <Shield className="w-4 h-4 mr-1.5" /> Federation Lists

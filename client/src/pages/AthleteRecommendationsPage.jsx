@@ -281,6 +281,7 @@ export default function AthleteRecommendationsPage() {
                     <h3 className="text-base font-extrabold text-[#173235] mt-1 line-clamp-1 flex items-center gap-1.5">
                       <span>{academy.name || 'Sports Academy'}</span>
                       <CheckCircle2 className="w-4 h-4 text-[#2f6d5a] shrink-0 inline" title="Verified TrackAthlete Sports Academy" />
+                      <span className="text-xs font-bold text-[#2f6d5a]">✓</span>
                     </h3>
                     {(academy.city || academy.state) && (
                       <p className="text-xs text-[#526668] flex items-center gap-1 mt-0.5">

@@ -235,6 +235,7 @@ export default function CoachAcademyOpeningsSection({
                           <p className="text-xs text-gray-600 font-semibold mt-0.5 flex items-center gap-1.5">
                             <span>{op.academyId?.name || 'Sports Academy'}</span>
                             <CheckCircle2 className="w-3.5 h-3.5 text-[#2f6d5a] shrink-0 inline" title="Verified TrackAthlete Sports Academy" />
+                            <span className="text-xs font-bold text-[#2f6d5a]">✓</span>
                           </p>
                         </div>
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">

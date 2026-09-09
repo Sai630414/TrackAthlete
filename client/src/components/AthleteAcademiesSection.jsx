@@ -228,15 +228,20 @@ export default function AthleteAcademiesSection({ athleteSport, athleteSports })
                             <h3 className="font-bold text-base text-[#173235] flex items-center gap-1.5">
                               <span>{acad.name}</span>
                               <CheckCircle2 className="w-4 h-4 text-[#2f6d5a] shrink-0 inline" title="Verified TrackAthlete Sports Academy" />
+                              <span className="text-xs font-bold text-[#2f6d5a]">✓</span>
                             </h3>
                             {acad.academyId && (
                               <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-[#526668] border border-gray-200">
                                 {acad.academyId}
                               </span>
                             )}
-                            {acad.achievementLevel && acad.achievementLevel !== 'UNRANKED' && (
+                            {acad.achievementLevel && acad.achievementLevel !== 'UNRANKED' ? (
                               <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
-                                {acad.achievementLevel}
+                                Achievement Level: {acad.achievementLevel}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-gray-50 text-gray-600 border border-gray-200">
+                                Achievement Level: UNRANKED
                               </span>
                             )}
                           </div>

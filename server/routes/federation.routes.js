@@ -386,6 +386,12 @@ router.post('/events', verifyToken, requireRoles('federation'), async (req, res)
       return res.status(400).json({ error: 'Event name, sport, category, tournament date, and submission deadline are required.' });
     }
 
+    const validLevels = ['DISTRICT', 'STATE', 'NATIONAL', 'INTERNATIONAL'];
+    const compLevelUpper = competitionLevel ? String(competitionLevel).trim().toUpperCase() : null;
+    if (!compLevelUpper || !validLevels.includes(compLevelUpper)) {
+      return res.status(400).json({ error: 'Tournament Level is required. Must be one of: DISTRICT, STATE, NATIONAL, INTERNATIONAL.' });
+    }
+
     const fed = await Federation.findById(req.user.id);
     if (!fed) return res.status(404).json({ error: 'Federation not found.' });
 
@@ -396,10 +402,6 @@ router.post('/events', verifyToken, requireRoles('federation'), async (req, res)
       return res.status(400).json({ error: 'Tournament date and submission deadline must be valid dates.' });
     }
 
-    const resolvedLevel = (competitionLevel && ['DISTRICT', 'STATE', 'NATIONAL', 'INTERNATIONAL'].includes(String(competitionLevel).trim().toUpperCase()))
-      ? String(competitionLevel).trim().toUpperCase()
-      : resolveCompetitionLevel({ eventName, category });
-
     const event = await OfficialEvent.create({
       eventId,
       federation: fed._id,
@@ -408,7 +410,7 @@ router.post('/events', verifyToken, requireRoles('federation'), async (req, res)
       eventName: String(eventName).trim(),
       sport: String(sport).trim(),
       category: String(category).trim(),
-      competitionLevel: resolvedLevel || null,
+      competitionLevel: compLevelUpper,
       location: location ? String(location).trim() : '',
       tournamentDate: tourneyDate,
       startDate: startDate ? new Date(startDate) : tourneyDate,
@@ -554,7 +556,7 @@ router.post('/achievements', verifyToken, requireRoles('federation'), async (req
       tournamentName: event.eventName,
       sport: event.sport,
       category: event.category,
-      competitionLevel: event.competitionLevel || resolveCompetitionLevel(event) || null,
+      competitionLevel: event.competitionLevel || 'STATE',
       achievementType,
       medal: achievementType === 'medal' ? (medal || 'Gold') : undefined,
       rank: achievementType === 'ranking' ? Number(rank || 1) : undefined,
@@ -565,6 +567,8 @@ router.post('/achievements', verifyToken, requireRoles('federation'), async (req
       certificateFileName: certificateFileName || 'official_certificate.pdf',
       certificateFileSize: certificateFileSize || 0,
       verificationStatus: 'FROZEN',
+      sourceType: 'FEDERATION',
+      sourceLabel: 'FEDERATION RECOGNIZED',
       isFrozen: true,
       frozenAt: new Date()
     });

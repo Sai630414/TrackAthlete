@@ -866,9 +866,21 @@ export default function FederationDashboard() {
                 >
                   <option value="">-- Choose Published Event --</option>
                   {events.filter(evt => !evt.isFrozen).map(evt => (
-                    <option key={evt._id} value={evt._id}>{evt.eventName} ({evt.eventId})</option>
+                    <option key={evt._id} value={evt._id}>
+                      {evt.eventName} ({evt.eventId}) - [{evt.competitionLevel || 'OFFICIAL'}]
+                    </option>
                   ))}
                 </select>
+                {selectedEventId && (() => {
+                  const ev = events.find(e => String(e._id) === String(selectedEventId));
+                  if (!ev) return null;
+                  return (
+                    <div className="mt-1.5 p-2 rounded-lg bg-[#e2eee4] border border-[#2f6d5a]/40 flex items-center justify-between text-xs text-[#194e42]">
+                      <span>Inherited Tournament Level: <strong className="font-extrabold uppercase">{ev.competitionLevel || 'STATE'}</strong></span>
+                      <span className="font-mono text-[10px] text-[#2f6d5a]">{ev.sport}</span>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
