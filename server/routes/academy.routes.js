@@ -81,13 +81,26 @@ async function getAcademyForUser(userId) {
     }
     if (academy.userId) {
       const u = await User.findById(academy.userId);
-      if (u && (!u.academyId || !u.trackAthleteId || u.verified !== true || u.isVerified !== true)) {
-        u.academyId = u.academyId || academy.academyId;
-        u.trackAthleteId = u.trackAthleteId || academy.academyId;
-        await User.updateOne(
-          { _id: u._id },
-          { $set: { academyId: u.academyId, trackAthleteId: u.trackAthleteId, verified: true, isVerified: true } }
-        );
+      if (u) {
+        const uUpdates = {};
+        if (!u.academyId || !u.trackAthleteId) {
+          uUpdates.academyId = u.academyId || academy.academyId;
+          uUpdates.trackAthleteId = u.trackAthleteId || academy.academyId;
+        }
+        if (u.verified !== true || u.isVerified !== true) {
+          uUpdates.verified = true;
+          uUpdates.isVerified = true;
+        }
+        if (academy.achievementLevel && u.achievementLevel !== academy.achievementLevel) {
+          uUpdates.achievementLevel = academy.achievementLevel;
+          uUpdates.achievementLevelLabel = academy.achievementLevelLabel;
+        }
+        if (academy.rankingStats) {
+          uUpdates.rankingStats = academy.rankingStats;
+        }
+        if (Object.keys(uUpdates).length > 0) {
+          await User.updateOne({ _id: u._id }, { $set: uUpdates });
+        }
       }
     }
   }
@@ -210,6 +223,9 @@ router.post(['/login', '/auth/login'], async (req, res) => {
       userObj.academyId = acadDoc.academyId;
       userObj.trackAthleteId = acadDoc.academyId;
       userObj.academyName = acadDoc.name;
+      userObj.achievementLevel = acadDoc.achievementLevel;
+      userObj.achievementLevelLabel = acadDoc.achievementLevelLabel;
+      userObj.rankingStats = acadDoc.rankingStats;
     } else {
       userObj.academyId = user.academyId || `ACA-${user._id.toString().slice(-8).toUpperCase()}`;
       userObj.trackAthleteId = userObj.academyId;
@@ -241,6 +257,15 @@ router.get('/my/profile', verifyToken, requireRoles('academy'), async (req, res)
 
     const { getAcademyPerSportAchievementLevels } = require('../utils/recommendationEngine');
     const { overallLevel, overallLevelLabel, perSport } = await getAcademyPerSportAchievementLevels(academy);
+
+    if (academy.achievementLevel !== overallLevel || academy.achievementLevelLabel !== overallLevelLabel) {
+      academy.achievementLevel = overallLevel;
+      academy.achievementLevelLabel = overallLevelLabel;
+      await Academy.updateOne({ _id: academy._id }, { $set: { achievementLevel: overallLevel, achievementLevelLabel: overallLevelLabel } });
+      if (academy.userId) {
+        await User.updateOne({ _id: academy.userId }, { $set: { achievementLevel: overallLevel, achievementLevelLabel: overallLevelLabel } });
+      }
+    }
 
     const serialized = serializeAcademyProfile(academy, 'academy');
     serialized.achievementLevel = overallLevel;

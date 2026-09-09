@@ -220,9 +220,24 @@ function serializeAcademyProfile(academyDoc, requesterRole = 'public') {
     : [];
 
   const rankingStats = a.rankingStats || { districtPlayers: 0, statePlayers: 0, nationalPlayers: 0, internationalPlayers: 0 };
-  // This serializer deliberately does not derive a level from rankingStats.
-  const achievementLevel = a.achievementLevel || 'NOT YET QUALIFIED';
+  let achievementLevel = a.achievementLevel;
+  if (!achievementLevel || achievementLevel === 'NOT YET QUALIFIED' || achievementLevel === 'UNRANKED') {
+    const { calculateAchievementLevelFromStats } = require('./academyRanking');
+    achievementLevel = calculateAchievementLevelFromStats(rankingStats);
+  }
   const isQualified = achievementLevel !== 'NOT YET QUALIFIED' && achievementLevel !== 'UNRANKED';
+
+  const perSportLevels = { ...(a.perSportLevels || {}) };
+  if (Object.keys(perSportLevels).length === 0 && sportsOffered.length > 0) {
+    for (const s of sportsOffered) {
+      perSportLevels[s] = {
+        sport: s,
+        rankingStats,
+        achievementLevel: isQualified ? achievementLevel : 'NOT YET QUALIFIED',
+        achievementLevelLabel: isQualified ? `Achievement Level: ${achievementLevel}` : 'Achievement Level: NOT YET QUALIFIED'
+      };
+    }
+  }
 
   const isVerified = a.verified !== false;
 
@@ -244,7 +259,7 @@ function serializeAcademyProfile(academyDoc, requesterRole = 'public') {
     rankingStats,
     achievementLevel: isQualified ? achievementLevel : 'NOT YET QUALIFIED',
     achievementLevelLabel: isQualified ? `Achievement Level: ${achievementLevel}` : 'Achievement Level: NOT YET QUALIFIED',
-    perSportLevels: a.perSportLevels || {},
+    perSportLevels,
     verified: isVerified,
     isVerified: isVerified,
     distanceKm: a.distanceKm !== undefined ? a.distanceKm : undefined,

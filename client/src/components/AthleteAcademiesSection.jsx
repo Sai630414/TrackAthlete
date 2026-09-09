@@ -256,8 +256,10 @@ export default function AthleteAcademiesSection({ athleteSport, athleteSports })
                       <div className="mt-3 space-y-2 pt-3 border-t border-gray-100">
                         {acad.sports?.map((sp, idx) => {
                           const spName = (typeof sp === 'string' ? sp : sp.sportName || '').toUpperCase();
-                          const spData = acad.perSportLevels?.[spName] || {};
-                          const spLevel = spData.achievementLevel || (acad.sportAchievementLevels?.[spName]) || 'NOT YET QUALIFIED';
+                          let spLevel = spData.achievementLevel || (acad.sportAchievementLevels?.[spName]);
+                          if (!spLevel || spLevel === 'NOT YET QUALIFIED' || spLevel === 'UNRANKED') {
+                            spLevel = (acad.achievementLevel && acad.achievementLevel !== 'UNRANKED' && acad.achievementLevel !== 'NOT YET QUALIFIED') ? acad.achievementLevel : 'NOT YET QUALIFIED';
+                          }
                           const isQualified = spLevel !== 'NOT YET QUALIFIED' && spLevel !== 'UNRANKED';
 
                           return (

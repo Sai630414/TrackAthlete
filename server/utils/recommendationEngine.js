@@ -219,13 +219,13 @@ async function getAcademyPerSportAchievementLevels(academyDoc, preloadedMembersh
       }
     }
 
-    // STRICT: Effective stats are derived SOLELY from actual linked athletes with verified achievements.
-    // DO NOT use manually entered rankingStats as an independent source.
+    // Derive effective player stats by combining active linked verified members
+    // and the academy's official representation statistics
     const effectiveStats = {
-      districtPlayers: districtCount,
-      statePlayers: stateCount,
-      nationalPlayers: nationalCount,
-      internationalPlayers: internationalCount
+      districtPlayers: Math.max(districtCount, Number(academyDoc.rankingStats?.districtPlayers || 0)),
+      statePlayers: Math.max(stateCount, Number(academyDoc.rankingStats?.statePlayers || 0)),
+      nationalPlayers: Math.max(nationalCount, Number(academyDoc.rankingStats?.nationalPlayers || 0)),
+      internationalPlayers: Math.max(internationalCount, Number(academyDoc.rankingStats?.internationalPlayers || 0))
     };
 
     const level = calculateAchievementLevelFromStats(effectiveStats);

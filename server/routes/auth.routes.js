@@ -796,6 +796,9 @@ router.post('/login', async (req, res) => {
       userObj.academyId = acad?.academyId || user.academyId || `ACA-${user._id.toString().slice(-8).toUpperCase()}`;
       userObj.trackAthleteId = userObj.academyId;
       if (acad?.name) userObj.academyName = acad.name;
+      if (acad?.achievementLevel) userObj.achievementLevel = acad.achievementLevel;
+      if (acad?.achievementLevelLabel) userObj.achievementLevelLabel = acad.achievementLevelLabel;
+      if (acad?.rankingStats) userObj.rankingStats = acad.rankingStats;
     }
     delete userObj.passwordHash;
     delete userObj.resetPasswordOTP;
@@ -863,6 +866,9 @@ router.post('/academy-login', async (req, res) => {
       userObj.academyId = acadDoc.academyId;
       userObj.trackAthleteId = acadDoc.academyId;
       userObj.academyName = acadDoc.name;
+      if (acadDoc.achievementLevel) userObj.achievementLevel = acadDoc.achievementLevel;
+      if (acadDoc.achievementLevelLabel) userObj.achievementLevelLabel = acadDoc.achievementLevelLabel;
+      if (acadDoc.rankingStats) userObj.rankingStats = acadDoc.rankingStats;
     } else {
       userObj.academyId = user.academyId || `ACA-${user._id.toString().slice(-8).toUpperCase()}`;
       userObj.trackAthleteId = userObj.academyId;
