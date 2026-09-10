@@ -100,8 +100,14 @@ async function getAcademyForUser(userId) {
           uUpdates.achievementLevel = academy.achievementLevel;
           uUpdates.achievementLevelLabel = academy.achievementLevelLabel;
         }
-        if (academy.rankingStats) {
+        const acadHasStats = academy.rankingStats && (academy.rankingStats.districtPlayers || academy.rankingStats.statePlayers || academy.rankingStats.nationalPlayers || academy.rankingStats.internationalPlayers);
+        const userHasStats = u.rankingStats && (u.rankingStats.districtPlayers || u.rankingStats.statePlayers || u.rankingStats.nationalPlayers || u.rankingStats.internationalPlayers);
+        
+        if (acadHasStats) {
           uUpdates.rankingStats = academy.rankingStats;
+        } else if (userHasStats) {
+          academy.rankingStats = u.rankingStats;
+          await Academy.updateOne({ _id: academy._id }, { $set: { rankingStats: u.rankingStats } });
         }
         if (Object.keys(uUpdates).length > 0) {
           await User.updateOne({ _id: u._id }, { $set: uUpdates });

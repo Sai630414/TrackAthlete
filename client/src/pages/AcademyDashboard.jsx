@@ -318,7 +318,10 @@ export default function AcademyDashboard() {
             contactPhone: res.data.contactPhone,
             phone: res.data.contactPhone,
             city: res.data.city,
-            state: res.data.state
+            state: res.data.state,
+            rankingStats: res.data.rankingStats,
+            achievementLevel: res.data.achievementLevel,
+            achievementLevelLabel: res.data.achievementLevelLabel
           });
         }
       }
@@ -369,6 +372,13 @@ export default function AcademyDashboard() {
           nationalPlayers: res.data.rankingStats?.nationalPlayers ?? prev.nationalPlayers,
           internationalPlayers: res.data.rankingStats?.internationalPlayers ?? prev.internationalPlayers
         }));
+        if (typeof updateUser === 'function') {
+          updateUser({
+            rankingStats: res.data.rankingStats,
+            achievementLevel: res.data.achievementLevel,
+            achievementLevelLabel: res.data.achievementLevelLabel
+          });
+        }
       }
       showNotification('Academy representation statistics saved & achievement level recalculated!');
       setIsEditingStats(false);

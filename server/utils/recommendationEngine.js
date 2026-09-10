@@ -207,6 +207,16 @@ async function getAcademyPerSportAchievementLevels(academyDoc, preloadedMembersh
     }
   }
 
+  // Also evaluate overall level directly from official rankingStats if set
+  if (academyDoc.rankingStats) {
+    const directLevel = calculateAchievementLevelFromStats(academyDoc.rankingStats);
+    const r = getCompetitionRank(directLevel);
+    if (r > maxRank) {
+      maxRank = r;
+      overallLevel = directLevel;
+    }
+  }
+
   const overallLevelLabel = overallLevel !== 'NOT YET QUALIFIED' && overallLevel !== 'UNRANKED'
     ? `Achievement Level: ${overallLevel}`
     : 'Achievement Level: NOT YET QUALIFIED';
@@ -362,10 +372,10 @@ async function syncAcademyAchievementLevels(academyDoc) {
   }
 
   const updatedStats = {
-    districtPlayers: maxDist,
-    statePlayers: maxState,
-    nationalPlayers: maxNatl,
-    internationalPlayers: maxIntl
+    districtPlayers: Math.max(maxDist, Number(academyDoc.rankingStats?.districtPlayers || 0)),
+    statePlayers: Math.max(maxState, Number(academyDoc.rankingStats?.statePlayers || 0)),
+    nationalPlayers: Math.max(maxNatl, Number(academyDoc.rankingStats?.nationalPlayers || 0)),
+    internationalPlayers: Math.max(maxIntl, Number(academyDoc.rankingStats?.internationalPlayers || 0))
   };
 
   await Academy.updateOne({ _id: academyDoc._id }, {
