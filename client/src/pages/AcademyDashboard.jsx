@@ -1690,11 +1690,42 @@ export default function AcademyDashboard() {
                     return lvl !== 'NOT YET QUALIFIED' && lvl !== 'UNRANKED' ? `Achievement Level: ${lvl}` : 'Achievement Level: NOT YET QUALIFIED';
                   })()}</span>
                 </div>
+                {!isEditingStats ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingStats(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#2f6d5a] hover:bg-[#255747] text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
+                  >
+                    <Edit className="w-3.5 h-3.5" />
+                    Edit Statistics
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveStats}
+                      disabled={savingStats}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#2f6d5a] hover:bg-[#255747] text-white text-xs font-bold transition-all shadow-sm cursor-pointer disabled:opacity-50"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      {savingStats ? 'Saving...' : 'Save Statistics'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCancelStats}
+                      disabled={savingStats}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      Cancel
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-white border border-gray-300 rounded-xl p-3 text-center">
+              <div className={`border rounded-xl p-3 text-center transition-all ${isEditingStats ? 'bg-amber-50/30 border-[#2f6d5a] ring-2 ring-[#2f6d5a]/20' : 'bg-white border-gray-300'}`}>
                 <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
                   District Players
                 </label>
@@ -1706,12 +1737,13 @@ export default function AcademyDashboard() {
                   onChange={(e) => {
                     const val = Math.max(0, parseInt(e.target.value, 10) || 0);
                     setProfileForm({ ...profileForm, districtPlayers: val });
+                    if (!isEditingStats) setIsEditingStats(true);
                   }}
                   className="w-full text-center py-1.5 text-base font-bold border border-gray-300 rounded-lg focus:outline-none focus:border-[#2f6d5a] bg-white"
                 />
               </div>
 
-              <div className="bg-white border border-gray-300 rounded-xl p-3 text-center">
+              <div className={`border rounded-xl p-3 text-center transition-all ${isEditingStats ? 'bg-amber-50/30 border-[#2f6d5a] ring-2 ring-[#2f6d5a]/20' : 'bg-white border-gray-300'}`}>
                 <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
                   State Players
                 </label>
@@ -1723,12 +1755,13 @@ export default function AcademyDashboard() {
                   onChange={(e) => {
                     const val = Math.max(0, parseInt(e.target.value, 10) || 0);
                     setProfileForm({ ...profileForm, statePlayers: val });
+                    if (!isEditingStats) setIsEditingStats(true);
                   }}
                   className="w-full text-center py-1.5 text-base font-bold border border-gray-300 rounded-lg focus:outline-none focus:border-[#2f6d5a] bg-white"
                 />
               </div>
 
-              <div className="bg-white border border-gray-300 rounded-xl p-3 text-center">
+              <div className={`border rounded-xl p-3 text-center transition-all ${isEditingStats ? 'bg-amber-50/30 border-[#2f6d5a] ring-2 ring-[#2f6d5a]/20' : 'bg-white border-gray-300'}`}>
                 <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
                   National Players
                 </label>
@@ -1740,12 +1773,13 @@ export default function AcademyDashboard() {
                   onChange={(e) => {
                     const val = Math.max(0, parseInt(e.target.value, 10) || 0);
                     setProfileForm({ ...profileForm, nationalPlayers: val });
+                    if (!isEditingStats) setIsEditingStats(true);
                   }}
                   className="w-full text-center py-1.5 text-base font-bold border border-gray-300 rounded-lg focus:outline-none focus:border-[#2f6d5a] bg-white"
                 />
               </div>
 
-              <div className="bg-white border border-gray-300 rounded-xl p-3 text-center">
+              <div className={`border rounded-xl p-3 text-center transition-all ${isEditingStats ? 'bg-amber-50/30 border-[#2f6d5a] ring-2 ring-[#2f6d5a]/20' : 'bg-white border-gray-300'}`}>
                 <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
                   International
                 </label>
@@ -1757,6 +1791,7 @@ export default function AcademyDashboard() {
                   onChange={(e) => {
                     const val = Math.max(0, parseInt(e.target.value, 10) || 0);
                     setProfileForm({ ...profileForm, internationalPlayers: val });
+                    if (!isEditingStats) setIsEditingStats(true);
                   }}
                   className="w-full text-center py-1.5 text-base font-bold border border-gray-300 rounded-lg focus:outline-none focus:border-[#2f6d5a] bg-white"
                 />
