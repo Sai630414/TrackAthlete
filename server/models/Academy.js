@@ -30,6 +30,7 @@ const AcademySchema = new mongoose.Schema({
     nationalPlayers: { type: Number, default: 0 },
     internationalPlayers: { type: Number, default: 0 }
   },
+  perSportLevels: { type: mongoose.Schema.Types.Mixed, default: {} },
   verified: { type: Boolean, default: true },
   achievementLevel: { type: String, enum: ['DISTRICT', 'STATE', 'NATIONAL', 'INTERNATIONAL', 'UNRANKED'], default: 'UNRANKED' },
   achievementLevelLabel: { type: String, default: 'Achievement Level: UNRANKED' },

@@ -302,12 +302,29 @@ router.put('/my/profile', verifyToken, requireRoles('academy'), async (req, res)
       address,
       city,
       state,
-      location
+      location,
+      rankingStats,
+      perSportLevels
     } = req.body;
 
     if (name !== undefined && String(name).trim()) academy.name = String(name).trim();
     if (contactPhone !== undefined && String(contactPhone).trim()) academy.contactPhone = String(contactPhone).trim();
     if (email !== undefined && String(email).trim()) academy.email = String(email).trim().toLowerCase();
+
+    if (rankingStats && typeof rankingStats === 'object') {
+      academy.rankingStats = {
+        districtPlayers: Math.max(0, parseInt(rankingStats.districtPlayers) || 0),
+        statePlayers: Math.max(0, parseInt(rankingStats.statePlayers) || 0),
+        nationalPlayers: Math.max(0, parseInt(rankingStats.nationalPlayers) || 0),
+        internationalPlayers: Math.max(0, parseInt(rankingStats.internationalPlayers) || 0)
+      };
+      academy.markModified('rankingStats');
+    }
+
+    if (perSportLevels && typeof perSportLevels === 'object') {
+      academy.perSportLevels = perSportLevels;
+      academy.markModified('perSportLevels');
+    }
 
     if (address) {
       academy.address = {
@@ -348,6 +365,8 @@ router.put('/my/profile', verifyToken, requireRoles('academy'), async (req, res)
         phone: academy.contactPhone,
         city: academy.city,
         state: academy.state,
+        rankingStats: academy.rankingStats,
+        perSportLevels: perSport,
         achievementLevel: overallLevel,
         achievementLevelLabel: overallLevelLabel
       };

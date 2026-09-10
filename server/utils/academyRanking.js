@@ -51,10 +51,10 @@ function calculateAchievementLevelFromStats(stats) {
   const state = Number(stats.statePlayers || 0);
   const dist = Number(stats.districtPlayers || 0);
 
-  if (intl >= ACADEMY_THRESHOLDS.INTERNATIONAL) return 'INTERNATIONAL';
-  if (natl >= ACADEMY_THRESHOLDS.NATIONAL) return 'NATIONAL';
-  if (state >= ACADEMY_THRESHOLDS.STATE || (state >= 2 && dist >= ACADEMY_THRESHOLDS.DISTRICT)) return 'STATE';
-  if (dist >= ACADEMY_THRESHOLDS.DISTRICT) return 'DISTRICT';
+  if (intl >= 1) return 'INTERNATIONAL';
+  if (natl >= 2) return 'NATIONAL';
+  if (state >= 3) return 'STATE';
+  if (dist >= 5) return 'DISTRICT';
 
   return 'NOT YET QUALIFIED';
 }

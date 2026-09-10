@@ -24,19 +24,14 @@ import {
   Trophy,
   ExternalLink,
   UserPlus,
-  Calendar
+  Calendar,
+  Edit
 } from 'lucide-react';
 import AthleteProfileModal from '../components/AthleteProfileModal';
 import CoachProfileModal from '../components/CoachProfileModal';
 import OrganizedEventsSection from '../components/OrganizedEventsSection';
 
 function resolveAcademyAchievementLevel(prof, usr) {
-  if (prof?.achievementLevel && prof.achievementLevel !== 'UNRANKED' && prof.achievementLevel !== 'NOT YET QUALIFIED') {
-    return prof.achievementLevel;
-  }
-  if (usr?.achievementLevel && usr.achievementLevel !== 'UNRANKED' && usr.achievementLevel !== 'NOT YET QUALIFIED') {
-    return usr.achievementLevel;
-  }
   const stats = prof?.rankingStats || usr?.rankingStats;
   if (stats) {
     const intl = Number(stats.internationalPlayers || 0);
@@ -46,8 +41,15 @@ function resolveAcademyAchievementLevel(prof, usr) {
 
     if (intl >= 1) return 'INTERNATIONAL';
     if (natl >= 2) return 'NATIONAL';
-    if (state >= 3 || (state >= 2 && dist >= 5)) return 'STATE';
+    if (state >= 3) return 'STATE';
     if (dist >= 5) return 'DISTRICT';
+    return 'NOT YET QUALIFIED';
+  }
+  if (prof?.achievementLevel && prof.achievementLevel !== 'UNRANKED' && prof.achievementLevel !== 'NOT YET QUALIFIED') {
+    return prof.achievementLevel;
+  }
+  if (usr?.achievementLevel && usr.achievementLevel !== 'UNRANKED' && usr.achievementLevel !== 'NOT YET QUALIFIED') {
+    return usr.achievementLevel;
   }
   return 'NOT YET QUALIFIED';
 }
@@ -83,6 +85,8 @@ export default function AcademyDashboard() {
     internationalPlayers: 0
   });
   const [savingProfile, setSavingProfile] = useState(false);
+  const [isEditingStats, setIsEditingStats] = useState(false);
+  const [savingStats, setSavingStats] = useState(false);
 
   // Sports & Memberships
   const [sports, setSports] = useState([]);
@@ -319,6 +323,55 @@ export default function AcademyDashboard() {
       showNotification(err.response?.data?.error || 'Failed to update profile.', 'error');
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  // Representation Statistics Save & Cancel
+  const handleCancelStats = () => {
+    setIsEditingStats(false);
+    if (profile?.rankingStats) {
+      setProfileForm(prev => ({
+        ...prev,
+        districtPlayers: profile.rankingStats.districtPlayers || 0,
+        statePlayers: profile.rankingStats.statePlayers || 0,
+        nationalPlayers: profile.rankingStats.nationalPlayers || 0,
+        internationalPlayers: profile.rankingStats.internationalPlayers || 0
+      }));
+    }
+  };
+
+  const handleSaveStats = async (e) => {
+    if (e && typeof e.preventDefault === 'function') e.preventDefault();
+    setSavingStats(true);
+    try {
+      const payload = {
+        rankingStats: {
+          districtPlayers: Math.max(0, parseInt(profileForm.districtPlayers, 10) || 0),
+          statePlayers: Math.max(0, parseInt(profileForm.statePlayers, 10) || 0),
+          nationalPlayers: Math.max(0, parseInt(profileForm.nationalPlayers, 10) || 0),
+          internationalPlayers: Math.max(0, parseInt(profileForm.internationalPlayers, 10) || 0)
+        }
+      };
+
+      const res = await api.put('/academy/my/profile', payload);
+      if (res.data) {
+        setProfile(res.data);
+        setProfileForm(prev => ({
+          ...prev,
+          districtPlayers: res.data.rankingStats?.districtPlayers ?? prev.districtPlayers,
+          statePlayers: res.data.rankingStats?.statePlayers ?? prev.statePlayers,
+          nationalPlayers: res.data.rankingStats?.nationalPlayers ?? prev.nationalPlayers,
+          internationalPlayers: res.data.rankingStats?.internationalPlayers ?? prev.internationalPlayers
+        }));
+      }
+      showNotification('Academy representation statistics saved & achievement level recalculated!');
+      setIsEditingStats(false);
+      fetchProfile();
+    } catch (err) {
+      console.error('Error saving representation statistics:', err);
+      showNotification(err.response?.data?.error || 'Failed to save representation statistics.', 'error');
+    } finally {
+      setSavingStats(false);
     }
   };
 
@@ -1601,9 +1654,9 @@ export default function AcademyDashboard() {
                   Academy Ranking & Representation Statistics
                 </h2>
                 <p className="text-xs text-gray-500">
-                  Derived from active athlete memberships and verified competition achievements; these values cannot be edited manually.
+                  Update your representation statistics. Achievement Level is calculated automatically from the saved values.
                 </p>
-                <div className="mt-1">
+                <div className="mt-1 flex items-center gap-3 flex-wrap">
                   <button
                     type="button"
                     onClick={() => setActiveNav('sports')}
@@ -1613,68 +1666,139 @@ export default function AcademyDashboard() {
                   </button>
                 </div>
               </div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-extrabold self-start sm:self-auto">
-                <Award className="w-4 h-4 text-amber-600" />
-                <span>{(() => {
-                  const lvl = resolveAcademyAchievementLevel(profile, user);
-                  return lvl !== 'NOT YET QUALIFIED' && lvl !== 'UNRANKED' ? `Achievement Level: ${lvl}` : 'Achievement Level: NOT YET QUALIFIED';
-                })()}</span>
+              <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-extrabold">
+                  <Award className="w-4 h-4 text-amber-600" />
+                  <span>{(() => {
+                    const lvl = resolveAcademyAchievementLevel(profile, user);
+                    return lvl !== 'NOT YET QUALIFIED' && lvl !== 'UNRANKED' ? `Achievement Level: ${lvl}` : 'Achievement Level: NOT YET QUALIFIED';
+                  })()}</span>
+                </div>
+                {!isEditingStats ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingStats(true)}
+                    className="px-3.5 py-1.5 rounded-xl bg-[#173d3c] hover:bg-[#2f6d5a] text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+                  >
+                    <Edit className="w-3.5 h-3.5" /> Edit Statistics
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={savingStats}
+                      onClick={handleSaveStats}
+                      className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-xs transition-all disabled:opacity-50"
+                    >
+                      <Save className="w-3.5 h-3.5" /> {savingStats ? 'Saving...' : 'Save Changes'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={savingStats}
+                      onClick={handleCancelStats}
+                      className="px-3.5 py-1.5 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all disabled:opacity-50"
+                    >
+                      <X className="w-3.5 h-3.5" /> Cancel
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-[#f8faf8] border border-gray-200 rounded-xl p-3 text-center">
+              <div className={`border rounded-xl p-3 text-center transition-all ${isEditingStats ? 'bg-amber-50/50 border-amber-300 ring-2 ring-amber-400/30' : 'bg-[#f8faf8] border-gray-200'}`}>
                 <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">
                   District Players
                 </label>
                 <input
                   type="number"
                   min="0"
+                  step="1"
                   value={profileForm.districtPlayers}
-                  disabled
-                  className="w-full text-center py-1.5 text-base font-bold border border-gray-300 rounded-lg focus:outline-none focus:border-[#2f6d5a]"
+                  disabled={!isEditingStats}
+                  onChange={(e) => {
+                    const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+                    setProfileForm({ ...profileForm, districtPlayers: val });
+                  }}
+                  className={`w-full text-center py-1.5 text-base font-bold border rounded-lg focus:outline-none ${isEditingStats ? 'border-amber-400 bg-white focus:border-[#2f6d5a]' : 'border-gray-300 bg-gray-50'}`}
                 />
               </div>
 
-              <div className="bg-[#f8faf8] border border-gray-200 rounded-xl p-3 text-center">
+              <div className={`border rounded-xl p-3 text-center transition-all ${isEditingStats ? 'bg-amber-50/50 border-amber-300 ring-2 ring-amber-400/30' : 'bg-[#f8faf8] border-gray-200'}`}>
                 <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">
                   State Players
                 </label>
                 <input
                   type="number"
                   min="0"
+                  step="1"
                   value={profileForm.statePlayers}
-                  disabled
-                  className="w-full text-center py-1.5 text-base font-bold border border-gray-300 rounded-lg focus:outline-none focus:border-[#2f6d5a]"
+                  disabled={!isEditingStats}
+                  onChange={(e) => {
+                    const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+                    setProfileForm({ ...profileForm, statePlayers: val });
+                  }}
+                  className={`w-full text-center py-1.5 text-base font-bold border rounded-lg focus:outline-none ${isEditingStats ? 'border-amber-400 bg-white focus:border-[#2f6d5a]' : 'border-gray-300 bg-gray-50'}`}
                 />
               </div>
 
-              <div className="bg-[#f8faf8] border border-gray-200 rounded-xl p-3 text-center">
+              <div className={`border rounded-xl p-3 text-center transition-all ${isEditingStats ? 'bg-amber-50/50 border-amber-300 ring-2 ring-amber-400/30' : 'bg-[#f8faf8] border-gray-200'}`}>
                 <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">
                   National Players
                 </label>
                 <input
                   type="number"
                   min="0"
+                  step="1"
                   value={profileForm.nationalPlayers}
-                  disabled
-                  className="w-full text-center py-1.5 text-base font-bold border border-gray-300 rounded-lg focus:outline-none focus:border-[#2f6d5a]"
+                  disabled={!isEditingStats}
+                  onChange={(e) => {
+                    const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+                    setProfileForm({ ...profileForm, nationalPlayers: val });
+                  }}
+                  className={`w-full text-center py-1.5 text-base font-bold border rounded-lg focus:outline-none ${isEditingStats ? 'border-amber-400 bg-white focus:border-[#2f6d5a]' : 'border-gray-300 bg-gray-50'}`}
                 />
               </div>
 
-              <div className="bg-[#f8faf8] border border-gray-200 rounded-xl p-3 text-center">
+              <div className={`border rounded-xl p-3 text-center transition-all ${isEditingStats ? 'bg-amber-50/50 border-amber-300 ring-2 ring-amber-400/30' : 'bg-[#f8faf8] border-gray-200'}`}>
                 <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">
                   International
                 </label>
                 <input
                   type="number"
                   min="0"
+                  step="1"
                   value={profileForm.internationalPlayers}
-                  disabled
-                  className="w-full text-center py-1.5 text-base font-bold border border-gray-300 rounded-lg focus:outline-none focus:border-[#2f6d5a]"
+                  disabled={!isEditingStats}
+                  onChange={(e) => {
+                    const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+                    setProfileForm({ ...profileForm, internationalPlayers: val });
+                  }}
+                  className={`w-full text-center py-1.5 text-base font-bold border rounded-lg focus:outline-none ${isEditingStats ? 'border-amber-400 bg-white focus:border-[#2f6d5a]' : 'border-gray-300 bg-gray-50'}`}
                 />
               </div>
             </div>
+
+            {isEditingStats && (
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-amber-100">
+                <button
+                  type="button"
+                  disabled={savingStats}
+                  onClick={handleCancelStats}
+                  className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold uppercase tracking-wider cursor-pointer transition-all disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={savingStats}
+                  onClick={handleSaveStats}
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-md transition-all disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" /> {savingStats ? 'Saving Changes...' : 'Save Representation Changes'}
+                </button>
+              </div>
+            )}
 
             {/* Per-Sport Dynamic Achievement Levels */}
             <div className="mt-4 pt-4 border-t border-gray-100">

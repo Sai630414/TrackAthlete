@@ -86,6 +86,13 @@ const UserSchema = new mongoose.Schema({
   sportsOffered: [String],
   contactPhone: String,
   address: String,
+  rankingStats: {
+    districtPlayers: { type: Number, default: 0 },
+    statePlayers: { type: Number, default: 0 },
+    nationalPlayers: { type: Number, default: 0 },
+    internationalPlayers: { type: Number, default: 0 }
+  },
+  perSportLevels: { type: mongoose.Schema.Types.Mixed, default: {} },
 
   // Location (used for distance calculations across roles)
   city: String,
