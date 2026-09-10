@@ -282,6 +282,12 @@ export default function AcademyDashboard() {
           type: 'Point',
           coordinates: [Number(profileForm.longitude) || 80.6480, Number(profileForm.latitude) || 16.5062]
         },
+        rankingStats: {
+          districtPlayers: Math.max(0, parseInt(profileForm.districtPlayers, 10) || 0),
+          statePlayers: Math.max(0, parseInt(profileForm.statePlayers, 10) || 0),
+          nationalPlayers: Math.max(0, parseInt(profileForm.nationalPlayers, 10) || 0),
+          internationalPlayers: Math.max(0, parseInt(profileForm.internationalPlayers, 10) || 0)
+        }
       };
 
       const res = await api.put('/academy/my/profile', payload);
@@ -1674,40 +1680,12 @@ export default function AcademyDashboard() {
                     return lvl !== 'NOT YET QUALIFIED' && lvl !== 'UNRANKED' ? `Achievement Level: ${lvl}` : 'Achievement Level: NOT YET QUALIFIED';
                   })()}</span>
                 </div>
-                {!isEditingStats ? (
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingStats(true)}
-                    className="px-3.5 py-1.5 rounded-xl bg-[#173d3c] hover:bg-[#2f6d5a] text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
-                  >
-                    <Edit className="w-3.5 h-3.5" /> Edit Statistics
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={savingStats}
-                      onClick={handleSaveStats}
-                      className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-xs transition-all disabled:opacity-50"
-                    >
-                      <Save className="w-3.5 h-3.5" /> {savingStats ? 'Saving...' : 'Save Changes'}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={savingStats}
-                      onClick={handleCancelStats}
-                      className="px-3.5 py-1.5 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-all disabled:opacity-50"
-                    >
-                      <X className="w-3.5 h-3.5" /> Cancel
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className={`border rounded-xl p-3 text-center transition-all ${isEditingStats ? 'bg-amber-50/50 border-amber-300 ring-2 ring-amber-400/30' : 'bg-[#f8faf8] border-gray-200'}`}>
-                <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">
+              <div className="bg-white border border-gray-300 rounded-xl p-3 text-center">
+                <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
                   District Players
                 </label>
                 <input
@@ -1715,17 +1693,16 @@ export default function AcademyDashboard() {
                   min="0"
                   step="1"
                   value={profileForm.districtPlayers}
-                  disabled={!isEditingStats}
                   onChange={(e) => {
                     const val = Math.max(0, parseInt(e.target.value, 10) || 0);
                     setProfileForm({ ...profileForm, districtPlayers: val });
                   }}
-                  className={`w-full text-center py-1.5 text-base font-bold border rounded-lg focus:outline-none ${isEditingStats ? 'border-amber-400 bg-white focus:border-[#2f6d5a]' : 'border-gray-300 bg-gray-50'}`}
+                  className="w-full text-center py-1.5 text-base font-bold border border-gray-300 rounded-lg focus:outline-none focus:border-[#2f6d5a] bg-white"
                 />
               </div>
 
-              <div className={`border rounded-xl p-3 text-center transition-all ${isEditingStats ? 'bg-amber-50/50 border-amber-300 ring-2 ring-amber-400/30' : 'bg-[#f8faf8] border-gray-200'}`}>
-                <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">
+              <div className="bg-white border border-gray-300 rounded-xl p-3 text-center">
+                <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
                   State Players
                 </label>
                 <input
@@ -1733,17 +1710,16 @@ export default function AcademyDashboard() {
                   min="0"
                   step="1"
                   value={profileForm.statePlayers}
-                  disabled={!isEditingStats}
                   onChange={(e) => {
                     const val = Math.max(0, parseInt(e.target.value, 10) || 0);
                     setProfileForm({ ...profileForm, statePlayers: val });
                   }}
-                  className={`w-full text-center py-1.5 text-base font-bold border rounded-lg focus:outline-none ${isEditingStats ? 'border-amber-400 bg-white focus:border-[#2f6d5a]' : 'border-gray-300 bg-gray-50'}`}
+                  className="w-full text-center py-1.5 text-base font-bold border border-gray-300 rounded-lg focus:outline-none focus:border-[#2f6d5a] bg-white"
                 />
               </div>
 
-              <div className={`border rounded-xl p-3 text-center transition-all ${isEditingStats ? 'bg-amber-50/50 border-amber-300 ring-2 ring-amber-400/30' : 'bg-[#f8faf8] border-gray-200'}`}>
-                <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">
+              <div className="bg-white border border-gray-300 rounded-xl p-3 text-center">
+                <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
                   National Players
                 </label>
                 <input
@@ -1751,17 +1727,16 @@ export default function AcademyDashboard() {
                   min="0"
                   step="1"
                   value={profileForm.nationalPlayers}
-                  disabled={!isEditingStats}
                   onChange={(e) => {
                     const val = Math.max(0, parseInt(e.target.value, 10) || 0);
                     setProfileForm({ ...profileForm, nationalPlayers: val });
                   }}
-                  className={`w-full text-center py-1.5 text-base font-bold border rounded-lg focus:outline-none ${isEditingStats ? 'border-amber-400 bg-white focus:border-[#2f6d5a]' : 'border-gray-300 bg-gray-50'}`}
+                  className="w-full text-center py-1.5 text-base font-bold border border-gray-300 rounded-lg focus:outline-none focus:border-[#2f6d5a] bg-white"
                 />
               </div>
 
-              <div className={`border rounded-xl p-3 text-center transition-all ${isEditingStats ? 'bg-amber-50/50 border-amber-300 ring-2 ring-amber-400/30' : 'bg-[#f8faf8] border-gray-200'}`}>
-                <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">
+              <div className="bg-white border border-gray-300 rounded-xl p-3 text-center">
+                <label className="block text-[11px] font-bold text-gray-700 uppercase mb-1">
                   International
                 </label>
                 <input
@@ -1769,36 +1744,14 @@ export default function AcademyDashboard() {
                   min="0"
                   step="1"
                   value={profileForm.internationalPlayers}
-                  disabled={!isEditingStats}
                   onChange={(e) => {
                     const val = Math.max(0, parseInt(e.target.value, 10) || 0);
                     setProfileForm({ ...profileForm, internationalPlayers: val });
                   }}
-                  className={`w-full text-center py-1.5 text-base font-bold border rounded-lg focus:outline-none ${isEditingStats ? 'border-amber-400 bg-white focus:border-[#2f6d5a]' : 'border-gray-300 bg-gray-50'}`}
+                  className="w-full text-center py-1.5 text-base font-bold border border-gray-300 rounded-lg focus:outline-none focus:border-[#2f6d5a] bg-white"
                 />
               </div>
             </div>
-
-            {isEditingStats && (
-              <div className="flex items-center justify-end gap-3 pt-2 border-t border-amber-100">
-                <button
-                  type="button"
-                  disabled={savingStats}
-                  onClick={handleCancelStats}
-                  className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold uppercase tracking-wider cursor-pointer transition-all disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={savingStats}
-                  onClick={handleSaveStats}
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-md transition-all disabled:opacity-50"
-                >
-                  <Save className="w-4 h-4" /> {savingStats ? 'Saving Changes...' : 'Save Representation Changes'}
-                </button>
-              </div>
-            )}
 
             {/* Per-Sport Dynamic Achievement Levels */}
             <div className="mt-4 pt-4 border-t border-gray-100">
