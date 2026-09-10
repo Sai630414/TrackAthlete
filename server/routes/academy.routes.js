@@ -24,16 +24,21 @@ const {
 async function getAcademyForUser(userId) {
   let academy = await Academy.findOne({ userId });
   if (!academy) {
-    // Fallback: check if academy exists with user's email or name
+    // Fallback: check if academy exists with user's academyId, email, or name
     const user = await User.findById(userId);
     if (user && user.role === 'academy') {
-      const cleanEmail = user.email ? String(user.email).trim().toLowerCase() : '';
-      academy = await Academy.findOne({
-        $or: [
-          { email: new RegExp('^' + cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i') },
-          { name: new RegExp('^' + String(user.academyName || user.name || '').trim().replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i') }
-        ]
-      });
+      if (user.academyId) {
+        academy = await Academy.findOne({ academyId: user.academyId });
+      }
+      if (!academy) {
+        const cleanEmail = user.email ? String(user.email).trim().toLowerCase() : '';
+        academy = await Academy.findOne({
+          $or: [
+            { email: new RegExp('^' + cleanEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i') },
+            { name: new RegExp('^' + String(user.academyName || user.name || '').trim().replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&') + '$', 'i') }
+          ]
+        });
+      }
       if (academy) {
         if (!academy.userId) {
           academy.userId = user._id;
@@ -46,7 +51,7 @@ async function getAcademyForUser(userId) {
           academyId: permanentId,
           name: String(user.academyName || user.name || 'Sports Academy').trim(),
           contactPhone: String(user.contactPhone || user.phone || '+91 0000000000').trim(),
-          email: cleanEmail,
+          email: user.email ? String(user.email).trim().toLowerCase() : '',
           address: {
             addressLine1: typeof user.address === 'string' ? user.address : (user.address?.addressLine1 || ''),
             city: user.city || '',
@@ -300,23 +305,23 @@ router.put('/my/profile', verifyToken, requireRoles('academy'), async (req, res)
       location
     } = req.body;
 
-    if (name) academy.name = String(name).trim();
-    if (contactPhone) academy.contactPhone = String(contactPhone).trim();
-    if (email) academy.email = String(email).trim().toLowerCase();
+    if (name !== undefined && String(name).trim()) academy.name = String(name).trim();
+    if (contactPhone !== undefined && String(contactPhone).trim()) academy.contactPhone = String(contactPhone).trim();
+    if (email !== undefined && String(email).trim()) academy.email = String(email).trim().toLowerCase();
 
     if (address) {
       academy.address = {
-        addressLine1: address.addressLine1 || academy.address?.addressLine1 || '',
-        addressLine2: address.addressLine2 || academy.address?.addressLine2 || '',
-        city: address.city || city || academy.address?.city || '',
-        state: address.state || state || academy.address?.state || '',
-        pincode: address.pincode || academy.address?.pincode || '',
-        country: address.country || academy.address?.country || 'India'
+        addressLine1: address.addressLine1 !== undefined ? String(address.addressLine1).trim() : (academy.address?.addressLine1 || ''),
+        addressLine2: address.addressLine2 !== undefined ? String(address.addressLine2).trim() : (academy.address?.addressLine2 || ''),
+        city: address.city !== undefined ? String(address.city).trim() : (city || academy.address?.city || ''),
+        state: address.state !== undefined ? String(address.state).trim() : (state || academy.address?.state || ''),
+        pincode: address.pincode !== undefined ? String(address.pincode).trim() : (academy.address?.pincode || ''),
+        country: address.country !== undefined ? String(address.country).trim() : (academy.address?.country || 'India')
       };
     }
 
-    if (city) academy.city = String(city).trim();
-    if (state) academy.state = String(state).trim();
+    if (city !== undefined && String(city).trim()) academy.city = String(city).trim();
+    if (state !== undefined && String(state).trim()) academy.state = String(state).trim();
 
     if (location && Array.isArray(location.coordinates) && location.coordinates.length === 2) {
       academy.location = {
@@ -325,14 +330,37 @@ router.put('/my/profile', verifyToken, requireRoles('academy'), async (req, res)
       };
     }
 
-    // Dynamic achievement level calculation
+    // Dynamic achievement level calculation (strictly derived per sport & overall, never manual)
     const { getAcademyPerSportAchievementLevels } = require('../utils/recommendationEngine');
-    const { overallLevel, perSport } = await getAcademyPerSportAchievementLevels(academy);
+    const { overallLevel, overallLevelLabel, perSport } = await getAcademyPerSportAchievementLevels(academy);
     academy.achievementLevel = overallLevel;
-    academy.achievementLevelLabel = overallLevel !== 'UNRANKED' ? `Achievement Level: ${overallLevel}` : 'Achievement Level: UNRANKED';
+    academy.achievementLevelLabel = overallLevelLabel;
     academy.verified = true;
     academy.updatedAt = new Date();
     await academy.save();
+
+    // Synchronize User document in MongoDB as well so both are always consistent
+    if (academy.userId) {
+      const userUpdates = {
+        name: academy.name,
+        academyName: academy.name,
+        contactPhone: academy.contactPhone,
+        phone: academy.contactPhone,
+        city: academy.city,
+        state: academy.state,
+        achievementLevel: overallLevel,
+        achievementLevelLabel: overallLevelLabel
+      };
+      if (academy.email) userUpdates.email = academy.email;
+      if (academy.location) userUpdates.location = academy.location;
+      if (academy.address) {
+        userUpdates.address = typeof academy.address === 'object'
+          ? `${academy.address.addressLine1 || ''} ${academy.address.addressLine2 || ''}`.trim()
+          : academy.address;
+      }
+      if (academy.academyId) userUpdates.academyId = academy.academyId;
+      await User.updateOne({ _id: academy.userId }, { $set: userUpdates });
+    }
 
     const serialized = serializeAcademyProfile(academy, 'academy');
     serialized.achievementLevel = overallLevel;

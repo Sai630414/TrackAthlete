@@ -82,6 +82,19 @@ export function AuthProvider({ children }) {
       const { data } = await api.post('/auth/reset-password', payload);
       return data;
     },
+    updateUser(updatedFields) {
+      setSession(prev => {
+        if (!prev) return prev;
+        const next = { ...prev, user: { ...prev.user, ...updatedFields } };
+        const key = window.location.pathname.startsWith('/organizer') ? organizerStorageKey : storageKey;
+        try {
+          localStorage.setItem(key, JSON.stringify(next));
+        } catch (e) {
+          // ignore storage quota error
+        }
+        return next;
+      });
+    },
     logout() {
       if (session?.user?.role === 'organizer') localStorage.removeItem(organizerStorageKey);
       else localStorage.removeItem(storageKey);

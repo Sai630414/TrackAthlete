@@ -53,7 +53,7 @@ function resolveAcademyAchievementLevel(prof, usr) {
 }
 
 export default function AcademyDashboard() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
 
   // Active navigation tab: 'sports' | 'openings' | 'requests' | 'profile' | 'organized-events'
   const [activeNav, setActiveNav] = useState('sports');
@@ -281,8 +281,39 @@ export default function AcademyDashboard() {
       };
 
       const res = await api.put('/academy/my/profile', payload);
-      setProfile(res.data);
+      if (res.data) {
+        setProfile(res.data);
+        setProfileForm(prev => ({
+          ...prev,
+          name: res.data.name || prev.name,
+          contactPhone: res.data.contactPhone || prev.contactPhone,
+          email: res.data.email || prev.email,
+          addressLine1: res.data.address?.addressLine1 ?? prev.addressLine1,
+          addressLine2: res.data.address?.addressLine2 ?? prev.addressLine2,
+          city: res.data.address?.city || res.data.city || prev.city,
+          state: res.data.address?.state || res.data.state || prev.state,
+          pincode: res.data.address?.pincode ?? prev.pincode,
+          country: res.data.address?.country || 'India',
+          longitude: res.data.location?.coordinates?.[0] ?? prev.longitude,
+          latitude: res.data.location?.coordinates?.[1] ?? prev.latitude,
+          districtPlayers: res.data.rankingStats?.districtPlayers ?? prev.districtPlayers,
+          statePlayers: res.data.rankingStats?.statePlayers ?? prev.statePlayers,
+          nationalPlayers: res.data.rankingStats?.nationalPlayers ?? prev.nationalPlayers,
+          internationalPlayers: res.data.rankingStats?.internationalPlayers ?? prev.internationalPlayers
+        }));
+        if (typeof updateUser === 'function') {
+          updateUser({
+            name: res.data.name,
+            academyName: res.data.name,
+            contactPhone: res.data.contactPhone,
+            phone: res.data.contactPhone,
+            city: res.data.city,
+            state: res.data.state
+          });
+        }
+      }
       showNotification('Academy profile updated successfully!');
+      fetchProfile();
     } catch (err) {
       console.error('Error saving profile:', err);
       showNotification(err.response?.data?.error || 'Failed to update profile.', 'error');

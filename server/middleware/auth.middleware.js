@@ -15,9 +15,10 @@ async function verifyToken(req, res, next) {
     const jwtSecret = process.env.JWT_SECRET || 'trackathlete_sih_secret_2026';
     const decoded = jwt.verify(token, jwtSecret);
 
+    const userId = decoded.id || decoded._id;
     if (decoded.role === 'federation') {
       const Federation = require('../models/Federation');
-      const fed = await Federation.findById(decoded.id).select('-passwordHash -loginOTPHash -activationOTPHash');
+      const fed = await Federation.findById(userId).select('-passwordHash -loginOTPHash -activationOTPHash');
       if (!fed) {
         return res.status(401).json({ error: 'Invalid authentication session. Federation record no longer exists.' });
       }
@@ -34,13 +35,13 @@ async function verifyToken(req, res, next) {
     }
     if (decoded.role === 'organizer') {
       const Organizer = require('../models/Organizer');
-      const organizer = await Organizer.findById(decoded.id);
+      const organizer = await Organizer.findById(userId);
       if (!organizer || organizer.accountStatus !== 'active') return res.status(401).json({ error: 'Invalid organizer session.' });
       req.user = { _id: organizer._id, id: organizer._id, role: 'organizer', organizerId: organizer.organizerId, name: organizer.name, email: organizer.email };
       return next();
     }
 
-    const user = await User.findById(decoded.id).select('-passwordHash -resetPasswordOTP');
+    const user = await User.findById(userId).select('-passwordHash -resetPasswordOTP');
     if (!user) {
       return res.status(401).json({ error: 'Invalid authentication session. User no longer exists.' });
     }
