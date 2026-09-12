@@ -16,6 +16,7 @@ const sponsorRoutes = require('./routes/sponsor.routes');
 const tournamentRoutes = require('./routes/tournament.routes');
 const referenceRoutes = require('./routes/reference.routes');
 const chatRoutes = require('./routes/chat.routes');
+const aiRoutes = require('./routes/ai.routes');
 
 const app = express();
 const server = http.createServer(app);
@@ -45,6 +46,7 @@ app.use('/api/sponsor', sponsorRoutes);
 app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/reference', referenceRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/ai', aiRoutes); // TrackMate AI assistant (separate from human coach-athlete chat)
 
 initSocket(io);
 

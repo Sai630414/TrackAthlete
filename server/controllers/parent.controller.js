@@ -189,3 +189,7 @@ exports.recommend = async (req, res) => {
     res.status(500).json({ error: 'Recommendation failed', details: err.message });
   }
 };
+
+// Exported so other features (e.g. the TrackMate assistant) reuse the same pilot
+// sport list instead of duplicating it. Purely additive — no behaviour change.
+exports.PILOT_SPORTS = PILOT_SPORTS;

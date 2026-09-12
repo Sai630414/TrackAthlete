@@ -1,0 +1,798 @@
+/*
+ * TrackMate — scoped styles.
+ *
+ * Every selector is prefixed `.tm-` and the whole widget is portalled to <body>,
+ * so nothing here can reach existing pages, dashboards or the sidebar. Colours,
+ * radii and type follow the existing TrackAthlete palette defined in index.css
+ * (forest #173d3c/#0c292c, coral #e07050, panel #fcfcf8, border #d8ded5).
+ *
+ * z-index sits above ordinary page content (the app uses z-10 at most) but below the
+ * Radix dialogs, sheets and toasts the project renders at z-50 — including the mobile
+ * navigation Sheet — so navigation and alerts always win.
+ */
+
+.tm-root {
+  --tm-forest: #173d3c;
+  --tm-forest-deep: #0c292c;
+  --tm-coral: #e07050;
+  --tm-coral-strong: #c85c40;
+  --tm-panel: #fcfcf8;
+  --tm-surface: #ffffff;
+  --tm-border: #d8ded5;
+  --tm-border-soft: #e2ede4;
+  --tm-ink: #173235;
+  --tm-muted: #697c7c;
+  --tm-sage: #194e42;
+  --tm-sage-soft: #e2eee4;
+  --tm-mint: #b9d9bf;
+  --tm-live: #b7da78;
+
+  font-family: 'Geist Variable', Arial, sans-serif;
+  color: var(--tm-ink);
+}
+
+.tm-root *,
+.tm-root *::before,
+.tm-root *::after {
+  box-sizing: border-box;
+}
+
+/* ---------------------------------------------------------------- launcher */
+
+.tm-launcher {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 45;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  height: 52px;
+  padding: 0 18px 0 15px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 26px;
+  background: linear-gradient(135deg, var(--tm-forest), var(--tm-forest-deep));
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  box-shadow: 0 10px 28px rgba(12, 41, 44, 0.28);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.tm-launcher:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 34px rgba(12, 41, 44, 0.34);
+}
+
+.tm-launcher:active {
+  transform: translateY(0);
+}
+
+.tm-launcher-mark {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  flex-shrink: 0;
+  /* the torch artwork is warm gold; a soft glow seats it on the dark pill */
+  filter: drop-shadow(0 1px 3px rgba(224, 112, 80, 0.45));
+}
+
+/* A single slow ring, not a constant attention-grab. */
+.tm-launcher-pulse {
+  position: absolute;
+  left: 14px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid var(--tm-coral);
+  opacity: 0;
+  animation: tm-ring 3.6s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes tm-ring {
+  0%   { transform: scale(1);   opacity: 0.55; }
+  55%  { transform: scale(1.7); opacity: 0; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+
+.tm-launcher-label {
+  white-space: nowrap;
+}
+
+/* Shown when a conversation is waiting behind a closed panel. */
+.tm-launcher-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tm-live);
+  box-shadow: 0 0 0 3px rgba(183, 218, 120, 0.2);
+  flex-shrink: 0;
+}
+
+/* ------------------------------------------------------------------- panel */
+
+.tm-panel {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 46;
+  display: flex;
+  flex-direction: column;
+  width: 384px;
+  max-width: calc(100vw - 32px);
+  height: min(624px, calc(100vh - 110px));
+  border: 1px solid var(--tm-border);
+  border-radius: 18px;
+  background: var(--tm-panel);
+  box-shadow: 0 24px 60px rgba(23, 50, 53, 0.22);
+  overflow: hidden;
+  transform-origin: bottom right;
+  animation: tm-open 0.22s cubic-bezier(0.16, 0.9, 0.3, 1);
+}
+
+@keyframes tm-open {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ------------------------------------------------------------------ header */
+
+.tm-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 12px 12px 14px;
+  background: linear-gradient(135deg, var(--tm-forest), var(--tm-forest-deep));
+  border-bottom: 1px solid #2f6d5a;
+  flex-shrink: 0;
+}
+
+.tm-mark {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.35));
+}
+
+.tm-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.tm-title b {
+  display: block;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.tm-title small {
+  display: block;
+  color: var(--tm-mint);
+  font-size: 10.5px;
+  line-height: 1.35;
+  margin-top: 1px;
+  /* One line, always: adding the "new conversation" button used to squeeze this
+     onto two lines and shove the header taller. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tm-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--tm-mint);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.tm-status em {
+  font-style: normal;
+}
+
+.tm-status i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tm-live);
+  box-shadow: 0 0 0 3px rgba(183, 218, 120, 0.22);
+}
+
+.tm-status.is-offline i {
+  background: #e0a050;
+  box-shadow: 0 0 0 3px rgba(224, 160, 80, 0.22);
+}
+
+.tm-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #c5d3ce;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.tm-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+/* ------------------------------------------------------------------ thread */
+
+.tm-thread {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px 16px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  scrollbar-width: thin;
+}
+
+/*
+ * The welcome is the panel's hero. It borrows the host app's display voice —
+ * Georgia at a tight negative track, exactly as .story-copy h1 and .login-heading h2
+ * do — so the assistant reads as part of TrackAthlete rather than a bolted-on widget.
+ */
+.tm-welcome {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 2px 2px;
+}
+
+.tm-welcome-headline {
+  margin: 0;
+  color: var(--tm-ink);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 25px;
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+
+.tm-welcome-sub {
+  margin: 10px 0 0;
+  max-width: 42ch;
+  color: var(--tm-muted);
+  font-size: 12.5px;
+  line-height: 1.62;
+}
+
+.tm-notice {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid #efd9c3;
+  border-radius: 10px;
+  background: #fdf6ef;
+  color: #8a5a32;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* Action cards follow the host's .role-option pattern: coral glyph, bold label,
+   quiet caption — so a first-time user can see what each one will actually ask. */
+.tm-actions {
+  display: grid;
+  gap: 7px;
+  margin-top: 18px;
+}
+
+.tm-action {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--tm-border);
+  border-radius: 11px;
+  background: var(--tm-surface);
+  color: var(--tm-ink);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.tm-action svg {
+  flex-shrink: 0;
+  color: var(--tm-coral);
+}
+
+.tm-action span {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.tm-action b {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.tm-action small {
+  color: var(--tm-muted);
+  font-size: 10.5px;
+}
+
+.tm-action:hover:not(:disabled) {
+  border-color: #2f6d5a;
+  background: #f4f8f2;
+  box-shadow: 0 7px 14px rgba(28, 69, 48, 0.06);
+  transform: translateY(-1px);
+}
+
+.tm-action:hover:not(:disabled) svg {
+  color: var(--tm-sage);
+}
+
+.tm-action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.tm-msg {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  animation: tm-msg-in 0.22s ease-out;
+}
+
+@keyframes tm-msg-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.tm-msg.is-user {
+  align-items: flex-end;
+}
+
+.tm-bubble {
+  max-width: 86%;
+  padding: 10px 13px;
+  border-radius: 14px 14px 14px 4px;
+  background: var(--tm-surface);
+  border: 1px solid var(--tm-border);
+  color: var(--tm-ink);
+  font-size: 13.5px;
+  line-height: 1.62;
+  word-break: break-word;
+  box-shadow: 0 2px 6px rgba(23, 50, 53, 0.05);
+}
+
+.tm-msg.is-user .tm-bubble {
+  max-width: 82%;
+  border-radius: 14px 14px 4px 14px;
+  background: var(--tm-coral);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(224, 112, 80, 0.22);
+}
+
+.tm-bubble.is-error {
+  background: #fff3f0;
+  border-color: #efcbc3;
+  color: #a44e3d;
+}
+
+/* Markdown-subset rendering inside an assistant bubble */
+.tm-bubble p { margin: 0 0 8px; }
+.tm-bubble p:last-child { margin-bottom: 0; }
+.tm-bubble ul,
+.tm-bubble ol { margin: 0 0 8px; padding-left: 18px; }
+.tm-bubble ul:last-child,
+.tm-bubble ol:last-child { margin-bottom: 0; }
+.tm-bubble li { margin: 0 0 3px; }
+.tm-bubble strong { font-weight: 700; }
+.tm-bubble code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--tm-sage-soft);
+  color: var(--tm-sage);
+  font-size: 12px;
+}
+.tm-bubble a {
+  color: var(--tm-sage);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.tm-msg.is-user .tm-bubble a { color: #fff; }
+
+/* Provenance line: says which TrackAthlete data actually backed the answer. */
+.tm-source {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 5px 0 0 2px;
+  color: var(--tm-muted);
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+.tm-source svg {
+  flex-shrink: 0;
+  color: var(--tm-sage);
+}
+
+/* Per-reply affordances (copy, retry) — quiet until hovered or focused. */
+.tm-reply-actions {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0 0 2px;
+}
+
+.tm-reply-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border: 1px solid var(--tm-border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--tm-muted);
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+.tm-reply-action:hover {
+  background: var(--tm-surface);
+  border-color: #9eb6a5;
+  color: var(--tm-sage);
+}
+
+.tm-reply-action.is-retry {
+  border-color: #efcbc3;
+  color: #a44e3d;
+}
+
+.tm-reply-action.is-retry:hover {
+  background: #fff3f0;
+  border-color: #d98d78;
+  color: #8d3f2f;
+}
+
+/* Suggested next questions. Quieter than the welcome cards — they follow an answer
+   rather than opening the conversation, so they read as a hint, not a menu. */
+.tm-followups {
+  margin: 9px 0 2px 2px;
+  align-self: stretch;
+}
+
+.tm-followups-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 6px;
+  color: var(--tm-muted);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.tm-followups-label svg {
+  color: var(--tm-coral);
+}
+
+.tm-followup-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tm-followup {
+  padding: 6px 11px;
+  border: 1px solid var(--tm-border);
+  border-radius: 999px;
+  background: var(--tm-surface);
+  color: var(--tm-sage);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+}
+
+.tm-followup:hover {
+  background: var(--tm-sage-soft);
+  border-color: #2f6d5a;
+  transform: translateY(-1px);
+}
+
+/* Reveal caret: shows the answer is still arriving on screen. */
+.tm-caret {
+  display: inline-block;
+  width: 2px;
+  height: 13px;
+  margin-left: 2px;
+  vertical-align: -2px;
+  background: var(--tm-coral);
+  animation: tm-blink 1s steps(2, start) infinite;
+}
+
+@keyframes tm-blink {
+  0%, 49%   { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.tm-skip {
+  align-self: center;
+  padding: 4px 11px;
+  border: 1px solid var(--tm-border);
+  border-radius: 999px;
+  background: var(--tm-surface);
+  color: var(--tm-muted);
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tm-skip:hover {
+  border-color: #9eb6a5;
+  color: var(--tm-sage);
+}
+
+/* Jump-to-latest, shown only when the reader has scrolled away from the bottom. */
+.tm-jump {
+  position: absolute;
+  right: 14px;
+  bottom: 82px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--tm-border);
+  border-radius: 50%;
+  background: var(--tm-surface);
+  color: var(--tm-sage);
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(23, 50, 53, 0.16);
+  animation: tm-msg-in 0.18s ease-out;
+}
+
+.tm-jump:hover {
+  border-color: #2f6d5a;
+  background: var(--tm-sage-soft);
+}
+
+/* Thinking indicator */
+.tm-bubble.is-thinking {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  padding: 4px 2px;
+  color: var(--tm-muted);
+  font-size: 12px;
+}
+
+.tm-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.tm-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--tm-sage);
+  animation: tm-bounce 1.25s ease-in-out infinite;
+}
+
+.tm-dots span:nth-child(2) { animation-delay: 0.16s; }
+.tm-dots span:nth-child(3) { animation-delay: 0.32s; }
+
+@keyframes tm-bounce {
+  0%, 65%, 100% { transform: translateY(0);    opacity: 0.4; }
+  30%           { transform: translateY(-4px); opacity: 1; }
+}
+
+/* ---------------------------------------------------------------- composer */
+
+.tm-composer {
+  flex-shrink: 0;
+  padding: 10px 12px 11px;
+  border-top: 1px solid var(--tm-border-soft);
+  background: var(--tm-surface);
+}
+
+.tm-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.tm-textarea {
+  flex: 1;
+  min-height: 40px;
+  max-height: 116px;
+  padding: 10px 12px;
+  border: 1px solid #d2dad2;
+  border-radius: 11px;
+  background: #f9faf8;
+  color: var(--tm-ink);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.tm-textarea:focus {
+  border-color: #4a8a70;
+  box-shadow: 0 0 0 3px rgba(100, 162, 123, 0.16);
+}
+
+.tm-textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.tm-send {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 11px;
+  background: var(--tm-coral);
+  color: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+
+.tm-send:hover:not(:disabled) {
+  background: var(--tm-coral-strong);
+  transform: translateY(-1px);
+}
+
+.tm-send:disabled {
+  background: var(--tm-border);
+  cursor: not-allowed;
+}
+
+.tm-footnote {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 7px 2px 0;
+  color: var(--tm-muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.tm-counter.is-near { color: var(--tm-coral-strong); font-weight: 700; }
+
+/* Shared focus ring for keyboard users across the widget */
+.tm-root :focus-visible {
+  outline: 2px solid #4a8a70;
+  outline-offset: 2px;
+}
+
+.tm-launcher:focus-visible,
+.tm-icon-btn:focus-visible {
+  outline-color: var(--tm-mint);
+}
+
+.tm-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ------------------------------------------------------------------ mobile */
+
+@media (max-width: 640px) {
+  .tm-launcher {
+    right: 16px;
+    bottom: 16px;
+    height: 48px;
+    padding: 0 16px 0 13px;
+  }
+
+  /* Bottom sheet: full width, leaves the top of the page visible and reachable. */
+  .tm-panel {
+    right: 0;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 100%;
+    height: 86vh;
+    height: 86dvh;
+    border-radius: 18px 18px 0 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    transform-origin: bottom center;
+  }
+
+  /* A touch more room for the serif hero now the sheet is full width. */
+  .tm-welcome-headline {
+    font-size: 27px;
+  }
+
+  .tm-jump {
+    bottom: 88px;
+  }
+
+  @keyframes tm-open {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* ------------------------------------------------------- reduced motion */
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-launcher,
+  .tm-panel,
+  .tm-msg,
+  .tm-action,
+  .tm-followup,
+  .tm-send,
+  .tm-icon-btn,
+  .tm-jump,
+  .tm-caret {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .tm-launcher:hover,
+  .tm-action:hover:not(:disabled),
+  .tm-followup:hover,
+  .tm-send:hover:not(:disabled) {
+    transform: none;
+  }
+
+  /* The caret only signals motion; with motion off it would sit there blinking. */
+  .tm-caret { display: none; }
+
+  .tm-launcher-pulse { display: none; }
+
+  /* Keep a non-motion cue that TrackMate is working. */
+  .tm-dots span {
+    animation: tm-fade 1.4s ease-in-out infinite;
+  }
+
+  @keyframes tm-fade {
+    0%, 100% { opacity: 0.3; }
+    50%      { opacity: 1; }
+  }
+}

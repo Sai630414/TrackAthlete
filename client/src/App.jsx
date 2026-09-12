@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { TooltipProvider } from './components/ui/tooltip';
 import { ToastProvider } from './components/ui/use-toast';
@@ -9,6 +10,9 @@ import CoachDashboard from './pages/CoachDashboard';
 import SponsorDashboard from './pages/SponsorDashboard';
 import AcademyDashboard from './pages/AcademyDashboard';
 import Login from './pages/Login';
+
+// TrackMate AI assistant — lazy so it never delays the dashboards' first paint.
+const TrackMateLauncher = lazy(() => import('./components/trackmate/TrackMateLauncher'));
 
 const routeForRole = { parent: '/parent', athlete: '/athlete', coach: '/coach', sponsor: '/sponsor', academy: '/academy', admin: '/academy' };
 
@@ -23,7 +27,7 @@ function ProtectedApp() {
     <Route path="/coach" element={user.role === 'coach' ? <CoachDashboard /> : <Navigate to={destination} replace />} />
     <Route path="/sponsor" element={user.role === 'sponsor' ? <SponsorDashboard /> : <Navigate to={destination} replace />} />
     <Route path="/academy" element={['academy', 'admin'].includes(user.role) ? <AcademyDashboard /> : <Navigate to={destination} replace />} />
-  </Routes></main></div>;
+  </Routes></main><Suspense fallback={null}><TrackMateLauncher /></Suspense></div>;
 }
 
 export default function App() {
