@@ -6,7 +6,7 @@ the Parent Module's 11-Rule Sport Recommendation Engine fully implemented, plus 
 dashboards for the other four roles.
 
 ## What's Fully Working
-- **Parent Module**: City + Sport + Radius search shows nearby SAI centres and academies
+- **Parent Module**: City + Sport + Radius search shows nearby SAI centres
   for the selected sport. "Not satisfied? Explore better sports" runs the full 11-rule
   weighted recommendation engine (see `server/utils/recommender.js`) and returns every
   pilot sport ranked by score, with an expandable rule-by-rule breakdown per sport,
